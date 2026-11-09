@@ -2,8 +2,10 @@
 
 > Status: implemented (phases A–D, 2026-11-08), including a single global
 > top-down scene editor and AGC-scaled onset detection for quiet Snapcast
-> streams. Phase E (mood layer, §9) remains deferred by design. Companion to
-> `PLAN.md`, which remains the source of truth for the overall platform.
+> streams. Sendspin playback-clock lookahead added 2026-11-09 (§11), plus a
+> live sync-test calibration UI (§12). Phase E (mood layer, §9) remains
+> deferred by design. Companion to `PLAN.md`, which remains the source of truth
+> for the overall platform.
 
 ## 0. Problem statement (user verdict)
 
@@ -281,3 +283,74 @@ build until the base pipeline ships and feels right.
 
 Keep out of scope: meter detection (4/4 fixed), chord/harmony extraction,
 true 3D rendering, per-fixture effect layering, WASAPI loopback, FLAC decode.
+
+## 11. Sendspin playback clock & 60 ms lookahead (2026-11-09)
+
+Problem: Sendspin delivers PCM *ahead* of the audible moment, but features were
+stamped with TCP arrival time. `_on_audio()` discarded both the server
+timestamp and `send_ahead`, so the relationship between analysis and playback
+was undefined. A negative sync trim could extrapolate the beat phase, but could
+not announce an unknown future kick/snare.
+
+Implemented:
+
+- **Source timing** (`hueme/sendspin_source.py`): every audio chunk stores its
+  playback time. `client.compute_play_time(server_timestamp_us)` and
+  `client.now_us()` share aiosendspin's clock domain, so their difference is
+  mapped onto Hueme's `time.monotonic()` (perf_counter/MONOTONIC_RAW is never
+  compared directly). `read()` returns the play time of the block's first
+  sample as `last_play_time`, correctly advancing through partially consumed
+  server chunks; buffer trimming drops matching timing metadata. First chunk
+  per connection logs play lead and `send_ahead`.
+  `latency` / `stream_latency_s` expose the newest chunk's lead; saturated
+  `send_ahead` values (0 / 2³²−1) only skip the log field, never playback.
+- **Playback-keyed features** (`hueme/audio.py`): `AudioEngine` stamps each
+  snapshot with `t_play` and keys `_history` by that time instead of arrival
+  time. `get_features()` selects:
+
+  ```text
+  target = now + LOOKAHEAD_S - audio.latency_ms/1000
+  LOOKAHEAD_S = 0.060   # fixed 60 ms anticipation
+  ```
+
+  Kick/snare triggers and envelopes now come from audio up to 60 ms before it
+  is audible. Positive Sync trim still delays the lights; negative trim still
+  adds phase lead. Sources without a playback clock (Snapcast, parec, WAV,
+  synthetic) fall back to arrival time, so their behaviour is unchanged.
+  Because the base timeline advances by 60 ms, an existing positive trim now
+  lands 60 ms early; add ~60 ms to that trim to restore the old alignment.
+- **Diagnostics**: snapshots carry `t_play`, `play_lead_ms`, `lookahead_ms`,
+  `latency_s` and `stream_latency_s`; the audio settings hint shows stream lead
+  plus the active analysis lookahead.
+- **Guards**: a play time outside `now ± 4 s` falls back to arrival time; a
+  backwards jump > 50 ms clears the history (reconnect/clock resync).
+
+Tests (`python -m unittest`): partial-chunk play-time tracking in
+`tests/test_sendspin.py`; future-audio selection/anticipation and no-future-leak
+for `get_features()`.
+
+## 12. Sync calibration UI (2026-11-09)
+
+Manual trim alone is hard to judge against a moving effect. The Audio card now
+has a **Sync test** toggle and live trim buttons:
+
+1. Play music normally and press **▶ Sync test**. Every enabled group is
+   overridden with a plain white flash: bright on each detected kick, with the
+   beat-grid pulse as fallback when kick confidence is low. Normal effects and
+   UDP overrides are bypassed while the test runs.
+2. Nudge **−50 / −10 / +10 / +50 ms** until the white flash lands on the
+   audible kick. Each press applies immediately at runtime
+   (`POST /api/audio/latency`); the config is marked dirty and **Save** persists
+   it. The number field in advanced settings uses the same live path.
+3. Press **■ Stop sync test** to return to the selected effects.
+
+Why no separate metronome click: the real stream is the only trustworthy
+reference. It already includes Sendspin send-ahead, playback-clock conversion
+and output latency. A browser-generated click would add another unsynced clock
+domain. The test flash is driven by `env.kick` (sharp attack, 260 ms release)
+and `beat.on_beat` only when `conf.bpm ≥ 0.35`, so silence/idle noise cannot
+produce misleading flashes.
+
+API: `POST /api/sync/test {"enabled": bool}` and
+`POST /api/audio/latency {"ms": number}`. `sync_test` is included in
+`/api/status`; `tests/test_sync.py` covers flash levels and latency clamping.

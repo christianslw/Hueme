@@ -149,9 +149,17 @@ class HuemeHTTPHandler(BaseHTTPRequestHandler):
             eng.config["audio"]["sensitivity"] = sens
             return self._send_json({"ok": True, "sensitivity": sens})
 
+        if path == "/api/audio/latency":
+            ms = eng.audio.set_latency(payload.get("ms", 0))
+            eng.config.setdefault("audio", {})["latency_ms"] = ms
+            return self._send_json({"ok": True, "latency_ms": ms})
+
         if path == "/api/audio/reconnect":
             eng.audio.start()
             return self._send_json({"ok": True})
+
+        if path == "/api/sync/test":
+            return self._send_json({"ok": True, "enabled": eng.set_sync_test(bool(payload.get("enabled")))})
 
         if path in ("/api/z2m/scan", "/api/scan_z2m"):
             devs = eng.scan_z2m()

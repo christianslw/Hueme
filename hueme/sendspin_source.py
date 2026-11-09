@@ -11,6 +11,7 @@ persisted under ``config/`` so the server keeps treating Hueme as one device.
 
 import asyncio
 import base64
+from collections import deque
 import json
 import logging
 import os
@@ -78,10 +79,19 @@ class SendspinAudioSource:
         self.last_error = _IMPORT_ERROR
         self.latency = 0.0
         self.bytes_per_frame = self.channels * 2
+        self.bytes_per_second = self.rate * self.bytes_per_frame
         self.bytes_needed = self.block * self.bytes_per_frame
         self._buf = bytearray()
         self._buf_lock = threading.Lock()
         self._max_buffer = self.rate * self.bytes_per_frame * 2  # 2 s
+        # PCM queue entries: [remaining bytes, play time (s), bytes consumed].
+        # Play time is expressed in Hueme's time.monotonic() domain, converted
+        # from aiosendspin's clock difference (server -> client).
+        self._chunks = deque()
+        self._timing_logged = False
+        self.last_play_time = 0.0
+        self.play_lead_s = 0.0
+        self.last_send_ahead_s = 0.0
         self._client = None
         self._loop = None
         self._thread = None
@@ -130,6 +140,7 @@ class SendspinAudioSource:
                 backoff = min(10.0, backoff * 1.5)
 
     async def _connect_once(self):
+        self._timing_logged = False
         os.makedirs(self.state_dir, exist_ok=True)
         identity = _load_or_create_identity(self.state_dir)
         pairing_store = FileClientPairingStore(os.path.join(self.state_dir, "sendspin_pairings.json"))
@@ -190,7 +201,18 @@ class SendspinAudioSource:
                 pass
 
     # -- audio ------------------------------------------------------------
-    def _on_audio(self, _server_timestamp_us, audio_data, audio_format, _send_ahead):
+    def _drop_chunk_bytes_locked(self, n):
+        """Drop `n` buffered bytes plus their timing metadata (front of queue)."""
+        while n > 0 and self._chunks:
+            head = self._chunks[0]
+            take = min(n, head[0])
+            head[0] -= take
+            head[2] += take
+            n -= take
+            if head[0] <= 0:
+                self._chunks.popleft()
+
+    def _on_audio(self, server_timestamp_us, audio_data, audio_format, send_ahead):
         try:
             if audio_format.codec != AudioCodec.PCM:
                 return
@@ -201,10 +223,38 @@ class SendspinAudioSource:
                     f"{pcm.bit_depth} bit differs from configured {self.rate}/{self.channels}/16"
                 )
                 return
+            mono_now = time.monotonic()
+            play_t = mono_now
+            client = self._client
+            if client is not None:
+                try:
+                    # Both values are in aiosendspin's clock domain (perf_counter
+                    # on Windows, MONOTONIC_RAW on Linux); only their difference
+                    # is used, so it maps cleanly onto time.monotonic().
+                    client_now_us = int(client.now_us())
+                    play_us = int(client.compute_play_time(int(server_timestamp_us)))
+                    play_t = mono_now + (play_us - client_now_us) / 1e6
+                except Exception:
+                    play_t = mono_now
+            self.last_play_time = play_t
+            self.play_lead_s = play_t - mono_now
+            self.latency = max(0.0, self.play_lead_s)
+            valid_ahead = 0 < int(send_ahead) < 0xFFFFFFFF
+            self.last_send_ahead_s = int(send_ahead) / 1e6 if valid_ahead else 0.0
+            if not self._timing_logged:
+                self._timing_logged = True
+                log.info(
+                    "Sendspin timing: first chunk play lead %.0f ms%s",
+                    self.play_lead_s * 1000.0,
+                    f", send-ahead {self.last_send_ahead_s * 1000.0:.0f} ms" if valid_ahead else "",
+                )
             with self._buf_lock:
                 self._buf.extend(audio_data)
-                if len(self._buf) > self._max_buffer:
-                    del self._buf[: len(self._buf) - self._max_buffer]
+                self._chunks.append([len(audio_data), play_t, 0])
+                overflow = len(self._buf) - self._max_buffer
+                if overflow > 0:
+                    del self._buf[:overflow]
+                    self._drop_chunk_bytes_locked(overflow)
         except Exception as exc:
             self.last_error = f"Sendspin audio decode: {exc}"
 
@@ -213,11 +263,26 @@ class SendspinAudioSource:
             time.sleep(0.05)
             return np.zeros(0, dtype=np.float32)
         deadline = time.monotonic() + 0.1
+        play_t = None
         while not self.stop_event.is_set():
             with self._buf_lock:
                 if len(self._buf) >= self.bytes_needed:
                     raw = bytes(self._buf[: self.bytes_needed])
                     del self._buf[: self.bytes_needed]
+                    if self._chunks:
+                        head = self._chunks[0]
+                        # Play time of the first byte in this block, accounting
+                        # for a partially consumed server chunk.
+                        play_t = head[1] + head[2] / self.bytes_per_second
+                        remaining = self.bytes_needed
+                        while remaining > 0 and self._chunks:
+                            chunk = self._chunks[0]
+                            take = min(remaining, chunk[0])
+                            chunk[0] -= take
+                            chunk[2] += take
+                            remaining -= take
+                            if chunk[0] <= 0:
+                                self._chunks.popleft()
                     break
             if time.monotonic() > deadline:
                 return np.zeros(0, dtype=np.float32)
@@ -226,6 +291,8 @@ class SendspinAudioSource:
             return np.zeros(0, dtype=np.float32)
         if not raw:
             return np.zeros(0, dtype=np.float32)
+        if play_t is not None:
+            self.last_play_time = play_t
         arr = np.frombuffer(raw, dtype="<i2").astype(np.float32) / 32768.0
         if self.channels >= 2 and len(arr) >= self.channels:
             frames = len(arr) // self.channels

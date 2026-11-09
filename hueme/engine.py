@@ -79,6 +79,24 @@ def _fixture_role(x, y, z, explicit=""):
     return "center" if abs(x - 0.5) < 0.25 else "edge"
 
 
+def sync_test_pixels(n, features, now=None):
+    """Plain white flash for audio/light alignment: kick first, beat as fallback."""
+    env = features.get("env") or {}
+    beat = features.get("beat") or {}
+    conf = features.get("conf") or {}
+    kick = max(0.0, min(1.0, float(env.get("kick", 0.0))))
+    on_beat = bool(beat.get("on_beat")) and float(conf.get("bpm", 0.0)) >= 0.35
+    level = 0.03 + 0.97 * kick
+    if on_beat:
+        level = max(level, 0.45)
+    if now is not None and not features.get("alive", True):
+        # No audio frames: slow heartbeat proves the overlay is active.
+        phase = (float(now) * 0.5) % 1.0
+        level = 0.06 + 0.25 * (1.0 - phase)
+    value = int(round(max(0.0, min(1.0, level)) * 255))
+    return [(value, value, value)] * max(1, int(n))
+
+
 class MemoryLogHandler(logging.Handler):
     """Captures recent log records into a bounded deque for the Web UI Inspector."""
 
@@ -291,6 +309,7 @@ class LightingEngine:
         self.udp_inputs = UdpInputManager(self.groups)
 
         self.stop_event = threading.Event()
+        self.sync_test = False
         self.render_thread = None
 
         self.latencies_ms = deque(maxlen=120)
@@ -397,6 +416,12 @@ class LightingEngine:
 
         log.info("Configuration updated and hot-applied")
         return True, []
+
+    def set_sync_test(self, enabled: bool) -> bool:
+        with self.lock:
+            self.sync_test = bool(enabled)
+        log.info("Sync test %s", "enabled" if self.sync_test else "disabled")
+        return self.sync_test
 
     def update_group_effect(self, group_id: str, payload: dict) -> bool:
         with self.lock:
@@ -560,6 +585,13 @@ class LightingEngine:
                     g.next_due = t0 + period_g
                 due_groups.append(g)
 
+                if self.sync_test:
+                    with g.lock:
+                        g.pixels = sync_test_pixels(g.n, af, t0)
+                    g.last_error = None
+                    g.record_frame_tick(t0)
+                    continue
+
                 if g.is_udp_fresh(t0):
                     with g.lock:
                         g.pixels = list(g.input_pixels)
@@ -621,7 +653,7 @@ class LightingEngine:
             try:
                 hue_records = []
                 for g in groups_list:
-                    if not g.is_active(t0):
+                    if not (g.is_active(t0) or (self.sync_test and g.enabled and g.n > 0)):
                         continue
                     with g.lock:
                         px_snapshot = list(g.pixels)
@@ -689,7 +721,7 @@ class LightingEngine:
                 "id": g.id,
                 "name": g.name,
                 "enabled": g.enabled,
-                "active": g.is_active(now),
+                "active": g.is_active(now) or (self.sync_test and g.enabled and g.n > 0),
                 "udp_fresh": g.is_udp_fresh(now),
                 "fps": g.rendered_fps,
                 "target_fps": g.fps,
@@ -709,6 +741,7 @@ class LightingEngine:
             "us": self.stats["us"],
             "latency_p50_ms": self.stats["latency_p50_ms"],
             "latency_p95_ms": self.stats["latency_p95_ms"],
+            "sync_test": bool(self.sync_test),
             "sandbox_restarts": self.effects.restarts,
             "scene": self._scene_bounds([g for g in groups_list if g.enabled and g.n > 0]),
             "audio": self.audio.get_features(consume_triggers=False),

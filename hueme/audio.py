@@ -27,6 +27,11 @@ BANDS = {
     "highs": (3000.0, 12000.0),
 }
 
+# Analysed audio is rendered this far ahead of the audible onset. Sendspin
+# buffers future PCM anyway, so this is anticipation, not added latency. The
+# user's Sync trim (audio.latency_ms) still shifts the final alignment.
+LOOKAHEAD_S = 0.060
+
 
 def pcm_s16le_to_mono_float32(data: bytes, channels: int = 2) -> np.ndarray:
     """Convert raw s16le bytes into mono float32 array in [-1.0, 1.0]."""
@@ -1236,6 +1241,13 @@ class AudioEngine:
             self.cfg["sensitivity"] = float(sens)
             self.dsp.sensitivity = float(sens)
 
+    def set_latency(self, ms: float) -> float:
+        """Apply the visual sync trim live (no config save)."""
+        ms = max(-500.0, min(2000.0, float(ms)))
+        with self.lock:
+            self.cfg["latency_ms"] = ms
+        return ms
+
     def get_sendspin_token(self) -> dict:
         """Return the pairing token for the active Sendspin client, if any."""
         src = self.source
@@ -1258,12 +1270,23 @@ class AudioEngine:
                     # len(samples)/rate), not on bursty TCP arrival timestamps.
                     feat = self.dsp.process_block(samples, now=None)
                     feat["t_ingest"] = t_now
+                    # Prefer the source's playback clock (Sendspin maps server
+                    # timestamps to the local monotonic clock). Key history by
+                    # *when the audio plays*, not when the TCP burst arrived.
+                    play_t = float(getattr(self.source, "last_play_time", 0.0) or 0.0)
+                    if not (t_now - 4.0 <= play_t <= t_now + 4.0):
+                        play_t = t_now
+                    feat["t_play"] = play_t
+                    feat["play_lead_s"] = round(play_t - t_now, 4)
                     feat["connected"] = getattr(self.source, "connected", True)
                     feat["source"] = self.active_source_name
                     feat["error"] = getattr(self.source, "last_error", None)
                     with self.lock:
                         self._latest = feat
-                        self._history.append((t_now, feat))
+                        if self._history and play_t < self._history[-1][0] - 0.05:
+                            # Clock resync/reconnect: drop stale ordering.
+                            self._history.clear()
+                        self._history.append((play_t, t_now, feat))
                         while self._history and self._history[0][0] < t_now - 4.0:
                             self._history.popleft()
                         self.last_update = t_now
@@ -1280,10 +1303,11 @@ class AudioEngine:
         except (TypeError, ValueError):
             stream_latency = 0.0
         # Automatic Snapcast buffer compensation made lights land hundreds of
-        # ms late on real setups. Only apply the explicit user trim.
+        # ms late on real setups. Only apply the explicit user trim; on top of
+        # that, render LOOKAHEAD_S into the buffered future for hit anticipation.
         latency = float(self.cfg.get("latency_ms", 0) or 0) / 1000.0
         latency = max(-0.5, min(2.0, latency))
-        target = now - latency
+        target = now + LOOKAHEAD_S - latency
 
         with self.lock:
             alive = (now - self.last_update) < 1.5 and getattr(self.source, "connected", False)
@@ -1301,18 +1325,19 @@ class AudioEngine:
             aligned_snare = False
             entry = None
             if consume_triggers:
-                # Deliver the snapshot that corresponds to the audio playing
-                # *now*. Drop triggers older than 80 ms when a network burst
-                # arrives, otherwise the lights flash a backlog of events late.
+                # Deliver the snapshot for the audio that will be audible at
+                # target (now + lookahead - trim). Drop triggers older than
+                # 80 ms when a network burst arrives, otherwise the lights
+                # flash a backlog of events late.
                 cutoff = target - 0.08
                 while self._history and self._history[0][0] <= target:
-                    t_proc, feat = self._history.popleft()
-                    if t_proc >= cutoff:
+                    t_play, t_proc, feat = self._history.popleft()
+                    if t_play >= cutoff:
                         kicks = kicks or bool(feat.get("kick"))
                         snares = snares or bool(feat.get("snare_hit"))
                         aligned_kick = aligned_kick or bool(feat.get("aligned_kick"))
                         aligned_snare = aligned_snare or bool(feat.get("aligned_snare"))
-                    entry = (t_proc, feat)
+                    entry = (t_play, t_proc, feat)
                 if entry is not None:
                     self._delayed = entry
                 else:
@@ -1326,8 +1351,8 @@ class AudioEngine:
                     entry = self._delayed
 
             if entry is None:
-                entry = (self.last_update, self._latest)
-            t_proc, feat = entry
+                entry = (self.last_update, self.last_update, self._latest)
+            t_play, t_proc, feat = entry
             out = dict(feat)
             out["kick"] = kicks
             out["snare_hit"] = snares
@@ -1337,16 +1362,19 @@ class AudioEngine:
             age = max(0.0, min(0.5, now - t_proc - max(0.0, latency)))
             out["latency_s"] = round(latency, 3)
             out["stream_latency_s"] = round(stream_latency, 3)
+            out["t_play"] = round(t_play, 3)
+            out["play_lead_ms"] = round((t_play - now) * 1000.0, 1)
+            out["lookahead_ms"] = int(LOOKAHEAD_S * 1000)
             out["age_ms"] = round(age * 1000.0, 1)
 
-            # A negative Sync trim means "advance the lights": move the beat
-            # phase forward by that amount. Network-age extrapolation stays
-            # off so TCP bursts cannot make the grid jitter.
+            # A negative Sync trim means "advance the lights". Extrapolate only
+            # the part not already covered by playback-time snapshots, so the
+            # fixed lookahead and the trim cannot double-advance the grid.
             if latency < 0.0:
                 bpm = float(out.get("bpm", 0) or 0)
                 beat = out.get("beat")
-                if bpm > 0 and isinstance(beat, dict):
-                    lead = min(0.5, -latency)
+                lead = min(0.5, max(0.0, (now - latency) - t_play))
+                if bpm > 0 and isinstance(beat, dict) and lead > 0.0:
                     beat = dict(beat)
                     phase = float(beat.get("phase", 0.0)) + lead * bpm / 60.0
                     wraps = int(phase)

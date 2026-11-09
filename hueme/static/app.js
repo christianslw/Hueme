@@ -20,6 +20,8 @@ const S = {
   lastLogs: 0,
   lastZ2mCheck: 0,
   lastToken: 0,
+  syncTest: false,
+  liveTrimWarned: false,
   errors: [],
 };
 
@@ -83,7 +85,51 @@ const App = {
     S.cfg.audio.latency_ms = Math.max(-500, Math.min(2000, Math.round(cur + delta)));
     const el = document.getElementById("sync-trim-val");
     if (el) el.textContent = `${S.cfg.audio.latency_ms} ms`;
+    const input = document.getElementById("visual-delay-input");
+    if (input) input.value = S.cfg.audio.latency_ms;
+    fetch("/api/audio/latency", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ ms: S.cfg.audio.latency_ms }),
+    })
+      .then((res) => {
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        S.liveTrimWarned = false;
+      })
+      .catch(() => {
+        if (!S.liveTrimWarned) {
+          S.liveTrimWarned = true;
+          this.toast("Live trim unavailable — restart the Hueme engine");
+        }
+      });
     this.markDirty();
+  },
+  setDelay(el) {
+    const v = parseFloat(el.value);
+    const ms = Number.isFinite(v) ? Math.round(v) : 0;
+    S.cfg.audio = S.cfg.audio || {};
+    this.nudgeDelay(ms - Number(S.cfg.audio.latency_ms ?? 0));
+  },
+  async toggleSyncTest() {
+    const next = !S.syncTest;
+    S.syncTest = next;
+    const btn = document.getElementById("sync-test-btn");
+    if (btn) btn.textContent = next ? "■ Stop sync test" : "▶ Sync test";
+    try {
+      const res = await fetch("/api/sync/test", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ enabled: next }),
+      });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const d = await res.json();
+      if (typeof d.enabled !== "boolean") throw new Error("sync test unavailable");
+      S.syncTest = !!d.enabled;
+    } catch (e) {
+      S.syncTest = !next;
+      this.toast("Sync test unavailable — restart the Hueme engine");
+    }
+    if (btn) btn.textContent = S.syncTest ? "■ Stop sync test" : "▶ Sync test";
   },
   async refreshSendspinToken() {
     try {
@@ -438,10 +484,13 @@ const App = {
         <div class="row" style="margin-top:14px">
           <strong class="small">Sync trim</strong>
           <button class="small" onclick="App.nudgeDelay(-50)">−50 ms</button>
+          <button class="small" onclick="App.nudgeDelay(-10)">−10 ms</button>
           <span class="badge" id="sync-trim-val">${Number((S.cfg.audio || {}).latency_ms ?? 0)} ms</span>
+          <button class="small" onclick="App.nudgeDelay(10)">+10 ms</button>
           <button class="small" onclick="App.nudgeDelay(50)">+50 ms</button>
-          <span class="hint">negative = lights earlier · positive = lights later</span>
+          <button class="small" id="sync-test-btn" onclick="App.toggleSyncTest()">▶ Sync test</button>
         </div>
+        <div class="hint" id="sync-test-hint" style="margin-top:6px">negative = lights earlier · positive = later · sync test flashes white on each kick (beat fallback)</div>
 
         <div id="sendspin-pair" class="notice" style="margin-top:14px;display:none">
           <div class="row" style="justify-content:space-between">
@@ -513,19 +562,22 @@ const App = {
               <label class="field">Snare decay (higher = shorter)
                 <input type="number" step="0.5" value="${esc(S.cfg.audio.decay_snare ?? 12)}" onchange="App.num(this,'audio.decay_snare')">
               </label>
-              <label class="field">Silence gate (dBFS)
+              <label class="field" title="Below this level audio counts as silence. −55 dBFS is a good default; −45 can gate quiet passages.">
+                Silence gate (dBFS)
                 <input type="number" step="1" value="${esc((S.cfg.audio.agc || {}).silence_db ?? -55)}" onchange="App.num(this,'audio.agc.silence_db')">
               </label>
               <label class="field" title="Positive delays the lights so they land with the speaker; negative advances them.">
                 Visual delay (ms)
-                <input type="number" step="10" value="${esc(S.cfg.audio.latency_ms ?? 0)}" onchange="App.num(this,'audio.latency_ms')">
+                <input id="visual-delay-input" type="number" step="10" value="${esc(S.cfg.audio.latency_ms ?? 0)}" onchange="App.setDelay(this)">
                 <span class="hint" id="audio-latency"></span>
               </label>
             </div>
             <div class="row" style="margin-top:14px">
               <label class="check"><input type="checkbox" ${(S.cfg.audio.agc || {}).enabled !== false ? "checked" : ""}
                 onchange="App.edit('audio.agc.enabled', this.checked)"> Automatic gain control</label>
-              <label class="field" style="flex-direction:row;align-items:center;gap:8px">Target RMS
+              <label class="field" style="flex-direction:row;align-items:center;gap:8px"
+                title="Linear RMS target: 0.08 ≈ −22 dBFS (default). Use 0.05–0.12; watch the live AGC × — it should not sit at 2.5×.">
+                Target RMS
                 <input type="number" step="0.01" style="width:90px" value="${esc((S.cfg.audio.agc || {}).target_rms ?? 0.08)}"
                   onchange="App.num(this,'audio.agc.target_rms')">
               </label>
@@ -1710,11 +1762,22 @@ def render(ctx):
     if (latEl) {
       const lead = a.stream_latency_s;
       latEl.textContent = a.alive && lead !== undefined
-        ? `server stream lead ${Math.round(lead * 1000)} ms (auto compensation off — use Sync trim)`
+        ? `server stream lead ${Math.round(lead * 1000)} ms · analysis lookahead ${a.lookahead_ms ?? 60} ms`
         : "";
     }
     const trimEl = document.getElementById("sync-trim-val");
     if (trimEl) trimEl.textContent = `${Number((S.cfg.audio || {}).latency_ms ?? 0)} ms`;
+    S.syncTest = !!st.sync_test;
+    const syncBtn = document.getElementById("sync-test-btn");
+    if (syncBtn) syncBtn.textContent = S.syncTest ? "■ Stop sync test" : "▶ Sync test";
+    const syncHint = document.getElementById("sync-test-hint");
+    if (syncHint) {
+      syncHint.textContent = S.syncTest
+        ? a.alive
+          ? "sync test active — nudge until the white flash lands on the audible kick"
+          : "sync test active — waiting for audio frames (slow heartbeat)"
+        : "negative = lights earlier · positive = later · sync test flashes white on each kick (beat fallback)";
+    }
 
     (st.groups || []).forEach((g) => {
       const badge = document.querySelector(`[data-zbadge="${CSS.escape(g.id)}"]`);
