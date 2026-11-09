@@ -1,0 +1,14 @@
+services:
+  hueme:
+    build: .
+    container_name: hueme
+    restart: unless-stopped
+    network_mode: host
+    volumes:
+      - ./config:/config
+      - ./effects:/app/effects
+      # Optional: uncomment below if using local PulseAudio/PipeWire monitor instead of Snapcast TCP
+      # - /run/user/1000/pulse:/run/user/1000/pulse:ro
+    environment:
+      - PYTHONUNBUFFERED=1
+      # - PULSE_SERVER=unix:/run/user/1000/pulse/native

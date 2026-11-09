@@ -1,0 +1,39 @@
+22:46:01 [INFO] hueme.effects: Loaded effect plugin 'ambient_uplight'
+22:46:01 [INFO] hueme.effects: Loaded effect plugin 'band_matrix'
+22:46:01 [INFO] hueme.effects: Loaded effect plugin 'bass_cannon'
+22:46:01 [INFO] hueme.effects: Loaded effect plugin 'blackbody_forge'
+22:46:01 [INFO] hueme.effects: Loaded effect plugin 'breathe'
+22:46:01 [INFO] hueme.effects: Loaded effect plugin 'club_tech'
+22:46:01 [INFO] hueme.effects: Loaded effect plugin 'diagnostic_chase'
+22:46:01 [INFO] hueme.effects: Loaded effect plugin 'dim2warm'
+22:46:01 [INFO] hueme.effects: Loaded effect plugin 'ferro_pendulum'
+22:46:01 [INFO] hueme.effects: Loaded effect plugin 'kuramoto_bloom'
+22:46:01 [INFO] hueme.effects: Loaded effect plugin 'ma3_busker'
+22:46:01 [INFO] hueme.effects: Loaded effect plugin 'ping_pong'
+22:46:01 [INFO] hueme.effects: Loaded effect plugin 'prism'
+22:46:01 [INFO] hueme.effects: Loaded effect plugin 'rainbow'
+22:46:01 [INFO] hueme.effects: Loaded effect plugin 'scene_pulse'
+22:46:01 [INFO] hueme.effects: Loaded effect plugin 'shockwave'
+22:46:01 [INFO] hueme.effects: Loaded effect plugin 'solid'
+22:46:01 [INFO] hueme.effects: Loaded effect plugin 'spectrum_sweep'
+22:46:01 [INFO] hueme.effects: Loaded effect plugin 'strobe_drop'
+22:46:02 [INFO] hueme.sendspin: Connecting to Sendspin server at ws://192.168.10.13:8927/sendspin ...
+22:46:02 [INFO] aiosendspin.client.client: Connecting to Sendspin server at ws://192.168.10.13:8927/sendspin
+22:46:02 [INFO] hueme.engine: LightingEngine started (2 groups)
+22:46:02 [INFO] hueme.sendspin: Sendspin connected (server: Music Assistant (d5369777-music-assistant))
+22:46:06 [INFO] hueme.engine: Auto-discovered 22 Zigbee devices from Zigbee2MQTT
+22:48:44 [INFO] aiosendspin.client.connection: Paired with server aWDR0-Q8LP6j1zjFEBBc9Sonjvg1ohTuekD9F4Lgzik via pairing_psk
+22:49:04 [INFO] aiosendspin.client.connection: Stream started with codec pcm
+22:49:27 [INFO] hueme.engine: Configuration updated and hot-applied
+22:49:52 [INFO] hueme.engine: Configuration updated and hot-applied
+22:50:08 [INFO] hueme.engine: Configuration updated and hot-applied
+22:50:14 [INFO] hueme.engine: Configuration updated and hot-applied
+22:50:37 [INFO] hueme.engine: Configuration updated and hot-applied
+22:50:47 [INFO] hueme.engine: Configuration updated and hot-applied
+22:51:03 [INFO] hueme.engine: Configuration updated and hot-applied
+22:51:05 [INFO] hueme.engine: Configuration updated and hot-applied
+22:51:39 [INFO] hueme.engine: Configuration updated and hot-applied
+22:51:45 [INFO] hueme.engine: Configuration updated and hot-applied
+22:51:58 [INFO] hueme.engine: Configuration updated and hot-applied
+22:54:08 [INFO] aiosendspin.client.connection: Stream started with codec pcm
+14:19:44 [WARNING] hueme.effects: Effect sandbox fault (Effect sandbox exceeded 80ms budget) -> restarting worker (#1)

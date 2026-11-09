@@ -1,0 +1,6 @@
+__pycache__/
+*.pyc
+config/gateway.json
+config/*.bak
+gateway_config.json.bak
+testdata/

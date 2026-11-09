@@ -1,0 +1,24 @@
+{
+  "records": {
+    "Z1WRfwwwO1XpzGP4rmj3A2CEtlUE1OMMu9dSMetya_Q": {
+      "psk_id": "Z1WRfwwwO1XpzGP4rmj3A2CEtlUE1OMMu9dSMetya_Q",
+      "psk": "LALXBJbdXbj1BgDyxdS-t6kf52KElLxfrI9_XbT8CgI",
+      "server_id": "aWDR0-Q8LP6j1zjFEBBc9Sonjvg1ohTuekD9F4Lgzik",
+      "used": true,
+      "created_at": "2026-11-08T21:48:44.698796+00:00",
+      "last_used_at": "2026-11-08T21:48:44.735682+00:00"
+    }
+  },
+  "pairing_config": {
+    "dynamic_pin_enabled": true,
+    "static_pin_enabled": false,
+    "unpaired_access_enabled": false
+  },
+  "pairing_psk": {
+    "psk_id": "n1xBQbFiXhZXrQZlKNYHDBJ7TLhppM0sc73drpQA9D8",
+    "psk": "wa2L7HQVikaZmr1KnO8fJAVH5HLlw9B5unm_azGu2ag"
+  },
+  "static_pin": null,
+  "pin_failures": 0,
+  "last_playback_server_id": "aWDR0-Q8LP6j1zjFEBBc9Sonjvg1ohTuekD9F4Lgzik"
+}

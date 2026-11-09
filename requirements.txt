@@ -1,0 +1,4 @@
+numpy>=1.26
+paho-mqtt>=2.0
+
+aiosendspin>=10.3

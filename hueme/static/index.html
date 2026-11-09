@@ -1,0 +1,51 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Hueme — reactive lighting</title>
+  <link rel="stylesheet" href="/style.css">
+</head>
+<body>
+<div class="app">
+
+  <aside class="sidebar">
+    <div class="brand">
+      <strong>Hueme</strong>
+      <span>reactive lighting</span>
+    </div>
+    <nav class="nav" id="nav">
+      <button data-page="overview" onclick="App.go('overview')">Overview</button>
+      <button data-page="zones" onclick="App.go('zones')">Zones &amp; fixtures</button>
+      <button data-page="effects" onclick="App.go('effects')">Effect editor</button>
+      <button data-page="outputs" onclick="App.go('outputs')">Outputs</button>
+      <button data-page="logs" onclick="App.go('logs')">Diagnostics</button>
+    </nav>
+  </aside>
+
+  <div class="content">
+    <header class="topbar">
+      <div class="statusline" id="statusline">
+        <span><span class="dot" id="run-dot"></span> <strong id="run-text">Starting…</strong></span>
+        <span id="stat-audio">audio –</span>
+        <span id="stat-engine">– fps</span>
+        <span id="stat-latency">latency –</span>
+      </div>
+      <div class="save-state" id="save-state">
+        <span id="save-text">Loading configuration…</span>
+        <button class="small" onclick="App.saveNow()">Save now</button>
+      </div>
+    </header>
+
+    <main>
+      <div class="errors" id="save-errors" hidden style="margin-bottom:16px"></div>
+      <div id="page"></div>
+    </main>
+  </div>
+
+</div>
+
+<div class="toast" id="toast"></div>
+<script src="/app.js"></script>
+</body>
+</html>
