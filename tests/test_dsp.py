@@ -64,6 +64,21 @@ class TestAudioDsp(unittest.TestCase):
         self.assertLess(fs["bass"], 0.02)
         self.assertEqual(fs["agc_gain"], 1.0)
 
+    def test_agc_freezes_below_quantization_noise_floor(self):
+        rate = 48000
+        block = 512
+        t = np.arange(int(2.0 * rate)) / rate
+        quiet = (0.008 * np.sin(2 * np.pi * 440.0 * t)).astype(np.float32)
+        dsp = AudioProcessor(
+            rate=rate, window_size=1024,
+            agc_cfg={"enabled": True, "target_rms": 0.08, "tau_s": 1.0, "silence_db": -45.0},
+        )
+        for i in range(0, len(quiet) - block, block):
+            dsp.process_block(quiet[i:i + block])
+        # 0.008 RMS is below the 0.012 noise-floor clamp: hold gain instead of
+        # ramping toward the 2.5x ceiling.
+        self.assertLessEqual(dsp.agc_gain, 1.05)
+
     # -- Phase A acceptance: rhythm stage --------------------------------
     def _run_click(self, bpm, secs=8.0):
         rate = 48000

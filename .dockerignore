@@ -1,0 +1,20 @@
+.git
+.gitignore
+__pycache__/
+*.pyc
+.pytest_cache/
+.ruff_cache/
+DANCE....mp4
+*.log
+test.html
+docs/
+tests/
+
+# Runtime state: never bake credentials, pairings, caches or locks into an image.
+config/gateway.json
+config/*.bak
+config/show_cache/
+config/blueprints/
+config/hueme.lock
+config/sendspin_identity.json
+config/sendspin_pairings.json

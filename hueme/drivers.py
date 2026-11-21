@@ -31,6 +31,7 @@ MODE_SEGMENT = 0b00000       # Gradient strip segment
 MAX_X = 0.7347
 MAX_Y = 0.8264
 SMOOTHING_FULLSCALE_US = 2_560_000
+ZCL_SNAP_SMOOTHING = 0x0080  # ~5 ms: hard snap for transients and cue cuts
 GAMUT = ((0.7347, 0.2653), (0.1704, 0.7099), (0.0366, 0.0856))
 
 E131_PORT = 5568
@@ -163,12 +164,17 @@ def format_hex(data: bytes, max_bytes: int = 96) -> str:
 # ---------------------------------------------------------------------------
 # Protocol Packet Builders & Parsers (DDP, E1.31, WLED)
 # ---------------------------------------------------------------------------
-def build_ddp_packet(rgb_bytes: bytes, offset_bytes: int = 0, seq: int = 1, push: bool = True) -> bytes:
+def build_ddp_packet(
+    rgb_bytes: bytes,
+    offset_bytes: int = 0,
+    seq: int = 1,
+    push: bool = True,
+    dtype: int = 0x01,
+) -> bytes:
     flags1 = 0x41 if push else 0x40  # DDP v1 + push flag
     flags2 = seq & 0x0F
-    dtype = 0x01  # RGB
     dest_id = 0x01
-    header = struct.pack(">BBBBIH", flags1, flags2, dtype, dest_id, offset_bytes, len(rgb_bytes))
+    header = struct.pack(">BBBBIH", flags1, flags2, dtype & 0xFF, dest_id, offset_bytes, len(rgb_bytes))
     return header + rgb_bytes
 
 
@@ -432,9 +438,10 @@ class HueZ2MDriver:
                 self._publish(name, zclcommand_msg(CMD_SYNC_STOP, sync_payload(self.counter)))
         self.streaming = False
 
-    def send_consolidated(self, fixture_records: list[tuple[str, int, tuple[int, int, int], str]], fps: float = 30.0):
+    def send_consolidated(self, fixture_records: list[tuple[str, int, tuple[int, int, int], str]], fps: float = 30.0, snap: bool = False):
         """Consolidate multi-group fixtures into <=max_fixtures_per_frame ZCL frames.
-        fixture_records: list of (fixture_name, addr_int, (r,g,b), group_proxy)."""
+        fixture_records: list of (fixture_name, addr_int, (r,g,b), group_proxy).
+        snap: transient/cue tick -> 5 ms ZCL smoothing instead of the frame ramp."""
         if not self.hue_cfg.get("enabled", False):
             return
         if not self.client:
@@ -455,13 +462,14 @@ class HueZ2MDriver:
         bri_mode = self.hue_cfg.get("brightness_mode", "max")
         sm_cfg = self.hue_cfg.get("smoothing", "auto")
         if sm_cfg == "auto" or sm_cfg is None or sm_cfg == "":
-            smoothing = smoothing_for_fps(fps)
+            trailing_smoothing = smoothing_for_fps(fps)
         else:
             try:
-                smoothing = int(str(sm_cfg), 0) if isinstance(sm_cfg, str) else int(sm_cfg)
+                trailing_smoothing = int(str(sm_cfg), 0) if isinstance(sm_cfg, str) else int(sm_cfg)
             except (TypeError, ValueError):
                 # User typed something that is not a number: fall back instead of killing the render loop.
-                smoothing = smoothing_for_fps(fps)
+                trailing_smoothing = smoothing_for_fps(fps)
+        smoothing = ZCL_SNAP_SMOOTHING if snap else trailing_smoothing
 
         # Build 7-byte records
         raw_recs = []
@@ -550,7 +558,7 @@ class DdpOutputDriver:
                 pass
             self.sock = None
 
-    def send_pixels(self, pixels: list[tuple[int, int, int]], host: str = None, port: int = None):
+    def send_pixels(self, pixels: list[tuple[int, int, int]] | list[tuple[int, int, int, int]], host: str = None, port: int = None):
         if not self.cfg.get("enabled", False) and host is None:
             return
         if not self.sock:
@@ -560,11 +568,21 @@ class DdpOutputDriver:
         target_host = host or self.cfg.get("host", "127.0.0.1")
         target_port = int(port or self.cfg.get("port", 4048))
 
-        raw = bytearray()
-        for r, g, b in pixels:
-            raw.extend((r & 0xFF, g & 0xFF, b & 0xFF))
+        # DDP supports RGB (type 1) and RGBW (type 3). The 4-channel path is
+        # used by SK6812 RGB+1800K strips; existing 3-tuple callers are
+        # byte-for-byte unchanged.
+        channels = len(pixels[0]) if pixels else int(self.cfg.get("channels", 3))
+        channels = 4 if channels == 4 else 3
+        dtype = 0x03 if channels == 4 else 0x01
 
-        max_chunk = 1440  # multiple of 3
+        raw = bytearray()
+        for px in pixels:
+            if channels == 4:
+                raw.extend((px[0] & 0xFF, px[1] & 0xFF, px[2] & 0xFF, px[3] & 0xFF))
+            else:
+                raw.extend((px[0] & 0xFF, px[1] & 0xFF, px[2] & 0xFF))
+
+        max_chunk = 1440 - (1440 % channels)  # multiple of pixel width
         total = len(raw)
         offset = 0
         try:
@@ -572,7 +590,7 @@ class DdpOutputDriver:
                 chunk = bytes(raw[offset : offset + max_chunk])
                 self.seq = (self.seq % 15) + 1
                 is_last = (offset + max_chunk) >= total
-                pkt = build_ddp_packet(chunk, offset_bytes=offset, seq=self.seq, push=is_last)
+                pkt = build_ddp_packet(chunk, offset_bytes=offset, seq=self.seq, push=is_last, dtype=dtype)
                 self.sock.sendto(pkt, (target_host, target_port))
                 self.stats["tx_packets"] += 1
                 self.stats["tx_bytes"] += len(pkt)

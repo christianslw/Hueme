@@ -58,8 +58,10 @@ def smooth_pixels(old, new, dt):
     if len(old) != len(new):
         return list(new)
     out = []
-    # Fast 28ms rise, 65ms release -> crisp patterns without double-smoothing lag
-    a_rise = 1.0 - math.exp(-max(0.0, dt) / 0.028)
+    # Attacks pass through untouched: the ZCL frame owns the hardware ramp
+    # (5 ms snap on transients, ~frame ramp on decay). Software rise smoothing
+    # here too would shave peak transient brightness. Release stays 65 ms.
+    a_rise = 1.0
     a_fall = 1.0 - math.exp(-max(0.0, dt) / 0.065)
     for (pr, pg, pb), (tr, tg, tb) in zip(old, new):
         ar = a_rise if tr >= pr else a_fall
@@ -311,6 +313,7 @@ class LightingEngine:
         self.stop_event = threading.Event()
         self.sync_test = False
         self.render_thread = None
+        self._last_cue_section = None
 
         self.latencies_ms = deque(maxlen=120)
         self._latency_since = 0.0
@@ -565,6 +568,16 @@ class LightingEngine:
             period = 1.0 / max(1.0, min(120.0, max_fps))
 
             af = self.audio.get_features(consume_triggers=True)
+            cue = af.get("cue") or {}
+            cue_section = cue.get("section")
+            cue_switch = bool(
+                cue_section
+                and self._last_cue_section is not None
+                and cue_section != self._last_cue_section
+            )
+            if cue_section:
+                self._last_cue_section = cue_section
+            snap = bool(af.get("kick") or af.get("snare_hit") or cue_switch)
             scene = self._scene_bounds([g for g in groups_list if g.enabled and g.n > 0])
             batch_reqs = []
             due_groups = []
@@ -671,7 +684,7 @@ class LightingEngine:
                     if g.outputs.get("wled") or self.wled_driver.cfg.get("enabled"):
                         self.wled_driver.send_pixels(px_snapshot)
 
-                self.hue_driver.send_consolidated(hue_records, fps=max_fps)
+                self.hue_driver.send_consolidated(hue_records, fps=max_fps, snap=snap)
             except Exception:
                 # A transport must never stop the render clock; drivers already record their own errors.
                 log.exception("Dispatch error (engine keeps running)")

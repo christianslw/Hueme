@@ -97,6 +97,15 @@ class SendspinAudioSource:
         self._thread = None
         self.pairing_token = None
         self.client_id = None
+        self.track_key = None
+        self.track_title = ""
+        self.track_artist = ""
+        self.track_item_id = None
+        self.track_duration_s = 0.0
+        self._track_lock = threading.Lock()
+        self._track_progress_base = 0.0
+        self._track_progress_t0 = time.monotonic()
+        self._track_speed = 1.0
 
     # -- lifecycle --------------------------------------------------------
     def start(self):
@@ -167,11 +176,12 @@ class SendspinAudioSource:
         client = SendspinClient(
             identity,
             self.client_name,
-            [Roles.PLAYER],
+            [Roles.PLAYER, Roles.METADATA],
             pairing_store=pairing_store,
             player_support=player_support,
         )
         client.add_audio_chunk_listener(self._on_audio)
+        client.add_metadata_listener(self._on_metadata)
         self._client = client
         log.info("Connecting to Sendspin server at %s ...", self.server_url)
         await client.connect(self.server_url)
@@ -257,6 +267,71 @@ class SendspinAudioSource:
                     self._drop_chunk_bytes_locked(overflow)
         except Exception as exc:
             self.last_error = f"Sendspin audio decode: {exc}"
+
+    def _on_metadata(self, payload):
+        """Track identity + progress for instant ShowGraph cache lookup."""
+        meta = getattr(payload, "metadata", None) if payload is not None else None
+        title = str(getattr(meta, "title", "") or "").strip()
+        artist = str(getattr(meta, "artist", "") or "").strip()
+        item_id = str(
+            getattr(meta, "item_id", "") or getattr(meta, "id", "") or ""
+        ).strip()
+        if not title and not artist:
+            with self._track_lock:
+                self.track_key = None
+                self.track_title = ""
+                self.track_artist = ""
+                self.track_item_id = None
+                self.track_duration_s = 0.0
+            return
+
+        progress = getattr(meta, "progress", None)
+        base = 0.0
+        speed = 1.0
+        duration = 0.0
+        if progress is not None:
+            try:
+                base = max(0.0, int(progress.track_progress) / 1000.0)
+                speed = max(0.0, int(progress.playback_speed) / 1000.0)
+                duration = max(0.0, int(progress.track_duration) / 1000.0)
+            except (AttributeError, TypeError, ValueError):
+                pass
+        key = "|".join(part for part in (artist, title) if part) or title
+        with self._track_lock:
+            changed = key != self.track_key
+            self.track_key = key
+            self.track_title = title
+            self.track_artist = artist
+            self.track_item_id = item_id or None
+            self.track_duration_s = duration
+            self._track_progress_base = base
+            self._track_progress_t0 = time.monotonic()
+            self._track_speed = speed
+        if changed:
+            log.info("Sendspin track: '%s' (%.0fs)", key, duration)
+
+    @property
+    def track_playing(self) -> bool:
+        """Best-effort playback state from metadata speed.
+
+        Without progress metadata the source is treated as playing; a paused
+        Sendspin item reports ``playback_speed == 0``.
+        """
+        with self._track_lock:
+            if not self.track_key:
+                return False
+            return self._track_speed > 0.01
+
+    @property
+    def track_progress_s(self):
+        with self._track_lock:
+            if not self.track_key:
+                return 0.0
+            elapsed = max(0.0, time.monotonic() - self._track_progress_t0)
+            progress = self._track_progress_base + elapsed * self._track_speed
+            if self.track_duration_s > 0.0:
+                progress = min(progress, self.track_duration_s)
+            return max(0.0, progress)
 
     def read(self) -> np.ndarray:
         if not _AVAILABLE:

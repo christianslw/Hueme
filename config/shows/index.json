@@ -1,0 +1,16 @@
+{
+  "schema_version": 1,
+  "shows": [
+    {
+      "id": "dance_loft_v1",
+      "name": "Dance Loft V1",
+      "file": "dance_loft_v1.json",
+      "duration_s": 236.25,
+      "bpm": 128.0,
+      "track_count": 7,
+      "clip_count": 23,
+      "artist": "Demo Artist",
+      "title": "Dance Loft 128"
+    }
+  ]
+}

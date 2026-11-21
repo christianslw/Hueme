@@ -29,3 +29,68 @@
 15:41:02 [INFO] hueme.engine: Auto-discovered 22 Zigbee devices from Zigbee2MQTT
 15:41:06 [INFO] hueme.engine: Sync test enabled
 15:41:08 [INFO] hueme.engine: Sync test disabled
+15:44:02 [INFO] hueme.engine: Configuration updated and hot-applied
+15:44:25 [INFO] hueme.engine: Sync test enabled
+15:44:31 [INFO] hueme.engine: Sync test disabled
+15:44:47 [INFO] hueme.engine: Configuration updated and hot-applied
+16:03:58 [INFO] hueme.effects: Loaded effect plugin 'symphonic_director'
+16:10:54 [INFO] hueme.effects: Loaded effect plugin 'symphonic_director'
+17:10:10 [INFO] hueme.engine: Configuration updated and hot-applied
+17:12:43 [INFO] hueme.sendspin: Connecting to Sendspin server at ws://192.168.10.13:8927/sendspin ...
+17:12:43 [INFO] aiosendspin.client.client: Connecting to Sendspin server at ws://192.168.10.13:8927/sendspin
+17:12:43 [WARNING] aiosendspin.client.connection: Server aWDR0-Q8LP6j1zjFEBBc9Sonjvg1ohTuekD9F4Lgzik referenced a credential this client cannot use; continuing unpaired on the Sentinel PSK until re-paired
+17:12:43 [INFO] hueme.sendspin: Sendspin connected (server: Music Assistant (d5369777-music-assistant))
+17:12:52 [ERROR] aiosendspin.client.connection: WebSocket reader encountered an error
+Traceback (most recent call last):
+  File "C:\Users\chris\AppData\Roaming\Python\Python313\site-packages\aiosendspin\client\connection.py", line 1448, in _reader_loop
+    await self._handle_ws_message(msg, received_us)
+  File "C:\Users\chris\AppData\Roaming\Python\Python313\site-packages\aiosendspin\client\connection.py", line 1458, in _handle_ws_message
+    await self._handle_json_message(msg.data, received_us)
+  File "C:\Users\chris\AppData\Roaming\Python\Python313\site-packages\aiosendspin\client\connection.py", line 1479, in _handle_json_message
+    await self._handle_handshake(data)
+  File "C:\Users\chris\AppData\Roaming\Python\Python313\site-packages\aiosendspin\client\connection.py", line 1588, in _handle_handshake
+    await self._rehandshake(data)
+  File "C:\Users\chris\AppData\Roaming\Python\Python313\site-packages\aiosendspin\client\connection.py", line 955, in _rehandshake
+    result = await run_rehandshake_client(
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    ...<7 lines>...
+    )
+    ^
+  File "C:\Users\chris\AppData\Roaming\Python\Python313\site-packages\aiosendspin\noise\driver.py", line 321, in run_rehandshake_client
+    resolved, _ = await _exchange_as_responder(
+                  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    ...<6 lines>...
+    )
+    ^
+  File "C:\Users\chris\AppData\Roaming\Python\Python313\site-packages\aiosendspin\noise\driver.py", line 484, in _exchange_as_responder
+    raise HandshakeAbortedError(f"no PSK matches psk_id={msg1_obj.psk_id!r}")
+aiosendspin.noise.driver.HandshakeAbortedError: no PSK matches psk_id='KfjalAX1Lp5ltZEizx5jVNh_wpp0UmR6Z-O0j3M_l5c'
+17:13:23 [INFO] hueme.engine: Sync test enabled
+17:13:29 [INFO] hueme.engine: Sync test disabled
+17:14:04 [INFO] hueme.engine: Configuration updated and hot-applied
+17:15:26 [INFO] hueme.sendspin: Connecting to Sendspin server at ws://192.168.10.13:8927/sendspin ...
+17:15:26 [INFO] aiosendspin.client.client: Connecting to Sendspin server at ws://192.168.10.13:8927/sendspin
+17:15:26 [WARNING] aiosendspin.client.connection: Server aWDR0-Q8LP6j1zjFEBBc9Sonjvg1ohTuekD9F4Lgzik referenced a credential this client cannot use; continuing unpaired on the Sentinel PSK until re-paired
+17:15:26 [INFO] hueme.sendspin: Sendspin connected (server: Music Assistant (d5369777-music-assistant))
+17:15:35 [INFO] hueme.engine: Configuration updated and hot-applied
+17:16:04 [INFO] aiosendspin.client.connection: Paired with server aWDR0-Q8LP6j1zjFEBBc9Sonjvg1ohTuekD9F4Lgzik via pairing_psk
+17:16:04 [INFO] aiosendspin.client.connection: Stream started with codec pcm
+17:16:04 [INFO] hueme.sendspin: Sendspin timing: first chunk play lead 191 ms, send-ahead 200 ms
+17:17:00 [INFO] hueme.engine: Configuration updated and hot-applied
+17:17:01 [INFO] hueme.engine: Configuration updated and hot-applied
+17:17:05 [INFO] hueme.engine: Configuration updated and hot-applied
+17:17:11 [INFO] hueme.engine: Configuration updated and hot-applied
+17:17:19 [INFO] hueme.engine: Configuration updated and hot-applied
+17:17:20 [INFO] hueme.engine: Configuration updated and hot-applied
+17:17:23 [INFO] hueme.engine: Auto-discovered 22 Zigbee devices from Zigbee2MQTT
+17:17:24 [INFO] hueme.engine: Auto-discovered 22 Zigbee devices from Zigbee2MQTT
+17:17:26 [INFO] hueme.engine: Configuration updated and hot-applied
+17:17:33 [INFO] hueme.engine: Configuration updated and hot-applied
+17:17:39 [INFO] hueme.engine: Configuration updated and hot-applied
+17:17:39 [INFO] hueme.engine: Configuration updated and hot-applied
+17:17:42 [INFO] hueme.engine: Configuration updated and hot-applied
+17:17:44 [INFO] hueme.engine: Configuration updated and hot-applied
+17:17:54 [INFO] hueme.sendspin: Connecting to Sendspin server at ws://192.168.10.13:8927/sendspin ...
+17:17:54 [INFO] aiosendspin.client.client: Connecting to Sendspin server at ws://192.168.10.13:8927/sendspin
+17:17:54 [WARNING] aiosendspin.client.connection: Server aWDR0-Q8LP6j1zjFEBBc9Sonjvg1ohTuekD9F4Lgzik referenced a credential this client cannot use; continuing unpaired on the Sentinel PSK until re-paired
+17:17:54 [INFO] hueme.sendspin: Sendspin connected (server: Music Assistant (d5369777-music-assistant))

@@ -1,0 +1,342 @@
+{
+  "schema_version": 1,
+  "id": "hueme_loft",
+  "name": "Hueme Loft",
+  "room": {
+    "min": [0.0, 0.0, 0.0],
+    "max": [6.5, 8.0, 5.1]
+  },
+  "fixtures": [
+    {
+      "id": "galerie_01",
+      "name": "Deckenstrahler 1",
+      "geometry": {
+        "type": "point",
+        "pos": [0.55, 1.15, 4.45],
+        "aim": [0.0, 1.0, -1.0],
+        "beam_deg": 42.0
+      },
+      "capabilities": {
+        "color_space": "cie_xy",
+        "max_fps": 25.0,
+        "zcl_snap": true,
+        "min_brightness": 0.01
+      },
+      "output": {
+        "protocol": "hue_z2m",
+        "enabled": true,
+        "friendly_name": "Deckenstrahler 1",
+        "address": "0x8B3C",
+        "proxy": "Deckenstrahler 2"
+      },
+      "tags": ["galerie_oben", "hue", "spot"]
+    },
+    {
+      "id": "galerie_02",
+      "name": "Deckenstrahler 2",
+      "geometry": {
+        "type": "point",
+        "pos": [1.45, 1.15, 4.45],
+        "aim": [0.0, 1.0, -1.0],
+        "beam_deg": 42.0
+      },
+      "capabilities": {
+        "color_space": "cie_xy",
+        "max_fps": 25.0,
+        "zcl_snap": true,
+        "min_brightness": 0.01
+      },
+      "output": {
+        "protocol": "hue_z2m",
+        "enabled": true,
+        "friendly_name": "Deckenstrahler 2",
+        "address": "0x52BC",
+        "proxy": "Deckenstrahler 2"
+      },
+      "tags": ["galerie_oben", "hue", "spot"]
+    },
+    {
+      "id": "galerie_03",
+      "name": "Deckenstrahler 3",
+      "geometry": {
+        "type": "point",
+        "pos": [2.35, 1.15, 4.45],
+        "aim": [0.0, 1.0, -1.0],
+        "beam_deg": 42.0
+      },
+      "capabilities": {
+        "color_space": "cie_xy",
+        "max_fps": 25.0,
+        "zcl_snap": true,
+        "min_brightness": 0.01
+      },
+      "output": {
+        "protocol": "hue_z2m",
+        "enabled": true,
+        "friendly_name": "Deckenstrahler 3",
+        "address": "0x2048",
+        "proxy": "Deckenstrahler 2"
+      },
+      "tags": ["galerie_oben", "hue", "spot"]
+    },
+    {
+      "id": "galerie_04",
+      "name": "Deckenstrahler 4",
+      "geometry": {
+        "type": "point",
+        "pos": [3.25, 1.15, 4.45],
+        "aim": [0.0, 1.0, -1.0],
+        "beam_deg": 42.0
+      },
+      "capabilities": {
+        "color_space": "cie_xy",
+        "max_fps": 25.0,
+        "zcl_snap": true,
+        "min_brightness": 0.01
+      },
+      "output": {
+        "protocol": "hue_z2m",
+        "enabled": true,
+        "friendly_name": "Deckenstrahler 4",
+        "address": "0xEC62",
+        "proxy": "Deckenstrahler 2"
+      },
+      "tags": ["galerie_oben", "hue", "spot"]
+    },
+    {
+      "id": "galerie_05",
+      "name": "Deckenstrahler 5",
+      "geometry": {
+        "type": "point",
+        "pos": [4.15, 1.15, 4.45],
+        "aim": [0.0, 1.0, -1.0],
+        "beam_deg": 42.0
+      },
+      "capabilities": {
+        "color_space": "cie_xy",
+        "max_fps": 25.0,
+        "zcl_snap": true,
+        "min_brightness": 0.01
+      },
+      "output": {
+        "protocol": "hue_z2m",
+        "enabled": true,
+        "friendly_name": "Deckenstrahler 5",
+        "address": "0x52BB",
+        "proxy": "Deckenstrahler 2"
+      },
+      "tags": ["galerie_oben", "hue", "spot"]
+    },
+    {
+      "id": "galerie_06",
+      "name": "Deckenstrahler 6",
+      "geometry": {
+        "type": "point",
+        "pos": [5.05, 1.15, 4.45],
+        "aim": [0.0, 1.0, -1.0],
+        "beam_deg": 42.0
+      },
+      "capabilities": {
+        "color_space": "cie_xy",
+        "max_fps": 25.0,
+        "zcl_snap": true,
+        "min_brightness": 0.01
+      },
+      "output": {
+        "protocol": "hue_z2m",
+        "enabled": true,
+        "friendly_name": "Deckenstrahler 6",
+        "address": "0x81DC",
+        "proxy": "Deckenstrahler 2"
+      },
+      "tags": ["galerie_oben", "hue", "spot"]
+    },
+    {
+      "id": "galerie_07",
+      "name": "Deckenstrahler 7",
+      "geometry": {
+        "type": "point",
+        "pos": [5.95, 1.15, 4.45],
+        "aim": [0.0, 1.0, -1.0],
+        "beam_deg": 42.0
+      },
+      "capabilities": {
+        "color_space": "cie_xy",
+        "max_fps": 25.0,
+        "zcl_snap": true,
+        "min_brightness": 0.01
+      },
+      "output": {
+        "protocol": "hue_z2m",
+        "enabled": true,
+        "friendly_name": "Deckenstrahler 7",
+        "address": "0x5EFA",
+        "proxy": "Deckenstrahler 2"
+      },
+      "tags": ["galerie_oben", "hue", "spot"]
+    },
+    {
+      "id": "decke_unten_01",
+      "name": "Deckenstrahler 8",
+      "geometry": {
+        "type": "point",
+        "pos": [1.40, 6.30, 3.15],
+        "aim": [0.0, -1.0, -1.0],
+        "beam_deg": 50.0
+      },
+      "capabilities": {
+        "color_space": "cie_xy",
+        "max_fps": 25.0,
+        "zcl_snap": true,
+        "min_brightness": 0.01
+      },
+      "output": {
+        "protocol": "hue_z2m",
+        "enabled": true,
+        "friendly_name": "Deckenstrahler 8",
+        "address": "0x1A42",
+        "proxy": "Deckenstrahler 8"
+      },
+      "tags": ["decke_unten", "hue", "spot"]
+    },
+    {
+      "id": "decke_unten_02",
+      "name": "Deckenstrahler 10",
+      "geometry": {
+        "type": "point",
+        "pos": [3.25, 6.30, 3.15],
+        "aim": [0.0, -1.0, -1.0],
+        "beam_deg": 50.0
+      },
+      "capabilities": {
+        "color_space": "cie_xy",
+        "max_fps": 25.0,
+        "zcl_snap": true,
+        "min_brightness": 0.01
+      },
+      "output": {
+        "protocol": "hue_z2m",
+        "enabled": true,
+        "friendly_name": "Deckenstrahler 10",
+        "address": "0x26A5",
+        "proxy": "Deckenstrahler 8"
+      },
+      "tags": ["decke_unten", "hue", "spot"]
+    },
+    {
+      "id": "decke_unten_03",
+      "name": "Deckenstrahler 12",
+      "geometry": {
+        "type": "point",
+        "pos": [5.10, 6.30, 3.15],
+        "aim": [0.0, -1.0, -1.0],
+        "beam_deg": 50.0
+      },
+      "capabilities": {
+        "color_space": "cie_xy",
+        "max_fps": 25.0,
+        "zcl_snap": true,
+        "min_brightness": 0.01
+      },
+      "output": {
+        "protocol": "hue_z2m",
+        "enabled": true,
+        "friendly_name": "Deckenstrahler 12",
+        "address": "0xB579",
+        "proxy": "Deckenstrahler 8"
+      },
+      "tags": ["decke_unten", "hue", "spot"]
+    },
+    {
+      "id": "stahltraeger",
+      "name": "Stahltraeger SK6812 1800K",
+      "geometry": {
+        "type": "line",
+        "start": [0.35, 4.40, 4.05],
+        "end": [6.15, 4.40, 4.05],
+        "pixels": 180,
+        "aim": [0.0, 0.0, -1.0],
+        "beam_deg": 120.0
+      },
+      "capabilities": {
+        "color_space": "rgb_amber_1800k",
+        "max_fps": 60.0,
+        "zcl_snap": false,
+        "min_brightness": 0.0
+      },
+      "output": {
+        "protocol": "wled_ddp",
+        "enabled": true,
+        "host": "192.168.10.40",
+        "port": 4048
+      },
+      "tags": ["stahltraeger", "wled", "strip", "1800k"]
+    }
+  ],
+  "groups": [
+    {
+      "id": "all",
+      "name": "Whole Loft",
+      "type": "all"
+    },
+    {
+      "id": "galerie_oben",
+      "name": "Upper Gallery",
+      "type": "list",
+      "fixtures": [
+        "galerie_01",
+        "galerie_02",
+        "galerie_03",
+        "galerie_04",
+        "galerie_05",
+        "galerie_06",
+        "galerie_07"
+      ]
+    },
+    {
+      "id": "decke_unten",
+      "name": "Lower Depth",
+      "type": "list",
+      "fixtures": ["decke_unten_01", "decke_unten_02", "decke_unten_03"]
+    },
+    {
+      "id": "stahltraeger",
+      "name": "Steel Beam Strip",
+      "type": "list",
+      "fixtures": ["stahltraeger"]
+    },
+    {
+      "id": "galerie_links",
+      "name": "Gallery Left",
+      "type": "list",
+      "fixtures": ["galerie_01", "galerie_02", "galerie_03", "galerie_04"]
+    },
+    {
+      "id": "galerie_rechts",
+      "name": "Gallery Right",
+      "type": "list",
+      "fixtures": ["galerie_04", "galerie_05", "galerie_06", "galerie_07"]
+    },
+    {
+      "id": "loft_center",
+      "name": "Loft Centre",
+      "type": "spatial_sphere",
+      "center": [3.25, 4.0, 2.4],
+      "radius": 2.4
+    },
+    {
+      "id": "front_half",
+      "name": "Front Half",
+      "type": "spatial_box",
+      "min": [0.0, 0.0, 0.0],
+      "max": [6.5, 3.2, 5.1]
+    },
+    {
+      "id": "rear_half",
+      "name": "Rear Half",
+      "type": "spatial_box",
+      "min": [0.0, 4.8, 0.0],
+      "max": [6.5, 8.0, 5.1]
+    }
+  ]
+}

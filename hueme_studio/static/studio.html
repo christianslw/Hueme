@@ -1,0 +1,153 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Hueme Studio</title>
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Crect width='16' height='16' fill='%23111214'/%3E%3Crect x='4' y='4' width='8' height='8' fill='%23e8862e'/%3E%3C/svg%3E">
+  <link rel="stylesheet" href="/static/ui.css">
+</head>
+<body>
+<div class="studio">
+
+  <header class="menubar">
+    <div class="brand">HUEME <span>STUDIO</span></div>
+    <div class="menubar-group">
+      <span class="menubar-label">Show</span>
+      <select id="show-select" class="select" aria-label="Active show" style="width:180px"></select>
+    </div>
+    <div class="menubar-group">
+      <button id="btn-to-start" class="button icon-button" type="button" title="Go to start">|&lt;</button>
+      <button id="btn-play" class="button primary" type="button" title="Play or pause">PLAY</button>
+      <button id="btn-to-end" class="button icon-button" type="button" title="Go to end">&gt;|</button>
+      <button id="btn-loop" class="button" type="button" title="Loop playback">LOOP</button>
+      <span id="timecode" class="mono timecode">00:00.000</span>
+    </div>
+    <div class="spacer"></div>
+    <div class="menubar-group">
+      <button id="sync-status" class="button" type="button" title="Music Assistant sync">MA --</button>
+      <span id="link-status" class="menubar-label">OFFLINE</span>
+      <a class="button" href="/live" title="Open the live deck">LIVE DECK</a>
+      <button id="btn-mcp" class="button" type="button" title="Open the MCP log">MCP</button>
+    </div>
+  </header>
+
+  <aside class="left-panel">
+    <section class="section open" id="section-presets">
+      <button class="section-head" type="button">Presets</button>
+      <div class="section-body">
+        <div id="preset-list" class="row-list"></div>
+      </div>
+    </section>
+
+    <section class="section open" id="section-rig">
+      <button class="section-head" type="button">Rig Manager</button>
+      <div class="section-body">
+        <div class="section-actions">
+          <select id="rig-select" class="select" aria-label="Rig preset" style="flex:1;min-width:100px"></select>
+          <span id="rig-dirty" class="dirty-dot hidden" title="Unsaved rig changes"></span>
+        </div>
+        <div class="section-actions">
+          <button id="rig-new" class="button small" type="button">New</button>
+          <button id="rig-save" class="button small" type="button">Save</button>
+          <button id="rig-save-as" class="button small" type="button">Save As</button>
+          <button id="rig-clone" class="button small" type="button">Clone</button>
+          <button id="rig-delete" class="button small danger" type="button">Delete</button>
+        </div>
+
+        <div class="list-subhead">
+          Fixtures
+          <span id="fixture-count" class="mono muted" style="margin-left:auto"></span>
+        </div>
+        <div id="fixture-list" class="row-list"></div>
+        <div class="section-actions" style="margin-top:4px">
+          <button id="add-point" class="button small" type="button">Add Point</button>
+          <button id="add-line" class="button small" type="button">Add Line</button>
+        </div>
+
+        <div class="list-subhead">
+          Groups
+          <button id="group-add" class="button small" type="button" style="margin-left:auto">New Group</button>
+        </div>
+        <div id="group-list" class="row-list"></div>
+        <div id="group-editor" class="hidden"></div>
+      </div>
+    </section>
+
+    <section class="section open" id="section-filters">
+      <button class="section-head" type="button">Filter Library</button>
+      <div class="section-body">
+        <div id="filter-list" class="row-list"></div>
+      </div>
+    </section>
+  </aside>
+
+  <main class="center-panel">
+    <canvas id="viewport" class="viewport" tabindex="0" aria-label="3D rig viewport"></canvas>
+    <div class="viewport-tools">
+      <button class="button" type="button" data-camera="persp">Persp</button>
+      <button class="button" type="button" data-camera="front">Front</button>
+      <button class="button" type="button" data-camera="top">Top</button>
+      <button class="button" type="button" data-camera="side">Side</button>
+      <button class="button" type="button" id="camera-fit">Fit</button>
+    </div>
+    <div id="viewport-status" class="viewport-status"></div>
+    <div class="viewport-hint">Alt+drag orbit &middot; MMB/Shift pan &middot; wheel zoom &middot; drag empty to marquee &middot; Shift+drag fixture for Z</div>
+  </main>
+
+  <aside class="right-panel">
+    <div class="inspector-tabs">
+      <button class="inspector-tab active" type="button" data-tab="clip">Clip</button>
+      <button class="inspector-tab" type="button" data-tab="fixture">Fixture</button>
+    </div>
+    <div id="inspector-body" class="inspector-body"></div>
+  </aside>
+
+  <section class="timeline">
+    <div class="timeline-toolbar">
+      <span class="label">Timeline</span>
+      <button id="undo" class="button small" type="button" title="Undo show edit">Undo</button>
+      <button id="redo" class="button small" type="button" title="Redo show edit">Redo</button>
+      <button id="split" class="button small" type="button" title="Split clip at playhead">Split</button>
+      <button id="mute" class="button small" type="button" title="Mute selected track">Mute</button>
+      <button id="add-clip" class="button small" type="button" title="Add a clip at the playhead">Add Clip</button>
+      <button id="blueprint-load" class="button small" type="button" title="Attach an AudioBlueprint from a 16-bit WAV">Audio</button>
+      <input id="blueprint-file" class="hidden" type="file" accept=".wav,audio/wav">
+      <span id="blueprint-status" class="mono muted" style="margin-left:4px"></span>
+      <span class="label" style="margin-left:8px">Vol</span>
+      <input id="audio-volume" class="slider" type="range" min="0" max="1" step="0.01" value="0.8" style="width:64px" aria-label="Audio preview volume">
+      <span id="history-label" class="mono muted" style="margin-left:4px"></span>
+      <div class="spacer"></div>
+      <span class="label">Grid</span>
+      <select id="grid-select" class="select" style="width:72px" aria-label="Grid division">
+        <option value="1/1">1/1</option>
+        <option value="1/2">1/2</option>
+        <option value="1/4" selected>1/4</option>
+        <option value="1/8">1/8</option>
+        <option value="1/16">1/16</option>
+      </select>
+      <button id="zoom-out" class="button small icon-button" type="button" title="Zoom out">-</button>
+      <button id="zoom-in" class="button small icon-button" type="button" title="Zoom in">+</button>
+      <button id="zoom-fit" class="button small" type="button" title="Fit show">Fit</button>
+    </div>
+    <canvas id="timeline" class="timeline-canvas" tabindex="0" aria-label="Show timeline"></canvas>
+  </section>
+</div>
+
+<aside id="mcp-drawer" class="mcp-drawer hidden" aria-label="MCP log">
+  <header>
+    MCP JSON-RPC
+    <span id="mcp-state" class="mono">HTTP</span>
+    <button id="mcp-close" class="button small" type="button">Close</button>
+  </header>
+  <div id="mcp-telemetry" class="mcp-telemetry"></div>
+  <div class="mcp-filter-row">
+    <input id="mcp-filter" class="input" type="search" placeholder="Filter tool or method" aria-label="Filter MCP log">
+  </div>
+  <div id="mcp-log" class="mcp-log"></div>
+</aside>
+
+<audio id="preview-audio" preload="auto"></audio>
+<script type="module" src="/static/studio.js"></script>
+</body>
+</html>

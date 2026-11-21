@@ -1,7 +1,7 @@
 import json
 import unittest
 
-from hueme.drivers import CMD_FRAME, CMD_SYNC_STOP, HueZ2MDriver
+from hueme.drivers import CMD_FRAME, CMD_SYNC_STOP, ZCL_SNAP_SMOOTHING, HueZ2MDriver, smoothing_for_fps
 
 
 class FakeMqttClient:
@@ -73,6 +73,29 @@ class TestHueConsolidation(unittest.TestCase):
         self.assertEqual(len(frame_msgs[1][1]["zclcommand"]["payload"]["data"]), 6 + 10 * 7)
         self.assertEqual(frame_msgs[2][0], "zigbee2mqtt/proxy_1/set")
         self.assertEqual(len(frame_msgs[2][1]["zclcommand"]["payload"]["data"]), 6 + 3 * 7)
+
+    def test_transient_frames_use_hard_snap_and_decay_uses_fps_ramp(self):
+        fake = FakeMqttClient()
+        drv = HueZ2MDriver(
+            {"base_topic": "zigbee2mqtt"},
+            {"enabled": True, "proxies": ["proxy_main"], "max_fixtures_per_frame": 10, "light_balance": False},
+            mqtt_client=fake,
+        )
+        drv.start()
+        recs = [(f"Spot_{i}", 0x4000 + i, (255, 120, 0), "") for i in range(4)]
+        drv.setup_session({r[0]: r[1] for r in recs}, do_balance=False)
+
+        fake.published.clear()
+        drv.send_consolidated(recs, fps=30.0, snap=True)
+        frame = [p for _, p in fake.published if p.get("zclcommand", {}).get("command") == CMD_FRAME][0]
+        data = frame["zclcommand"]["payload"]["data"]
+        self.assertEqual(int.from_bytes(bytes(data[4:6]), "little"), ZCL_SNAP_SMOOTHING)
+
+        fake.published.clear()
+        drv.send_consolidated(recs, fps=30.0, snap=False)
+        frame = [p for _, p in fake.published if p.get("zclcommand", {}).get("command") == CMD_FRAME][0]
+        data = frame["zclcommand"]["payload"]["data"]
+        self.assertEqual(int.from_bytes(bytes(data[4:6]), "little"), smoothing_for_fps(30.0))
 
     def test_single_proxy_over_10_deterministically_interleaves_and_stops_on_idle(self):
         fake = FakeMqttClient()

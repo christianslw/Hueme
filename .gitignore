@@ -2,5 +2,8 @@ __pycache__/
 *.pyc
 config/gateway.json
 config/*.bak
+config/show_cache/
+config/blueprints/
+config/hueme.lock
 gateway_config.json.bak
 testdata/

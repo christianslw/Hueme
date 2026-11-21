@@ -32,7 +32,7 @@ def default_config():
                 "enabled": True,
                 "target_rms": 0.08,
                 "tau_s": 20.0,
-                "silence_db": -55.0,
+                "silence_db": -45.0,
             },
         },
         "mqtt": {

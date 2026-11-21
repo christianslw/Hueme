@@ -169,6 +169,20 @@ const App = {
     this.markDirty();
     this.render();
   },
+  setEffectAll(zoneIdx) {
+    const src = S.cfg.groups[zoneIdx];
+    if (!src || !src.effect) return;
+    const fx = JSON.parse(JSON.stringify(src.effect));
+    fx.enabled = true;
+    (S.cfg.groups || []).forEach((g, i) => {
+      if (i === zoneIdx) return;
+      g.effect = JSON.parse(JSON.stringify(fx));
+    });
+    this.markDirty();
+    this.render();
+    const name = effectById(fx.id).meta.name || fx.id;
+    this.toast(`"${name}" is now active in all ${(S.cfg.groups || []).length} zones`);
+  },
   setProxy(zoneIdx, fixtureIdx) {
     S.cfg.groups[zoneIdx].proxy = S.cfg.groups[zoneIdx].fixtures[fixtureIdx].name;
     this.syncProxies();
@@ -1093,7 +1107,10 @@ const App = {
             <input type="number" min="1" max="120" value="${esc(g.fps ?? 30)}" onchange="App.num(this,'groups.${i}.fps')">
           </label>
           <label class="field">Effect
-            <select onchange="App.setEffect(${i}, this.value)">${effectOptions(fx.id)}</select>
+            <span class="row">
+              <select onchange="App.setEffect(${i}, this.value)">${effectOptions(fx.id)}</select>
+              <button class="small" title="Copy this effect and its settings to every zone" onclick="App.setEffectAll(${i})">All zones</button>
+            </span>
           </label>
           <label class="check" style="margin-top:24px">
             <input type="checkbox" ${fx.enabled ? "checked" : ""}
@@ -1742,9 +1759,14 @@ def render(ctx):
     }
     const sectionEl = document.getElementById("live-section");
     if (sectionEl) {
-      const sec = (a.section || {}).name || "–";
-      sectionEl.textContent = String(sec).toUpperCase();
-      sectionEl.className = "badge" + (sec === "drop" || sec === "build" ? " live" : "");
+      const cue = a.cue || {};
+      const sec = cue.available ? (cue.section || "–") : ((a.section || {}).name || "–");
+      const progress = cue.available ? ` ${Math.round(Number(cue.section_progress || 0) * 100)}%` : "";
+      sectionEl.textContent = String(sec).toUpperCase() + progress;
+      sectionEl.title = cue.available
+        ? `cue: ${cue.section} · ${Number(cue.beats_to_drop || 0).toFixed(1)} beats to drop · harmonic ${Number(cue.harmonic_swell || 0).toFixed(2)} · percussive ${Number(cue.percussive_punch || 0).toFixed(2)}`
+        : "live cue fallback";
+      sectionEl.className = "badge" + (sec === "drop" || sec === "build" || sec === "pre_drop" ? " live" : "");
     }
     const agc = document.getElementById("live-agc");
     if (agc) agc.textContent = `AGC ${Number(a.agc_gain ?? 1).toFixed(1)}×`;

@@ -1,0 +1,17 @@
+{
+  "schema_version": 1,
+  "id": "empty_loft",
+  "name": "Empty Loft",
+  "room": {
+    "min": [0.0, 0.0, 0.0],
+    "max": [6.5, 8.0, 5.1]
+  },
+  "fixtures": [],
+  "groups": [
+    {
+      "id": "all",
+      "name": "All Fixtures",
+      "type": "all"
+    }
+  ]
+}

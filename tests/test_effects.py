@@ -79,7 +79,9 @@ class TestEffectsAndSandbox(unittest.TestCase):
         effects = [
             "scene_pulse", "prism", "spectrum_sweep", "shockwave", "rainbow", "band_matrix",
             "club_tech", "ambient_uplight", "breathe", "ping_pong", "bass_cannon",
-            "dim2warm", "solid", "strobe_drop", "ma3_busker",
+            "dim2warm", "solid", "strobe_drop", "ma3_busker", "symphonic_director", "silk_spline",
+            "aurora_veil", "lava_lumen", "starlit_canopy",
+            "turrell_skyspace", "caustic_abyss", "celestial_orrery", "silk_prism_atelier",
         ]
         mgr = EffectManager(effects_dir="effects", poll_s=10.0, timeout_ms=250)
         mgr.start()
@@ -154,6 +156,172 @@ class TestEffectsAndSandbox(unittest.TestCase):
                     recent_kick[e] = max(0, recent_kick[e] - 1)
                     recent_snare[e] = max(0, recent_snare[e] - 1)
             self.assertEqual(violations[:5], [], f"Flicker guardrail violations: {violations[:5]}")
+        finally:
+            mgr.stop()
+
+    def test_room_wide_effects_work_without_audio(self):
+        """Room-wide presets must animate from world time + world positions alone."""
+        mgr = EffectManager(effects_dir="effects", poll_s=10.0, timeout_ms=250)
+        mgr.start()
+        try:
+            zones = {
+                "main": [(1.0, y, 2.0) for y in (0.55, 1.05, 1.5, 2.0, 2.5, 3.0, 3.5)],
+                "side": [(-0.85, y, 0.5) for y in (-1.05, -0.6, -0.1)],
+            }
+            scene = {"min": [-1.0, -1.1, 0.5], "max": [1.0, 3.5, 2.0], "center": [0.0, 1.2, 1.25]}
+            for eid in (
+                "aurora_veil", "lava_lumen", "starlit_canopy",
+                "turrell_skyspace", "caustic_abyss", "celestial_orrery", "silk_prism_atelier",
+            ):
+                params = mgr.default_params_for(eid)
+                states = {gid: {} for gid in zones}
+                peak = 0
+                spatial_diff = False
+                for frame in range(60):
+                    now = frame / 30.0
+                    reqs = [
+                        {
+                            "group_id": gid, "id": eid, "n": len(positions),
+                            "now": now, "dt": 1 / 30.0, "features": {},
+                            "params": params, "state": states[gid],
+                            "positions": positions, "world_positions": positions, "scene": scene,
+                        }
+                        for gid, positions in zones.items()
+                    ]
+                    res = mgr.render_batch(reqs)
+                    for gid, positions in zones.items():
+                        r = res[gid]
+                        self.assertIsNone(r["error"], f"{eid} failed: {r['error']}")
+                        self.assertEqual(len(r["pixels"]), len(positions))
+                        peak = max(peak, max(max(px) for px in r["pixels"]))
+                    if res["main"]["pixels"] != res["side"]["pixels"]:
+                        spatial_diff = True
+                    states = {gid: res[gid]["state"] for gid in zones}
+                self.assertGreater(peak, 20, f"{eid} renders black without audio")
+                self.assertTrue(spatial_diff, f"{eid} ignores world positions")
+        finally:
+            mgr.stop()
+
+    def test_symphonic_director_consumes_showgraph_cue(self):
+        mgr = EffectManager(effects_dir="effects", poll_s=10.0, timeout_ms=250)
+        mgr.start()
+        try:
+            info = mgr.get_effect("symphonic_director")
+            self.assertIsNotNone(info)
+            self.assertIsNone(info["error"])
+            base = {
+                "bass": 0.4, "snare": 0.2, "mids": 0.4, "highs": 0.3,
+                "kick": False, "snare_hit": False, "kick_env": 0.0, "snare_env": 0.0,
+                "beat_count": 0, "bpm": 128,
+                "env": {"pulse": 0.4, "kick": 0.0, "snare": 0.0, "bright": 0.3, "energy": 0.45},
+                "beat": {"phase": 0.1, "bar_phase": 0.1, "count": 0, "bar_pos": 0, "on_beat": False, "on_downbeat": False},
+                "section": {"name": "groove", "build": 0.0, "drop": False},
+            }
+            params = mgr.default_params_for("symphonic_director")
+            positions = [(i / 6.0, 0.5, 0.0) for i in range(7)]
+
+            def render(cue, frame):
+                features = dict(base)
+                features["cue"] = cue
+                req = [{
+                    "group_id": "main", "id": "symphonic_director", "n": 7,
+                    "now": frame / 30.0, "dt": 1 / 30.0, "features": features,
+                    "params": params, "state": {}, "positions": positions,
+                }]
+                return mgr.render_batch(req)["main"]["pixels"]
+
+            vacuum = render({
+                "available": True, "section": "pre_drop", "section_progress": 0.5,
+                "beats_to_drop": 1.0, "beats_in_section": 2.0,
+                "harmonic_swell": 0.1, "percussive_punch": 0.05, "prominence": 0.2,
+            }, 0)
+            self.assertEqual(vacuum, [(0, 0, 0)] * 7)
+
+            intro = render({
+                "available": True, "section": "intro", "section_progress": 0.3,
+                "beats_to_drop": 8.0, "beats_in_section": 16.0,
+                "harmonic_swell": 0.6, "percussive_punch": 0.0, "prominence": 0.5,
+            }, 1)
+            lit = sum(1 for px in intro if max(px) > 0)
+            self.assertGreaterEqual(lit, 1)
+            self.assertLessEqual(lit, 3)  # 60-80% negative space
+
+            drop = render({
+                "available": True, "section": "drop", "section_progress": 0.2,
+                "beats_to_drop": 0.0, "beats_in_section": 8.0,
+                "harmonic_swell": 0.8, "percussive_punch": 1.0, "prominence": 0.95,
+            }, 2)
+            self.assertGreater(max(max(px) for px in drop), 100)
+        finally:
+            mgr.stop()
+
+    def test_slayyyter_dance_follows_track_phrase_grid(self):
+        mgr = EffectManager(effects_dir="effects", poll_s=10.0, timeout_ms=250)
+        mgr.start()
+        try:
+            info = mgr.get_effect("slayyyter_dance")
+            self.assertIsNotNone(info)
+            self.assertIsNone(info["error"], info.get("error"))
+
+            params = mgr.default_params_for("slayyyter_dance")
+            main = [(1.0, y, 2.0) for y in (0.55, 1.05, 1.5, 2.0, 2.5, 3.0, 3.5)]
+            low = [(-0.85, y, 0.5) for y in (-1.05, -0.6, -0.1)]
+            base = {
+                "bass": 0.5, "snare": 0.2, "mids": 0.4, "highs": 0.4,
+                "kick": False, "snare_hit": False, "kick_env": 0.0, "snare_env": 0.0,
+                "beat_count": 0, "bpm": 112, "alive": True, "rms": 0.1,
+                "env": {"pulse": 0.45, "kick": 0.0, "snare": 0.0, "bright": 0.3, "energy": 0.45},
+                "beat": {"phase": 0.1, "bar_phase": 0.1, "count": 0, "bar_pos": 0,
+                         "on_beat": False, "on_downbeat": False},
+            }
+
+            def render(progress, positions):
+                features = dict(base)
+                features["show_track"] = {
+                    "key": "Slayyyter|DANCE...", "progress_s": progress, "tempo": 112.5,
+                }
+                req = [{
+                    "group_id": "show", "id": "slayyyter_dance", "n": len(positions),
+                    "now": progress, "dt": 1 / 20.0, "features": features,
+                    "params": params, "state": {}, "positions": positions,
+                }]
+                res = mgr.render_batch(req)["show"]
+                return res["pixels"], res["error"]
+
+            # The build's vacuum is exactly the last two beats before beat 104.
+            vacuum, err = render(54.5, main)
+            self.assertIsNone(err)
+            self.assertEqual(vacuum, [(0, 0, 0)] * 7)
+
+            # The drop impact is bright on both the 7-spot and 3-spot groups.
+            drop, err = render(55.5, main)
+            self.assertIsNone(err)
+            self.assertGreater(max(max(px) for px in drop), 120)
+            drop_low, err = render(55.5, low)
+            self.assertIsNone(err)
+            self.assertGreater(max(max(px) for px in drop_low), 100)
+
+            # The breakdown keeps most of the ceiling in true black.
+            breakdown, err = render(210.0, main)
+            self.assertIsNone(err)
+            lit = sum(1 for px in breakdown if max(px) > 20)
+            self.assertGreaterEqual(lit, 1)
+            self.assertLessEqual(lit, 4)
+
+            # Nothing is left burning after the final outro.
+            end, err = render(286.5, main)
+            self.assertIsNone(err)
+            self.assertEqual(end, [(0, 0, 0)] * 7)
+
+            # Silence without a track map stays black and never raises.
+            req = [{
+                "group_id": "idle", "id": "slayyyter_dance", "n": 7,
+                "now": 10.0, "dt": 1 / 20.0, "features": dict(base, alive=False, rms=0.0),
+                "params": params, "state": {}, "positions": main,
+            }]
+            idle = mgr.render_batch(req)["idle"]
+            self.assertIsNone(idle["error"])
+            self.assertEqual(idle["pixels"], [(0, 0, 0)] * 7)
         finally:
             mgr.stop()
 

@@ -1,14 +1,31 @@
 services:
   hueme:
     build: .
-    container_name: hueme
+    container_name: hueme-studio
     restart: unless-stopped
-    network_mode: host
+    ports:
+      - "8090:8090"
     volumes:
-      - ./config:/config
-      - ./effects:/app/effects
-      # Optional: uncomment below if using local PulseAudio/PipeWire monitor instead of Snapcast TCP
+      - ./config:/app/config
+      # Optional: local PulseAudio/PipeWire monitor instead of Sendspin/Snapcast.
       # - /run/user/1000/pulse:/run/user/1000/pulse:ro
     environment:
       - PYTHONUNBUFFERED=1
-      # - PULSE_SERVER=unix:/run/user/1000/pulse/native
+      # - HUEME_MQTT_PASSWORD=change-me
+    command:
+      - python
+      - -m
+      - hueme_studio
+      - --host
+      - 0.0.0.0
+      - --port
+      - "8090"
+      # Optional: MA sync + Home Assistant discovery from ./config/gateway.json.
+      # - --gateway
+      # - /app/config/gateway.json
+      # - --sync
+      # - --ha-discovery
+    stop_grace_period: 10s
+    # DDP/E1.31/WLED output needs LAN multicast/broadcast; uncomment and drop
+    # the ports mapping above if the container must own the host network.
+    # network_mode: host

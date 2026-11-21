@@ -17,6 +17,7 @@ import wave
 import numpy as np
 
 from hueme.sendspin_source import SendspinAudioSource
+from hueme.show_analyzer import ShowAnalyzer
 
 log = logging.getLogger("hueme.audio")
 
@@ -118,6 +119,9 @@ class WavSource:
         self.connected = False
         self.last_error = None
         self.next_t = time.monotonic()
+        # Lets `python -m hueme.show_analyzer track.wav` (default key =
+        # basename) match a WAV source without Sendspin metadata.
+        self.track_key = os.path.basename(str(path)) if path else None
         self._open()
 
     def _open(self):
@@ -133,8 +137,18 @@ class WavSource:
         self.wf = wave.open(self.path, "rb")
         self.channels = self.wf.getnchannels()
         self.rate = self.wf.getframerate()
+        self.track_key = os.path.basename(str(self.path))
         self.connected = True
         self.last_error = None
+
+    @property
+    def track_progress_s(self):
+        if not self.wf:
+            return 0.0
+        try:
+            return float(self.wf.tell()) / max(1, self.rate)
+        except Exception:
+            return 0.0
 
     def read(self) -> np.ndarray:
         if not self.wf:
@@ -427,6 +441,28 @@ def _wrap_pm(x: float) -> float:
     return (x + 0.5) % 1.0 - 0.5
 
 
+def _hpss_frame(mag, history, freq_width=15):
+    """Split one magnitude frame into harmonic and percussive components.
+
+    Harmonic: median over recent frames per frequency bin (sustained tones).
+    Percussive: median over neighbouring frequency bins (broadband transients).
+    """
+    history.append(np.asarray(mag, dtype=np.float32))
+    frames = np.stack(history, axis=0)
+    harmonic = np.median(frames, axis=0).astype(np.float32)
+
+    width = min(max(1, int(freq_width)), len(mag))
+    if width % 2 == 0:
+        width -= 1
+    if width <= 1:
+        return harmonic, np.asarray(mag, dtype=np.float32).copy()
+    pad = width // 2
+    padded = np.pad(np.asarray(mag, dtype=np.float32), (pad, pad), mode="edge")
+    windows = np.lib.stride_tricks.sliding_window_view(padded, width)
+    percussive = np.median(windows, axis=-1).astype(np.float32)
+    return harmonic, percussive
+
+
 class AudioProcessor:
     """Multi-resolution FFT, onset peak-picking, rhythm/tempo lock, and musical envelopes."""
 
@@ -453,7 +489,7 @@ class AudioProcessor:
         self.agc_enabled = bool(agc_cfg.get("enabled", True))
         self.target_rms = float(agc_cfg.get("target_rms", 0.08))
         self.agc_tau = float(agc_cfg.get("tau_s", 20.0))
-        self.silence_db = float(agc_cfg.get("silence_db", -55.0))
+        self.silence_db = float(agc_cfg.get("silence_db", -45.0))
         self.silence_linear = 10.0 ** (self.silence_db / 20.0)
 
         # Treble FFT (21 ms) — snare/transient timing.
@@ -488,8 +524,11 @@ class AudioProcessor:
         midi = 69.0 + 12.0 * np.log2(np.maximum(cf, 1e-6) / 440.0)
         self.chroma_pc = np.mod(np.rint(midi).astype(np.int64), 12)
 
-        self.prev_mag = np.zeros(len(self.freqs), dtype=np.float32)
-        self.prev_mag_bass = np.zeros(len(self.bass_freqs), dtype=np.float32)
+        # HPSS history: ~180 ms at the nominal 512/48k hop.
+        self.mag_hist = deque(maxlen=17)
+        self.bass_mag_hist = deque(maxlen=17)
+        self.prev_p_mag = np.zeros(len(self.freqs), dtype=np.float32)
+        self.prev_p_mag_bass = np.zeros(len(self.bass_freqs), dtype=np.float32)
         self.prev_flux = {k: 0.0 for k in BANDS}
         self.total_flux = 0.0
         self.total_flux_hist = deque(maxlen=150)
@@ -499,6 +538,7 @@ class AudioProcessor:
 
         self.band_ref = {"bass": 1e-3, "snare": 1e-3, "mids": 1e-3, "highs": 1e-3}
         self.levels = {"bass": 0.0, "snare": 0.0, "mids": 0.0, "highs": 0.0}
+        self.perc_levels = {"bass": 0.0, "snare": 0.0, "mids": 0.0, "highs": 0.0}
 
         self.rms_ema = self.target_rms
         self.agc_gain = 1.0
@@ -512,6 +552,8 @@ class AudioProcessor:
         self.snare_env = 0.0
         self.bright_env = 0.0
         self.energy_env = 0.0
+        self.harmonic_swell = 0.0
+        self.percussive_punch = 0.0
 
         self.kick_trig = False
         self.snare_trig = False
@@ -577,7 +619,8 @@ class AudioProcessor:
         floor_eff = floor * max(0.2, self.agc_gain)
         thr = max(floor_eff, med * k + floor_eff * 0.5)
         # Local-max approximation: current must be above the previous hop.
-        if gate and flux > thr and flux >= prev and self.levels.get(name, 1.0) > min_level and (now - last_t) > refractory:
+        level_gate = max(self.levels.get(name, 1.0), self.perc_levels.get(name, 1.0))
+        if gate and flux > thr and flux >= prev and level_gate > min_level and (now - last_t) > refractory:
             strength = min(1.0, max(0.0, flux / max(thr, 1e-9) - 1.0))
             return strength
         return 0.0
@@ -697,6 +740,13 @@ class AudioProcessor:
             self.mood[key] += (target - self.mood[key]) * 0.5
 
     def _update_tempo(self, now):
+        # Broadband noise has a flat spectrum and no musical pulse; never let
+        # its accidental autocorrelation peaks be promoted to a tempo lock.
+        if self.spectral_flatness > 0.55:
+            self.bpm_conf *= 0.5
+            self.music_conf *= 0.5
+            self.grid_conf *= 0.5
+            return
         while self.onset_hist and self.onset_hist[0][0] < now - 8.0:
             self.onset_hist.popleft()
         while self.bass_onsets and self.bass_onsets[0][0] < now - 8.0:
@@ -756,7 +806,7 @@ class AudioProcessor:
         p90 = float(np.percentile(scores, 90))
         # Peak prominence: the winner must stand out from the top decile of
         # tempo candidates, otherwise random onsets (noise/speech) score high.
-        conf = max(0.0, min(1.0, (best_score / max(p90, 1e-9) - 1.0) / 1.5))
+        conf = max(0.0, min(1.0, (best_score / max(p90, 1e-9) - 1.0) / 1.2))
 
         winner = float(temps[best_i])
         # Octave folding / disambiguation (§3.2.3): only pull a tempo that
@@ -826,11 +876,16 @@ class AudioProcessor:
         if is_silent:
             self.agc_gain = 1.0
         elif self.agc_enabled:
-            alpha_agc = min(1.0, dt / max(0.5, self.agc_tau))
-            # Only let rms_ema adapt downward when signal is clearly above noise floor
-            if raw_rms >= self.rms_ema or raw_rms > max(self.silence_linear * 4.0, 0.008):
-                self.rms_ema = (1.0 - alpha_agc) * self.rms_ema + alpha_agc * raw_rms
-            self.agc_gain = float(np.clip(self.target_rms / max(self.rms_ema, 1e-3), 0.4, 2.5))
+            # Noise-floor clamp: below 0.012 RMS the block is mostly
+            # quantisation noise, so hold the last gain instead of ramping
+            # 2.5x into hiss during fade-outs and quiet passages.
+            if raw_rms >= 0.012:
+                alpha_agc = min(1.0, dt / max(0.5, self.agc_tau))
+                if raw_rms >= self.rms_ema or raw_rms > max(self.silence_linear * 4.0, 0.012):
+                    self.rms_ema = (1.0 - alpha_agc) * self.rms_ema + alpha_agc * raw_rms
+                self.agc_gain = float(np.clip(self.target_rms / max(self.rms_ema, 1e-3), 0.4, 2.5))
+            else:
+                self.agc_gain = float(np.clip(self.agc_gain, 0.4, 2.5))
         else:
             self.agc_gain = 1.0
 
@@ -851,13 +906,14 @@ class AudioProcessor:
 
         spec = np.fft.rfft(self.ring * self.hann)
         mag = np.abs(spec).astype(np.float32) / (self.window_size * 0.5)
-        pos_diff = np.maximum(0.0, mag - self.prev_mag)
-        self.prev_mag = mag
+        # HPSS: harmonic beds vs. percussive transients. Only the
+        # percussive component is allowed to fire onsets.
+        harm_mag, perc_mag = _hpss_frame(mag, self.mag_hist)
+        pos_diff = np.maximum(0.0, perc_mag - self.prev_p_mag)
+        self.prev_p_mag = perc_mag
         total_diff = float(np.sum(pos_diff))
         centroid = float(np.dot(pos_diff, self.freqs) / total_diff) if total_diff > 1e-9 else 0.0
         fast_bass_flux = float(np.mean(pos_diff[self.fast_bass_mask]))
-        low_ratio = float(np.sum(pos_diff[self.fast_bass_mask]) / max(total_diff, 1e-9))
-        self.low_ratio = low_ratio
 
         # Timbre + harmony (slow, stable features).
         sm = mag[self.spectral_mask]
@@ -875,8 +931,9 @@ class AudioProcessor:
 
         bass_spec = np.fft.rfft(self.bass_ring * self.bass_hann)
         bass_mag = np.abs(bass_spec).astype(np.float32) / (self.bass_window_size * 0.5)
-        bass_pos_diff = np.maximum(0.0, bass_mag - self.prev_mag_bass)
-        self.prev_mag_bass = bass_mag
+        bass_harm, bass_perc = _hpss_frame(bass_mag, self.bass_mag_hist)
+        bass_pos_diff = np.maximum(0.0, bass_perc - self.prev_p_mag_bass)
+        self.prev_p_mag_bass = bass_perc
 
         self.kick_trig = False
         self.snare_trig = False
@@ -890,12 +947,15 @@ class AudioProcessor:
         if is_silent:
             for k in self.levels:
                 self.levels[k] = _follow(self.levels[k], 0.0, dt, 0.06, 0.40)
+                self.perc_levels[k] = _follow(self.perc_levels[k], 0.0, dt, 0.06, 0.40)
             self.pulse_env = _follow(self.pulse_env, 0.0, dt, 0.08, 0.40)
             self.kick_env = _follow(self.kick_env, 0.0, dt, 0.0, 0.26)
             self.snare_env = _follow(self.snare_env, 0.0, dt, 0.0, 0.18)
             self.hat_env = _follow(self.hat_env, 0.0, dt, 0.0, 0.12)
             self.bright_env = _follow(self.bright_env, 0.0, dt, 0.10, 0.30)
             self.energy_env = _follow(self.energy_env, energy_target, dt, 3.0, 3.0)
+            self.harmonic_swell = _follow(self.harmonic_swell, 0.0, dt, 0.10, 0.60)
+            self.percussive_punch = _follow(self.percussive_punch, 0.0, dt, 0.0, 0.18)
             # Keep the grid clock running through short gaps; sustained silence
             # drops confidence so effects fall back to their idle state.
             self.on_downbeat = False
@@ -916,11 +976,13 @@ class AudioProcessor:
         for name in BANDS:
             if name == "bass":
                 mask = self.bass_band_masks[name]
-                b_rms = self._band_rms(bass_mag, mask)
+                b_rms = self._band_rms(bass_harm, mask)
+                p_rms = self._band_rms(bass_perc, mask)
                 flux = float(np.mean(bass_pos_diff[mask]))
             else:
                 mask = self.band_masks[name]
-                b_rms = self._band_rms(mag, mask)
+                b_rms = self._band_rms(harm_mag, mask)
+                p_rms = self._band_rms(perc_mag, mask)
                 flux = float(np.mean(pos_diff[mask]))
 
             b_floor = band_floors[name]
@@ -928,12 +990,18 @@ class AudioProcessor:
                 if self._analysis_blocks == 0:
                     self.band_ref[name] = max(b_floor, b_rms)
                 else:
-                    # Fast upward adaptation to loud passages (2.5s), very slow downward (12s) bounded by b_floor
-                    tau_ref = 2.5 if b_rms > self.band_ref[name] else 12.0
+                    # Asymmetric reference: fast attack into loud passages
+                    # (2.5 s), very slow release (18 s) with a hard b_floor so
+                    # fade-outs glide to black instead of self-normalising.
+                    tau_ref = 2.5 if b_rms > self.band_ref[name] else 18.0
                     self.band_ref[name] = max(b_floor, self.band_ref[name] + (b_rms - self.band_ref[name]) * min(1.0, dt / tau_ref))
             ratio = (b_rms / max(self.band_ref[name], b_floor)) * 0.30 * self.sensitivity
             target = _log01(ratio) * quiet_knee
             self.levels[name] = _follow(self.levels[name], target, dt, 0.06, 0.40)
+            # Percussive gate level: onset peak-picking rides the isolated
+            # drum component, not the harmonic bed.
+            p_ratio = (p_rms / max(self.band_ref[name], b_floor)) * 0.30 * self.sensitivity
+            self.perc_levels[name] = _follow(self.perc_levels[name], _log01(p_ratio) * quiet_knee, dt, 0.02, 0.25)
 
             if name == "bass":
                 lat = dt + 0.25 * self.window_size / self.rate
@@ -989,6 +1057,10 @@ class AudioProcessor:
         bright_target = max(0.0, min(1.0, (0.4 * self.levels["highs"] + 0.35 * self.snare_env + 0.25 * self.hat_env) * (0.25 + 0.75 * self.music_conf)))
         self.bright_env = _follow(self.bright_env, bright_target, dt, 0.10, 0.30)
         self.energy_env = _follow(self.energy_env, energy_target, dt, 3.0, 3.0)
+        harmonic_target = max(0.0, min(1.0, 0.50 * self.levels["bass"] + 0.32 * self.levels["mids"] + 0.18 * self.levels["highs"]))
+        self.harmonic_swell = _follow(self.harmonic_swell, harmonic_target, dt, 0.20, 0.80)
+        percussive_target = max(self.kick_env, self.snare_env, 0.5 * self.hat_env)
+        self.percussive_punch = _follow(self.percussive_punch, percussive_target, dt, 0.01, 0.18)
 
         target_build = max(0.0, min(1.0, (self.energy_fast / max(self.energy_slow, 1e-6) - 1.0) * 1.5))
         self.build += (target_build - self.build) * min(1.0, dt / 0.5)
@@ -1012,6 +1084,56 @@ class AudioProcessor:
         self._analysis_blocks += 1
         return self.snapshot(alive=True, t_ingest=now)
 
+    def _live_cue(self, alive=True):
+        """Best-effort ShowGraph cue when no cached TrackMap is loaded."""
+        cue = {
+            "available": False,
+            "section": "intro",
+            "section_progress": 0.0,
+            "beats_to_drop": 0.0,
+            "beats_in_section": 0.0,
+            "harmonic_swell": 0.0,
+            "percussive_punch": 0.0,
+            "prominence": 0.0,
+            "source": "live",
+        }
+        if not alive:
+            return cue
+
+        available = bool(self.music_conf > 0.05 and self.section_name != "idle")
+        if self.section_name == "drop":
+            name = "drop"
+        elif self.section_name == "build":
+            name = "build"
+        elif not available:
+            name = "intro"
+        elif self.energy_env < 0.12:
+            name = "breakdown"
+        else:
+            name = "verse"
+
+        if name == "build":
+            progress = max(0.0, min(1.0, self.build))
+            beats_to_drop = max(0.0, (1.0 - progress) * 8.0)
+        elif name == "drop":
+            progress = 1.0 - max(0.0, min(1.5, self.drop_until - self.sim_time)) / 1.5
+            beats_to_drop = 0.0
+        else:
+            progress = ((self.beat_count % 16) + self.beat_phase) / 16.0
+            beats_to_drop = 0.0
+
+        cue.update({
+            "available": available,
+            "section": name,
+            "section_progress": round(max(0.0, min(1.0, progress)), 4),
+            "beats_to_drop": round(beats_to_drop, 2),
+            "beats_in_section": 16.0,
+            "harmonic_swell": round(float(self.harmonic_swell), 3),
+            "percussive_punch": round(float(self.percussive_punch), 3),
+            "prominence": round(min(1.0, float(self.energy_fast / max(self.energy_slow, 1e-6))), 3),
+        })
+        return cue
+
     def snapshot(self, alive=True, connected=True, source_name="synthetic", error=None, t_ingest=0.0):
         bpm = max(1.0, float(self.bpm_est))
         beat_period = 60.0 / bpm
@@ -1023,6 +1145,8 @@ class AudioProcessor:
             "hat": round(float(self.hat_env), 3),
             "bright": round(float(self.bright_env), 3),
             "energy": round(float(self.energy_env), 3),
+            "harmonic": round(float(self.harmonic_swell), 3),
+            "percussive": round(float(self.percussive_punch), 3),
         }
         beat = {
             "phase": round(float(self.beat_phase), 4),
@@ -1085,6 +1209,7 @@ class AudioProcessor:
                 "mood": {k: 0.0 for k in mood},
                 "harmony": {"key": 0, "key_conf": 0.0, "chroma": [0.0] * 12},
                 "section": {"name": "idle", "build": 0.0, "drop": False},
+                "cue": self._live_cue(False),
             }
         return {
             "alive": True,
@@ -1115,6 +1240,7 @@ class AudioProcessor:
             "mood": mood,
             "harmony": harmony,
             "section": section,
+            "cue": self._live_cue(True),
         }
 
 
@@ -1133,6 +1259,20 @@ class AudioEngine:
         self._history = deque(maxlen=512)
         self._delayed = None
         self.last_update = 0.0
+        show_cfg = self.cfg.get("show") or {}
+        self.show = ShowAnalyzer(cache_dir=show_cfg.get("cache_dir", "config/show_cache"))
+        self._track_key = None
+        self._track_map = None
+        self._capture_key = None
+        self._capture_parts = []
+        self._capture_frames = 0
+        self._capture_start_progress = 0.0
+        self._capture_last_progress = 0.0
+        self._capture_duration = 0.0
+        self._capture_enabled = False
+        self._capture_max_s = float(show_cfg.get("capture_max_s", 480.0))
+        self._analysis_lock = threading.Lock()
+        self._analysis_keys = set()
 
     @staticmethod
     def _resolve_source_name(src):
@@ -1231,7 +1371,7 @@ class AudioEngine:
             self.dsp.agc_enabled = bool(agc.get("enabled", True))
             self.dsp.target_rms = float(agc.get("target_rms", 0.08))
             self.dsp.agc_tau = max(20.0, float(agc.get("tau_s", 20.0)))
-            self.dsp.silence_db = float(agc.get("silence_db", -55.0))
+            self.dsp.silence_db = float(agc.get("silence_db", -45.0))
             self.dsp.silence_linear = 10.0 ** (self.dsp.silence_db / 20.0)
         if restart_needed:
             self.start()
@@ -1260,6 +1400,125 @@ class AudioEngine:
             "source": self.active_source_name,
         }
 
+    def _attach_show_cue(self, feat):
+        """Override the live cue with a cached TrackMap when the source knows the track."""
+        key = getattr(self.source, "track_key", None)
+        if not key:
+            return
+        if key != self._track_key:
+            self._track_key = key
+            self._track_map = self.show.load_cached(key)
+            if self._track_map is not None:
+                log.info("ShowGraph cue loaded for '%s' (%.1f BPM, %d sections)",
+                         key, self._track_map.tempo, len(self._track_map.sections))
+        if self._track_map is None:
+            return
+        try:
+            progress = float(getattr(self.source, "track_progress_s", 0.0) or 0.0)
+        except (TypeError, ValueError):
+            progress = 0.0
+        feat["cue"] = self._track_map.cue_at(progress)
+        feat["show_track"] = {
+            "key": key,
+            "progress_s": round(progress, 3),
+            "tempo": round(float(self._track_map.tempo), 2),
+        }
+
+    def _update_show_capture(self, samples):
+        """Record the streamed track once, then compile its TrackMap in the background.
+
+        This removes the manual WAV/ffmpeg step: the first full play of a track
+        populates the cache, subsequent plays get the full ShowGraph instantly.
+        """
+        key = getattr(self.source, "track_key", None)
+        if not key:
+            self._finish_show_capture()
+            return
+        try:
+            progress = float(getattr(self.source, "track_progress_s", 0.0) or 0.0)
+            duration = float(getattr(self.source, "track_duration_s", 0.0) or 0.0)
+        except (TypeError, ValueError):
+            progress, duration = 0.0, 0.0
+
+        if key != self._capture_key:
+            self._finish_show_capture()
+            self._capture_key = key
+            self._capture_parts = []
+            self._capture_frames = 0
+            self._capture_start_progress = progress
+            self._capture_last_progress = progress
+            self._capture_duration = duration
+            cached = self._track_key == key and self._track_map is not None
+            self._capture_enabled = bool(key and progress <= 2.0 and not cached)
+            if self._capture_enabled:
+                log.info("ShowGraph capture started for '%s'", key)
+
+        if not self._capture_enabled:
+            return
+
+        if duration > 0.0 and self._capture_duration <= 0.0:
+            self._capture_duration = duration
+        self._capture_last_progress = progress
+        if self._capture_frames < int(self._capture_max_s * self.dsp.rate):
+            self._capture_parts.append(np.asarray(samples, dtype=np.float32).copy())
+            self._capture_frames += len(samples)
+
+        if (
+            self._capture_frames >= int(self._capture_max_s * self.dsp.rate)
+            or (duration > 0.0 and progress >= duration - 1.0)
+        ):
+            self._finish_show_capture()
+
+    def _finish_show_capture(self):
+        if not self._capture_key:
+            return
+        key = self._capture_key
+        parts = self._capture_parts
+        frames = self._capture_frames
+        duration = self._capture_duration
+        last_progress = self._capture_last_progress
+        self._capture_key = None
+        self._capture_parts = []
+        self._capture_frames = 0
+        self._capture_enabled = False
+
+        if not parts or frames <= 0:
+            return
+        captured_s = frames / float(self.dsp.rate)
+        min_s = min(120.0, duration * 0.85) if duration > 0.0 else 60.0
+        if captured_s < min_s:
+            log.info("ShowGraph capture for '%s' discarded (only %.0fs)", key, captured_s)
+            return
+        if duration > 0.0 and last_progress < duration - 3.0 and captured_s < duration * 0.90:
+            log.info("ShowGraph capture for '%s' discarded (track skipped)", key)
+            return
+
+        with self._analysis_lock:
+            if key in self._analysis_keys:
+                return
+            self._analysis_keys.add(key)
+        log.info("ShowGraph compiling '%s' from %.0fs of captured audio ...", key, captured_s)
+        threading.Thread(
+            target=self._analyze_show_capture,
+            args=(key, parts, captured_s),
+            name="hueme-show-analyze",
+            daemon=True,
+        ).start()
+
+    def _analyze_show_capture(self, key, parts, captured_s):
+        try:
+            samples = np.concatenate(parts)
+            track_map = self.show.analyze_audio(samples, self.dsp.rate, track_key=key, force=False)
+            log.info(
+                "ShowGraph compiled '%s': %.1f BPM, %d sections, %d drops",
+                key, track_map.tempo, len(track_map.sections), len(track_map.drops),
+            )
+        except Exception as e:
+            log.warning("ShowGraph compile failed for '%s': %s", key, e)
+        finally:
+            with self._analysis_lock:
+                self._analysis_keys.discard(key)
+
     def _loop(self):
         while not self.stop_event.is_set():
             try:
@@ -1281,6 +1540,11 @@ class AudioEngine:
                     feat["connected"] = getattr(self.source, "connected", True)
                     feat["source"] = self.active_source_name
                     feat["error"] = getattr(self.source, "last_error", None)
+                    try:
+                        self._attach_show_cue(feat)
+                        self._update_show_capture(samples)
+                    except Exception:
+                        log.debug("ShowGraph cue lookup/capture failed", exc_info=True)
                     with self.lock:
                         self._latest = feat
                         if self._history and play_t < self._history[-1][0] - 0.05:

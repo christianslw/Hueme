@@ -1,0 +1,32 @@
+17:18:48 [INFO] hueme.effects: Loaded effect plugin 'ambient_uplight'
+17:18:48 [INFO] hueme.effects: Loaded effect plugin 'band_matrix'
+17:18:48 [INFO] hueme.effects: Loaded effect plugin 'bass_cannon'
+17:18:49 [INFO] hueme.effects: Loaded effect plugin 'berghain_shutter'
+17:18:49 [INFO] hueme.effects: Loaded effect plugin 'blackbody_forge'
+17:18:49 [INFO] hueme.effects: Loaded effect plugin 'breathe'
+17:18:49 [INFO] hueme.effects: Loaded effect plugin 'club_tech'
+17:18:49 [INFO] hueme.effects: Loaded effect plugin 'diagnostic_chase'
+17:18:49 [INFO] hueme.effects: Loaded effect plugin 'dim2warm'
+17:18:49 [INFO] hueme.effects: Loaded effect plugin 'ferro_pendulum'
+17:18:49 [INFO] hueme.effects: Loaded effect plugin 'kinetic_polyrhythm'
+17:18:49 [INFO] hueme.effects: Loaded effect plugin 'kuramoto_bloom'
+17:18:49 [INFO] hueme.effects: Loaded effect plugin 'ma3_busker'
+17:18:49 [INFO] hueme.effects: Loaded effect plugin 'ma3_matrix_wing'
+17:18:49 [INFO] hueme.effects: Loaded effect plugin 'ping_pong'
+17:18:49 [INFO] hueme.effects: Loaded effect plugin 'prism'
+17:18:49 [INFO] hueme.effects: Loaded effect plugin 'rainbow'
+17:18:49 [INFO] hueme.effects: Loaded effect plugin 'scene_pulse'
+17:18:49 [INFO] hueme.effects: Loaded effect plugin 'shockwave'
+17:18:49 [INFO] hueme.effects: Loaded effect plugin 'solid'
+17:18:49 [INFO] hueme.effects: Loaded effect plugin 'spectrum_sweep'
+17:18:49 [INFO] hueme.effects: Loaded effect plugin 'strobe_drop'
+17:18:49 [INFO] hueme.effects: Loaded effect plugin 'symphonic_director'
+17:18:49 [INFO] hueme.effects: Loaded effect plugin 'timecode_architect'
+17:18:50 [INFO] hueme.sendspin: Connecting to Sendspin server at ws://192.168.10.13:8927/sendspin ...
+17:18:50 [INFO] aiosendspin.client.client: Connecting to Sendspin server at ws://192.168.10.13:8927/sendspin
+17:18:50 [INFO] hueme.engine: LightingEngine started (2 groups)
+17:18:50 [WARNING] aiosendspin.client.connection: Server aWDR0-Q8LP6j1zjFEBBc9Sonjvg1ohTuekD9F4Lgzik referenced a credential this client cannot use; continuing unpaired on the Sentinel PSK until re-paired
+17:18:50 [INFO] hueme.sendspin: Sendspin connected (server: Music Assistant (d5369777-music-assistant))
+17:18:54 [INFO] hueme.engine: Auto-discovered 22 Zigbee devices from Zigbee2MQTT
+17:19:21 [INFO] hueme.engine: Configuration updated and hot-applied
+17:19:25 [INFO] hueme.engine: Configuration updated and hot-applied

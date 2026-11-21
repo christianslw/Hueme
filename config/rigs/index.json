@@ -1,0 +1,40 @@
+{
+  "schema_version": 1,
+  "active": "hueme_loft",
+  "presets": [
+    {
+      "id": "empty_loft",
+      "name": "Empty Loft",
+      "file": "empty_loft.json",
+      "fixture_count": 0,
+      "voxel_count": 0,
+      "room_min": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "room_max": [
+        6.5,
+        8.0,
+        5.1
+      ]
+    },
+    {
+      "id": "hueme_loft",
+      "name": "Hueme Loft",
+      "file": "hueme_loft.json",
+      "fixture_count": 11,
+      "voxel_count": 190,
+      "room_min": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "room_max": [
+        6.5,
+        8.0,
+        5.1
+      ]
+    }
+  ]
+}

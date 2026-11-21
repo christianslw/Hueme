@@ -3,12 +3,40 @@
 import argparse
 import logging
 import multiprocessing
+import os
 import signal
+import sys
 import threading
 
 from hueme.config import DEFAULT_CONFIG_PATH
 from hueme.engine import LightingEngine
 from hueme.web import create_http_server
+
+_LOCK_FILE = None
+
+
+def _acquire_single_instance(config_path):
+    """Refuse a second Hueme process: duplicate senders fight over the same lamps."""
+    global _LOCK_FILE
+    lock_path = os.path.join(os.path.dirname(os.path.abspath(config_path)), "hueme.lock")
+    try:
+        handle = open(lock_path, "a+")
+    except OSError:
+        return True
+    try:
+        if os.name == "nt":
+            import msvcrt
+            handle.seek(0)
+            msvcrt.locking(handle.fileno(), msvcrt.LK_NBLCK, 1)
+        else:
+            import fcntl
+            fcntl.flock(handle.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
+    except OSError:
+        handle.close()
+        print(f"Hueme is already running (lock {lock_path}). Stop the other instance first.", file=sys.stderr)
+        return False
+    _LOCK_FILE = handle
+    return True
 
 
 def main(argv=None):
@@ -25,6 +53,8 @@ def main(argv=None):
     ap.add_argument("--web-port", type=int, default=None)
     ap.add_argument("--host", default=None, help="MQTT broker host override")
     args = ap.parse_args(argv)
+    if not _acquire_single_instance(args.config):
+        raise SystemExit(1)
 
     overrides = {
         "source": args.source,

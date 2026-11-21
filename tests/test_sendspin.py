@@ -13,6 +13,31 @@ except Exception:
     AudioCodec = None
 
 
+class TestSendspinTrackMetadata(unittest.TestCase):
+    def test_item_id_and_playing_state_follow_metadata(self):
+        src = SendspinAudioSource(rate=48000, channels=2, block=512)
+        progress = SimpleNamespace(
+            track_progress=12_000,
+            playback_speed=1_000,
+            track_duration=236_250,
+        )
+        meta = SimpleNamespace(
+            title="Dance Loft 128",
+            artist="Demo Artist",
+            item_id="ma-item-1",
+            progress=progress,
+        )
+        src._on_metadata(SimpleNamespace(metadata=meta))
+        self.assertEqual(src.track_item_id, "ma-item-1")
+        self.assertEqual(src.track_key, "Demo Artist|Dance Loft 128")
+        self.assertTrue(src.track_playing)
+        self.assertAlmostEqual(src.track_progress_s, 12.0, places=1)
+
+        progress.playback_speed = 0
+        src._on_metadata(SimpleNamespace(metadata=meta))
+        self.assertFalse(src.track_playing)
+
+
 @unittest.skipUnless(_AVAILABLE and AudioCodec is not None, "aiosendspin not installed")
 class TestSendspinSource(unittest.TestCase):
     def test_pcm_chunks_are_buffered_as_mono_blocks(self):

@@ -37,11 +37,30 @@ GRADIENT_ALIASES = {
     "rainbow": "synth",
 }
 
+DEFAULT_CUE = {
+    "available": False,
+    "section": "intro",
+    "section_progress": 0.0,
+    "beats_to_drop": 0.0,
+    "beats_in_section": 0.0,
+    "harmonic_swell": 0.0,
+    "percussive_punch": 0.0,
+    "prominence": 0.0,
+}
+
 ALLOWED_IMPORTS = {
     "math": math,
     "random": random,
     "colorsys": colorsys,
 }
+
+
+def _cue_context(features):
+    cue = dict(DEFAULT_CUE)
+    raw = features.get("cue")
+    if isinstance(raw, dict):
+        cue.update(raw)
+    return cue
 
 
 def _safe_import(name, globals=None, locals=None, fromlist=(), level=0):
@@ -337,6 +356,7 @@ def sandbox_worker(conn):
                         "mood": features.get("mood") or {},
                         "harmony": features.get("harmony") or {"key": 0, "key_conf": 0.0, "chroma": [0.0] * 12},
                         "section": features.get("section") or {"name": "idle", "build": 0.0, "drop": False},
+                        "cue": _cue_context(features),
                         "utils": UTILS,
                     }
                     raw_px = ns["render"](ctx)
