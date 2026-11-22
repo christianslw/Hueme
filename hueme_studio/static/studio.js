@@ -144,6 +144,10 @@ const dom = {
   paletteList: $("#palette-list"),
   paletteNew: $("#palette-new"),
   timeline: $("#timeline"),
+  timelineSection: $(".timeline"),
+  timelineLayers: $("#timeline-layers"),
+  timelineAnalysis: $("#timeline-analysis"),
+  analysisLegend: $("#analysis-legend"),
   history: $("#history-label"),
   grid: $("#grid-select"),
   autoKeys: $("#auto-keys"),
@@ -153,6 +157,23 @@ const dom = {
 };
 
 const TRACK_COLORS = ["#d06b4a", "#5e9aa8", "#9b7fb5", "#8fa65a", "#b3925a"];
+const ANALYSIS_CURVES = [
+  { key: "pulse", label: "Pulse", color: "#e8862e" },
+  { key: "kick", label: "Kick", color: "#d06b4a" },
+  { key: "snare", label: "Snare", color: "#c45a52" },
+  { key: "hat", label: "Hat", color: "#c9a34a" },
+  { key: "energy", label: "Energy", color: "#8fa65a" },
+  { key: "harmonic", label: "Harmonic", color: "#5e9aa8" },
+  { key: "percussive", label: "Percussive", color: "#9b7fb5" },
+  { key: "prominence", label: "Prominence", color: "#b3925a" },
+  { key: "bass", label: "Bass", color: "#4f8fc0" },
+  { key: "mid", label: "Mid", color: "#58a66b" },
+  { key: "high", label: "High", color: "#e0b36a" },
+  { key: "sectionProgress", label: "Section", color: "#7c8089" },
+  { key: "beatsToDrop", label: "To Drop", color: "#c45a52" },
+  { key: "inDrop", label: "In Drop", color: "#d06b4a" },
+];
+const ANALYSIS_STORAGE_KEY = "hueme.studio.analysisCurves.v1";
 const PROTOCOL_CLASS = {
   hue_z2m: "hue",
   wled_ddp: "ddp",
@@ -220,6 +241,17 @@ let heightCommitTimer = 0;
 const collapsedFolders = new Set();
 const openLanes = new Set();
 const openExpressions = new Set();
+let timelineMode = "layers";
+let analysisHover = null;
+let analysisCurves = new Set(ANALYSIS_CURVES.map((curve) => curve.key));
+try {
+  const stored = JSON.parse(localStorage.getItem(ANALYSIS_STORAGE_KEY) || "null");
+  if (Array.isArray(stored)) {
+    analysisCurves = new Set(stored.filter((key) => ANALYSIS_CURVES.some((curve) => curve.key === key)));
+  }
+} catch {
+  // A broken localStorage entry must not stop the Studio.
+}
 let lastHistory = { undo_depth: 0, redo_depth: 0 };
 let libraryQuery = "";
 const collapsedCategories = new Set();
@@ -2284,6 +2316,294 @@ function formatTimelineLabel(time) {
   return timecodeText(time);
 }
 
+function analysisHasAudio() {
+  const length = Number(blueprint?.waveform?.length || 0);
+  const audioDuration = Number(audioAnalysis?.duration || blueprint?.duration_s || 0);
+  return Boolean((audioAnalysis || length > 0) && audioDuration > 0);
+}
+
+function saveAnalysisCurves() {
+  try {
+    localStorage.setItem(ANALYSIS_STORAGE_KEY, JSON.stringify([...analysisCurves]));
+  } catch {
+    // Persistence is a convenience, not a requirement for analysis.
+  }
+}
+
+function renderAnalysisLegend() {
+  if (!dom.analysisLegend) return;
+  const all = el("button", {
+    class: "button small", type: "button", text: "All",
+    onclick: () => {
+      analysisCurves = new Set(ANALYSIS_CURVES.map((curve) => curve.key));
+      saveAnalysisCurves();
+      renderAnalysisLegend();
+      requestDraw();
+    },
+  });
+  const none = el("button", {
+    class: "button small", type: "button", text: "None",
+    onclick: () => {
+      analysisCurves.clear();
+      saveAnalysisCurves();
+      renderAnalysisLegend();
+      requestDraw();
+    },
+  });
+  const chips = ANALYSIS_CURVES.map((curve) => {
+    const input = el("input", { type: "checkbox" });
+    input.checked = analysisCurves.has(curve.key);
+    input.addEventListener("change", () => {
+      if (input.checked) analysisCurves.add(curve.key);
+      else analysisCurves.delete(curve.key);
+      saveAnalysisCurves();
+      requestDraw();
+    });
+    return el(
+      "label",
+      { class: "analysis-curve" },
+      input,
+      el("span", { class: "analysis-swatch", style: `background:${curve.color}` }),
+      el("span", { text: curve.label })
+    );
+  });
+  dom.analysisLegend.replaceChildren(
+    el("div", { class: "analysis-actions" }, all, none),
+    ...chips,
+    el("span", { id: "analysis-values", class: "mono muted analysis-values", text: "values at playhead" })
+  );
+}
+
+function setTimelineMode(mode) {
+  timelineMode = mode === "analysis" ? "analysis" : "layers";
+  dom.timelineSection?.classList.toggle("analysis-mode", timelineMode === "analysis");
+  dom.timelineLayers?.classList.toggle("active", timelineMode === "layers");
+  dom.timelineAnalysis?.classList.toggle("active", timelineMode === "analysis");
+  dom.analysisLegend?.classList.toggle("hidden", timelineMode !== "analysis");
+  if (timelineMode === "analysis") renderAnalysisLegend();
+  analysisHover = null;
+  resizeAll();
+  requestDraw();
+}
+
+function drawTimelineAnalysis(context, w, h, doc) {
+  const top = view.rulerH;
+  const spectrumH = 54;
+  const bottom = Math.max(top + 40, h - spectrumH - 6);
+  const left = view.labelW;
+  context.fillStyle = "#101216";
+  context.fillRect(0, 0, w, h);
+  context.fillStyle = "#141518";
+  context.fillRect(0, 0, left, h);
+  context.fillStyle = "#1d1f23";
+  context.fillRect(left, 0, w - left, top);
+
+  // Beat grid.
+  let step = gridSeconds();
+  while ((step / Math.max(0.001, view.end - view.start)) * (w - left) < 6) step *= 2;
+  const offset = Number(doc.timing?.beat_offset_s || 0);
+  for (let time = offset + Math.floor((view.start - offset) / step) * step; time <= view.end; time += step) {
+    if (time < 0) continue;
+    const x = timeToX(time);
+    context.strokeStyle = Math.abs(time / (beatSeconds() * 4) - Math.round(time / (beatSeconds() * 4))) < 1e-6 ? "#2b2e34" : "#202329";
+    context.beginPath();
+    context.moveTo(x + 0.5, top);
+    context.lineTo(x + 0.5, bottom);
+    context.stroke();
+  }
+
+  for (const window of blueprint?.drop_windows || []) {
+    const x0 = Math.max(left, timeToX(Number(window.start)));
+    const x1 = Math.min(w, timeToX(Number(window.end)));
+    if (x1 > x0) {
+      context.fillStyle = "rgba(208, 107, 74, 0.10)";
+      context.fillRect(x0, top, x1 - x0, bottom - top);
+    }
+  }
+  for (const marker of doc.timing?.markers || []) {
+    const x = timeToX(marker.t_s);
+    if (x < left || x > w) continue;
+    context.strokeStyle = marker.kind === "drop" ? "#d06b4a" : "#6f7480";
+    context.setLineDash([3, 3]);
+    context.beginPath();
+    context.moveTo(x + 0.5, 12);
+    context.lineTo(x + 0.5, bottom);
+    context.stroke();
+    context.setLineDash([]);
+    context.fillStyle = marker.kind === "drop" ? "#d06b4a" : "#7c8089";
+    context.font = "9px Inter, sans-serif";
+    context.fillText(marker.name, x + 3, 22);
+  }
+
+  context.fillStyle = "#9da1aa";
+  context.font = "9px JetBrains Mono, monospace";
+  context.fillText("ANALYSIS · WAVEFORM + ENVELOPE BASIS", 8, 16);
+  context.fillStyle = "#4a4e56";
+  context.fillText("click/scrub = seek + snap", 8, 29);
+
+  if (!analysisHasAudio()) {
+    context.fillStyle = "#7c8089";
+    context.font = "12px JetBrains Mono, monospace";
+    context.fillText("NO AUDIO — attach a WAV, MP3 or video to analyse", left + 24, top + (bottom - top) / 2);
+    const values = dom.analysisLegend?.querySelector(".analysis-values");
+    if (values) values.textContent = "NO AUDIO";
+    drawAnalysisPlayhead(context, w, h, bottom);
+    return;
+  }
+
+  const source = audioAnalysis;
+  const audioDuration = Number(source?.duration || blueprint?.duration_s || duration());
+  const mid = top + (bottom - top) / 2;
+  const span = (bottom - top) * 0.46;
+  if (source && audioDuration > 0) {
+    for (let x = left; x < w; x += 2) {
+      const time = xToTime(x);
+      if (time < 0 || time > audioDuration) continue;
+      const index = Math.min(source.buckets - 1, Math.max(0, Math.floor((time / audioDuration) * source.buckets)));
+      const lo = source.min[index];
+      const hi = source.max[index];
+      context.fillStyle = "rgba(94, 154, 168, 0.30)";
+      context.fillRect(x, mid - hi * span, 1, Math.max(1, (hi - lo) * span));
+      context.fillStyle = "rgba(232, 134, 46, 0.55)";
+      const rms = source.rms[index];
+      context.fillRect(x, mid - rms * span, 1, Math.max(1, rms * span * 2));
+    }
+  } else {
+    const wave = blueprint?.waveform || [];
+    for (let x = left; x < w; x += 2) {
+      const time = xToTime(x);
+      if (time < 0 || time > audioDuration) continue;
+      const index = Math.min(wave.length - 1, Math.floor((time / audioDuration) * wave.length));
+      const amp = wave[index] * span;
+      context.fillStyle = "rgba(94, 154, 168, 0.32)";
+      context.fillRect(x, mid - amp, 1, Math.max(1, amp * 2));
+    }
+  }
+
+  context.save();
+  context.beginPath();
+  context.rect(left, top, w - left, bottom - top);
+  context.clip();
+  const samples = [];
+  for (let x = left; x <= w; x += 2) {
+    samples.push({ x, env: envelopeAt(xToTime(x)) });
+  }
+  for (const curve of ANALYSIS_CURVES) {
+    if (!analysisCurves.has(curve.key)) continue;
+    context.strokeStyle = curve.color;
+    context.lineWidth = curve.key === "inDrop" ? 1 : 1.25;
+    if (curve.key === "beatsToDrop" || curve.key === "inDrop") context.setLineDash([4, 3]);
+    else context.setLineDash([]);
+    context.beginPath();
+    samples.forEach((sample, index) => {
+      const value = clamp(Number(sample.env[curve.key]) || 0, 0, 1);
+      const y = bottom - value * (bottom - top);
+      if (index === 0) context.moveTo(sample.x, y);
+      else context.lineTo(sample.x, y);
+    });
+    context.stroke();
+  }
+  context.setLineDash([]);
+  context.restore();
+
+  // Spectrum strip.
+  const spectrumTop = bottom + 7;
+  const spectrum = ["bass", "mid", "high", "energy"];
+  const envNow = envelopeAt(currentTime());
+  context.fillStyle = "#0c0d10";
+  context.fillRect(left, spectrumTop, w - left, spectrumH - 6);
+  context.fillStyle = "#4a4e56";
+  context.font = "8px JetBrains Mono, monospace";
+  context.fillText("SPECTRUM", 8, spectrumTop + 10);
+  const barW = Math.max(18, Math.min(48, (w - left - 30) / spectrum.length - 6));
+  spectrum.forEach((key, index) => {
+    const value = clamp(Number(envNow[key]) || 0, 0, 1);
+    const x = left + 10 + index * (barW + 18);
+    const barH = spectrumH - 22;
+    context.fillStyle = "#25282d";
+    context.fillRect(x, spectrumTop + 12, barW, barH);
+    context.fillStyle = "#5e9aa8";
+    context.fillRect(x, spectrumTop + 12 + barH * (1 - value), barW, barH * value);
+    context.fillStyle = "#b3b6bd";
+    context.font = "8px JetBrains Mono, monospace";
+    context.fillText(`${key.toUpperCase()} ${value.toFixed(2)}`, x, spectrumTop + barH + 20);
+  });
+
+  const bases = ANALYSIS_CURVES.filter((curve) => analysisCurves.has(curve.key));
+  const dominant = bases.reduce(
+    (best, curve) => {
+      const value = clamp(Number(envNow[curve.key]) || 0, 0, 1);
+      return value > best.value ? { label: curve.label, value } : best;
+    },
+    { label: "—", value: 0 }
+  );
+  context.fillStyle = "#e8862e";
+  context.font = "9px JetBrains Mono, monospace";
+  context.fillText(`DOMINANCE · ${dominant.label.toUpperCase()} ${dominant.value.toFixed(2)}`, left + 10, h - 4);
+  const values = dom.analysisLegend?.querySelector(".analysis-values");
+  if (values) {
+    values.textContent = ANALYSIS_CURVES
+      .filter((curve) => analysisCurves.has(curve.key))
+      .map((curve) => `${curve.label} ${(Number(envNow[curve.key]) || 0).toFixed(2)}`)
+      .join("  ");
+  }
+
+  if (analysisHover && analysisHover.x >= left) {
+    const hoverX = timeToX(analysisHover.time);
+    context.strokeStyle = "#e8862e88";
+    context.lineWidth = 1;
+    context.beginPath();
+    context.moveTo(hoverX + 0.5, top);
+    context.lineTo(hoverX + 0.5, bottom);
+    context.stroke();
+    const hoverEnv = envelopeAt(analysisHover.time);
+    const lines = ANALYSIS_CURVES
+      .filter((curve) => analysisCurves.has(curve.key))
+      .map((curve) => `${curve.label.padEnd(12, " ")} ${(Number(hoverEnv[curve.key]) || 0).toFixed(3)}`);
+    const boxW = 132;
+    const boxH = 14 + lines.length * 11;
+    const boxX = hoverX + 8 + boxW > w ? hoverX - boxW - 8 : hoverX + 8;
+    const boxY = top + 8;
+    context.fillStyle = "#111214ee";
+    context.fillRect(boxX, boxY, boxW, boxH);
+    context.strokeStyle = "#3a3e46";
+    context.strokeRect(boxX + 0.5, boxY + 0.5, boxW - 1, boxH - 1);
+    context.fillStyle = "#e8862e";
+    context.font = "8px JetBrains Mono, monospace";
+    context.fillText(timecodeText(analysisHover.time), boxX + 5, boxY + 11);
+    context.fillStyle = "#b3b6bd";
+    lines.forEach((line, index) => {
+      context.fillText(line, boxX + 5, boxY + 23 + index * 11);
+    });
+  }
+
+  drawAnalysisPlayhead(context, w, h, bottom);
+}
+
+function drawAnalysisPlayhead(context, w, h, bottom) {
+  const playhead = timeToX(currentTime());
+  if (playhead < view.labelW || playhead > w) return;
+  context.strokeStyle = "#e8862e";
+  context.lineWidth = 1;
+  context.beginPath();
+  context.moveTo(playhead + 0.5, 0);
+  context.lineTo(playhead + 0.5, bottom);
+  context.stroke();
+  context.fillStyle = "#e8862e";
+  context.beginPath();
+  context.moveTo(playhead - 4, 0);
+  context.lineTo(playhead + 5, 0);
+  context.lineTo(playhead + 0.5, 7);
+  context.closePath();
+  context.fill();
+  context.strokeStyle = "#3a3e46";
+  context.beginPath();
+  context.moveTo(view.labelW + 0.5, 0);
+  context.lineTo(view.labelW + 0.5, h);
+  context.stroke();
+}
+
+
 function drawTimeline() {
   const context = dom.timeline.getContext("2d");
   const { w, h } = timelineSize;
@@ -2295,6 +2615,10 @@ function drawTimeline() {
     context.fillStyle = "#7c8089";
     context.font = "11px Inter, sans-serif";
     context.fillText("No show loaded", 12, 42);
+    return;
+  }
+  if (timelineMode === "analysis") {
+    drawTimelineAnalysis(context, w, h, doc);
     return;
   }
   const rows = buildTimelineRows();
@@ -7255,6 +7579,15 @@ function setTimelineCursor(cursor) {
 
 function bindTimeline() {
   const canvas = dom.timeline;
+  dom.timelineLayers?.addEventListener("click", () => setTimelineMode("layers"));
+  dom.timelineAnalysis?.addEventListener("click", () => setTimelineMode("analysis"));
+
+  canvas.addEventListener("pointerleave", () => {
+    if (analysisHover) {
+      analysisHover = null;
+      requestDraw();
+    }
+  });
 
   canvas.addEventListener("pointerdown", (event) => {
     canvas.focus();
@@ -7266,6 +7599,15 @@ function bindTimeline() {
       client.seek(time);
       timelineDrag = { mode: "scrub" };
       canvas.setPointerCapture(event.pointerId);
+      return;
+    }
+    if (timelineMode === "analysis") {
+      const time = clamp(snapTime(xToTime(x)), 0, duration());
+      client.seek(time);
+      analysisHover = { x, y, time };
+      timelineDrag = { mode: "scrub" };
+      canvas.setPointerCapture(event.pointerId);
+      requestDraw();
       return;
     }
     const audioBottom = view.rulerH + view.audioH;
@@ -7416,6 +7758,14 @@ function bindTimeline() {
         }
       }
       setTimelineCursor("over-resize");
+      requestDraw();
+      return;
+    }
+    if (timelineMode === "analysis") {
+      const time = clamp(snapTime(xToTime(x)), 0, duration());
+      analysisHover = { x, y, time };
+      if (timelineDrag?.mode === "scrub") client.seek(time);
+      setTimelineCursor("pointer");
       requestDraw();
       return;
     }

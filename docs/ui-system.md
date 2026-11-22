@@ -39,6 +39,11 @@ Four-panel After Effects geometry, edge-to-edge, 1 px separators:
 - Timeline is the visual anchor: bars alternate only by a barely perceptible
   value shift; clips are flat rectangles with 2 px radius and a colored top
   edge for track identity.
+- **Layers / Analysis** mode switch. Analysis hides tracks and draws the audio
+  waveform full-height with beat grid, sections, drops and toggleable envelope
+  overlays. The legend carries All/None, colour keys and playhead values; the
+  spectrum strip and dominance readout answer what the music is doing here.
+  Analysis is a scope, not a compositor effect.
 - MCP drawer slides over the right panel, 360 px, JSON-RPC log with monospace
   timestamps and a tool filter. It must not resize the timeline.
 

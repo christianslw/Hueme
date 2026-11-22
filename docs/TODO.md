@@ -3,18 +3,19 @@
 > **Read this after `docs/PROGRESS.md`.** Update this file whenever a task starts,
 > lands or is deliberately deferred. One checkbox = one shippable change.
 
-Last updated: 2026-11-22 (Phase 2 slice 4: blueprint FX + Effect Builder complete)
+Last updated: 2026-11-22 (Phase 2 complete; P1 next)
 
 ## Current state
 
-- Phase 1 UI is complete: editable filter stack, global palettes, fixture-free FX
-  preview, auto names, layer context menus, MDI icons.
-- Code-review bugs 1–7 are fixed and verified. Full suite: 162 passed.
-- GitHub: `main` at `0c0af10`, tag `phase1-ui-2026-11-22`.
+- Phase 2 is complete: expressions and diagnostics, four new presets, filter
+  keyframes/lanes, blueprint FX + Effect Builder, and Timeline Analysis.
+- Phase 1 UI and code-review bugs remain in place. Full suite: 175 passed.
+- GitHub: `main` includes the Phase 2 slices, tag `phase1-ui-2026-11-22` is the
+  earlier checkpoint.
 - Reference analysis: `docs/effectcraft-analysis.md` (read-only).
 - Server: `python3 -m hueme_studio --host 0.0.0.0 --port 8090`.
 
-## P0 — Phase 2 core
+## P0 — Phase 2 core — COMPLETE
 
 ### 2.1 Expressions
 
@@ -77,21 +78,21 @@ Last updated: 2026-11-22 (Phase 2 slice 4: blueprint FX + Effect Builder complet
 Goal: a waveform/scope view that shows **only audio** and lets every analysis
 basis be overlaid.
 
-- [ ] Add a Timeline mode switch: **Layers / Analysis** (optional split later).
-- [ ] In Analysis mode hide track rows; show a full-height waveform, beat grid,
+- [x] Add a Timeline mode switch: **Layers / Analysis** (optional split later).
+- [x] In Analysis mode hide track rows; show a full-height waveform, beat grid,
       section markers and drop windows.
-- [ ] Overlay every available basis, each toggleable and colour-coded:
+- [x] Overlay every available basis, each toggleable and colour-coded:
       `pulse`, `kick`, `snare`, `hat`, `energy`, `harmonic`, `percussive`,
       `prominence`, `bass`, `mid`, `high`, `sectionProgress`, `beatsToDrop`,
       `inDrop`.
-- [ ] Legend with checkboxes, “all/none”, and values at the playhead.
-- [ ] Show a compact spectrum strip (bass/mid/high/energy bars) and a
+- [x] Legend with checkboxes, “all/none”, and values at the playhead.
+- [x] Show a compact spectrum strip (bass/mid/high/energy bars) and a
       “dominance” readout: which basis is strongest at the playhead or over the
       selected range.
-- [ ] Hover/scrub readout of every visible value; snap to beat grid.
-- [ ] Use the same values as the expression scope; no duplicate envelope math.
-- [ ] Persist the visible-curve selection in `localStorage`.
-- [ ] Tests: deterministic curve sampling, toggle rendering, no audio = empty
+- [x] Hover/scrub readout of every visible value; snap to beat grid.
+- [x] Use the same values as the expression scope; no duplicate envelope math.
+- [x] Persist the visible-curve selection in `localStorage`.
+- [x] Tests: deterministic curve sampling, toggle rendering, no audio = empty
       state, blueprint min/max normalization.
 
 ## P1 — usability polish
@@ -114,8 +115,8 @@ basis be overlaid.
 
 ## Verification checklist
 
-- [ ] `python3 -m pytest -q -W error`
-- [ ] `python3 -m compileall -q hueme_studio`
-- [ ] `node --check hueme_studio/static/*.js`
-- [ ] Headless Chromium: no console/server errors; test the new UI path.
-- [ ] Update `docs/PROGRESS.md` and add a checkpoint under `docs/checkpoints/`.
+- [x] `python3 -m pytest -q -W error`
+- [x] `python3 -m compileall -q hueme_studio`
+- [x] `node --check hueme_studio/static/*.js`
+- [x] Headless Chromium: no console/server errors; test the new UI path.
+- [x] Update `docs/PROGRESS.md` and add a checkpoint under `docs/checkpoints/`.

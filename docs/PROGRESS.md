@@ -4,7 +4,7 @@ This file is the durable handoff. A new session should read this first, then
 `docs/TODO.md`, then continue at the first unchecked item. Do **not** re-do
 completed work.
 
-Last updated: 2026-11-22 (Phase 2 slice 4: blueprint FX + Effect Builder)
+Last updated: 2026-11-22 (Phase 2 slice 5: Timeline Analysis complete)
 
 ## Ground rules
 
@@ -272,6 +272,27 @@ systems) is intentionally separate.
   play/pause, adding a bloom filter, saving a look and inserting it as a new
   clip with no console errors.
 
+### Phase 2 slice 5 — Timeline Analysis view — COMPLETE
+
+- [x] Timeline toolbar switch **Layers / Analysis**. Analysis replaces track
+  rows with a full-height waveform, beat grid, section markers and drop
+  windows.
+- [x] Every basis is toggleable and colour-coded: `pulse`, `kick`, `snare`,
+  `hat`, `energy`, `harmonic`, `percussive`, `prominence`, `bass`, `mid`,
+  `high`, `sectionProgress`, `beatsToDrop`, `inDrop`. All/None buttons and the
+  visible-curve selection persist in `localStorage`.
+- [x] Legend shows values at the playhead; hover/click shows every visible
+  value at the beat-snapped hover time and seeks the playhead.
+- [x] Spectrum strip (bass/mid/high/energy) and dominance readout are drawn at
+  the playhead. Audio-less shows render an explicit empty state.
+- [x] Curves use the same `envelopeAt()` values as expression lanes; no second
+  envelope implementation.
+- [x] Tests: deterministic sampling, blueprint clipping/structure, waveform
+  unit normalisation; full suite **175 passed, 6 subtests passed**.
+- [x] Headless Chromium verified the mode switch, 14 curve toggles, All/None
+  persistence, audio-less empty state, hover/scrub readout and a 20.8s seek
+  with no console errors.
+
 ## Decisions already made
 
 - Coordinates metres, Z up. Room defaults to `[6.5, 8.0, 5.1]` only in the
@@ -336,6 +357,12 @@ systems) is intentionally separate.
   tracks default to `false` so loading an old show does not rename rows.
 - Auto naming runs inside `ShowStore` commits, so REST, MCP and UI edits share
   the same result. A manual track rename sets `name_auto=false`.
+- Filter automation addresses `filter:<uid>:<param>`. Legacy filters get a
+  deterministic uid during validation; reorder never retargets automation.
+- User looks are global runtime data in `config/user-presets.json`, not show
+  data. They store preset + params + mask + filter stack, not timing.
+- Analysis mode is a scope over the same `envelopeAt()` values as expressions;
+  it does not add a compositor effect or write to the show.
 - The Studio may live at `/root/Hueme/test` in the current workspace; commands
   below use that project root.
 
@@ -370,19 +397,23 @@ curl -s localhost:8090/mcp -H 'Content-Type: application/json' \
 
 ## Next session start point
 
-Sprint 5 UI phase 1 and the review fixes are complete. Read `docs/PROGRESS.md`,
-`docs/TODO.md`, `docs/effectcraft-analysis.md`, `docs/ui-system.md` and
+Phase 2 (slices 2.1–2.5) is complete. Read `docs/PROGRESS.md`, `docs/TODO.md`,
+`docs/effectcraft-analysis.md`, `docs/ui-system.md` and
 `docs/studio-server.md` first.
 
-Phase 2 is the active task board in `docs/TODO.md`. It includes:
+The next board is **P1 usability polish** in `docs/TODO.md`: library favourites
+and recents, filter drag reorder, double-click parameter lane reveal, effect
+header polish and keyboard reveal shortcuts. P2 (full graph editor,
+syntax-highlighted editor, preset import/export) remains later.
 
-- Richer expression vocabulary, audio/structure variables, generator presets,
-  live values and diagnostics.
-- New basic presets plus expression-addressable `emitter_swarm` particles.
-- Filter parameter keyframes and timeline lanes.
-- Blueprint-backed FX preview and the pop-up Effect Builder.
-- The new **Timeline Analysis view**: waveform only, every envelope basis
-  overlaid, spectrum strip and dominance readout.
+Completed in Phase 2:
+
+- Safe expression vocabulary, audio/structure variables, generator dialog and
+  diagnostics.
+- `color_wash`, `wave_interference`, `shutter_matrix`, `emitter_swarm`.
+- Stable filter uids, filter parameter keyframes/expressions and timeline lanes.
+- Blueprint-backed FX preview, global user looks and the Effect Builder.
+- Timeline Analysis view with all envelope bases, spectrum and dominance.
 
 Remaining external verification, not code work:
 

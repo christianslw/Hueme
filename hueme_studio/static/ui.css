@@ -957,6 +957,70 @@ button.list-row {
   flex: 1;
 }
 
+.timeline-mode {
+  display: inline-flex;
+  gap: 2px;
+  margin-right: 8px;
+}
+
+.timeline-mode .button.active {
+  border-color: var(--accent-dim);
+  color: var(--accent);
+}
+
+.timeline.analysis-mode {
+  grid-template-rows: 30px 26px auto minmax(0, 1fr);
+}
+
+.analysis-legend {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 3px 9px;
+  max-height: 88px;
+  padding: 4px 8px;
+  overflow: auto;
+  border-bottom: 1px solid var(--line);
+  background: #121316;
+}
+
+.analysis-legend.hidden {
+  display: none;
+}
+
+.analysis-actions {
+  display: inline-flex;
+  gap: 2px;
+  margin-right: 4px;
+}
+
+.analysis-curve {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  color: var(--text-1);
+  font-size: 9px;
+  white-space: nowrap;
+}
+
+.analysis-curve input {
+  margin: 0;
+  accent-color: var(--accent);
+}
+
+.analysis-swatch {
+  width: 9px;
+  height: 3px;
+  flex: none;
+}
+
+.analysis-values {
+  flex-basis: 100%;
+  color: var(--text-2);
+  font-size: 8px;
+  line-height: 1.4;
+}
+
 .timeline-canvas {
   display: block;
   width: 100%;

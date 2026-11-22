@@ -240,8 +240,13 @@
     </div>
     <div class="timeline-toolbar">
       <span class="label">Timeline</span>
+      <div class="timeline-mode" role="group" aria-label="Timeline mode">
+        <button id="timeline-layers" class="button small active" type="button">Layers</button>
+        <button id="timeline-analysis" class="button small" type="button">Analysis</button>
+      </div>
       <span class="mono muted timeline-hint">Alt+Klick Header = Clipping &middot; Alt+Wheel = Spurhöhe &middot; Rechtsklick = Menü</span>
     </div>
+    <div id="analysis-legend" class="analysis-legend hidden" aria-label="Analysis curves"></div>
     <canvas id="timeline" class="timeline-canvas" tabindex="0" aria-label="Show timeline"></canvas>
   </section>
 </div>
