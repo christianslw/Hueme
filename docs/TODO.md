@@ -3,7 +3,7 @@
 > **Read this after `docs/PROGRESS.md`.** Update this file whenever a task starts,
 > lands or is deliberately deferred. One checkbox = one shippable change.
 
-Last updated: 2026-11-22 (P2 slice 2: view cube, structure band, colour keys, auto-show)
+Last updated: 2026-11-22 (P2 slice 2 + board audit: completed items checked, partials noted)
 
 ## Current state
 
@@ -14,6 +14,9 @@ Last updated: 2026-11-22 (P2 slice 2: view cube, structure band, colour keys, au
 - Honest assessment: many pieces exist as isolated features, while overall
   usability, creative flow, Show-building speed, spatial/emitter depth, and
   UI clarity still need substantial improvement.
+- Board audited against `docs/PROGRESS.md`: completed P1/builder/library items
+  are checked, partial items keep an explicit "offen" note, and external work
+  (PSK rotation, real-rig HA/DDP checks) stays separate.
 - Reference analysis: `docs/effectcraft-analysis.md` (read-only).
 - Server: `python3 -m hueme_studio --host 0.0.0.0 --port 8090`.
 
@@ -32,8 +35,9 @@ Last updated: 2026-11-22 (P2 slice 2: view cube, structure band, colour keys, au
 - [x] Kleine Code-Bugs in `presets.py` (`shockwave_3d`, `strobe_blinder`),
       `server.py` (sauberer Restart) und `mcp.py` beheben.
 - [x] `config/sendspin_pairings.json` und `config/sendspin_identity.json` aus
-      dem Repo nehmen (Runtime-Secrets; bereits in `.gitignore`). PSK nach dem
-      Historie-Leak rotieren/neu paaren.
+      dem Repo nehmen (Runtime-Secrets; bereits in `.gitignore`).
+- [ ] Sendspin-PSK rotieren und neu paaren (extern; der alte PSK stand in der
+      Git-Historie).
 
 ## 1. UI/UX-Klarheit, Toolbar, Inspector & Viewport-Orientierung
 
@@ -79,28 +83,32 @@ Last updated: 2026-11-22 (P2 slice 2: view cube, structure band, colour keys, au
       3D-Transformationen/Masken und Filter-Kette (Blur, Glow/Bloom, Pixelation,
       Shutter/Gate, Grain, Inertia) flexibel kombinierbar und umsortierbar.
 - [ ] Direkte Modulator- (`ƒ`) und Keyframe- (`◇`) Anbindung an Emitter-, Farb-
-      und Filter-Parameter im Baukasten.
-- [ ] Live-Vorschau im Baukasten mit Playback/Scrubbing, passendem Auto-Namen und
+      und Filter-Parameter im Baukasten. Preset-Parameter nutzen bereits die
+      gemeinsamen ◇/ƒ-Zeilen; Filter-Parameter und das Speichern von Automation
+      im Look fehlen noch.
+- [x] Live-Vorschau im Baukasten mit Playback/Scrubbing, passendem Auto-Namen und
       1-Klick-Aktionen: *Als eigenen Effekt/Preset speichern*, *Auf Clip anwenden*,
       *Als neuen Clip einfügen*.
-- [ ] Library um Favoriten, Zuletzt verwendet, Such-Highlighting und Sortieroptionen
-      erweitern.
+- [x] Library um Favoriten, Zuletzt verwendet, Such-Highlighting und Sortieroptionen
+      erweitern (P1).
 
 ## 4. Audio-, Rhythmus- & Emitter-Expressions + Event-Trigger
 
-- [ ] Ausdrucksstarke Audio- & Rhythmus-Signale bereitstellen (Beats, Takte, Phrasen,
-      Abschnitte, Drop-Abstände, Frequenz-/Stem-Verläufe wie Bass/Kick/Snare/Hi-Hat/
-      Energie/Dynamik) — algorithmisch/DSP-basiert und mit optionalen leichten CPU-
-      Modellen für den 8700G.
-- [ ] Raum- & Emitter-Bezug in Expressions/Modulatoren ermöglichen (Emitter-Index/
-      Reihenfolge, Position, Abstand, Phasenversatz über Lampen/Strips).
-- [ ] Geführte Funktions-Presets & Modulatoren im `ƒ`-Dialog anbieten (Puls,
-      Ducking/Sidechain, Riser, Welle/Spread, Wiggle) mit Live-Vorschau und Fehlerfeedback.
+- [ ] Ausdrucksstarke Audio- & Rhythmus-Signale bereitstellen. Vorhanden:
+      Beat/Takt/Phrase, Sections, `beatsToDrop`, `bass`/`mid`/`high` sowie
+      `kick`/`snare`/`hat`/`energy`/`percussive`/`prominence`. Offen: eine echte
+      `dynamics`-Kurve und DSP-Feinschliff.
+- [ ] Raum- & Emitter-Bezug in Expressions/Modulatoren ermöglichen. Presets
+      kennen `emitterIdx`, `emitterNorm`, `nx`/`ny`/`nz` und `distCenter`;
+      Clip-Expressions und Modulatoren haben noch keinen Emitter-Bezug.
+- [x] Geführte Funktions-Presets & Modulatoren im `ƒ`-Dialog anbieten (Beat LFO,
+      Stem Follower, Sidechain Duck, Phrase Riser, Emitter Wave, Wiggle) mit
+      Live-Vorschau und Fehlerfeedback.
 - [ ] Event-basierte Auslöser ermöglichen (z. B. Partikel-/Shockwave-Spawn oder
       Impuls bei Beat, Onset, Snare, Kick oder Schwellwert statt nur starrem Timer).
-- [ ] Spektrumanalyzer / Audio-Basis-Ansicht verfeinern (klare Erklärungen der Werte,
-      optionale Einzel-Ausgabe/Isolierung eines Parameters, VU-Anzeigen sauber
-      ausgelagert/einklappbar).
+- [ ] Spektrumanalyzer / Audio-Basis-Ansicht verfeinern. Analysis-Modus, Legende,
+      Playhead-Werte, Spektrum-Strip und Dominance-Readout existieren; offen sind
+      Isolierung einzelner Parameter, einklappbare VU-Anzeigen und Hilfetexte.
 
 ## 5. Lichtziele, Gruppen-HW-Out, Start-Hub & Live-Modus (`/live`)
 

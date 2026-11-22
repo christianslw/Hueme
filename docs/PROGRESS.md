@@ -372,6 +372,13 @@ systems) is intentionally separate.
   overlap trimming and unique ids (5 cases).
 - [x] Long inspector help moved into tooltips (Sync-Offset); the Show tab hint
   is translated and shortened.
+- [x] The `ƒ` generator list gained **Sidechain Duck**
+  (`val * (1 - 0.75 * env('kick', beatPhase))`), matching the board's ducking
+  request.
+- [x] TODO board audited against this file: the builder's live preview / save /
+  apply / insert actions and the P1 library features are checked, partial audio
+  and analyser items carry explicit notes, and PSK rotation is a separate open
+  item because it is external work.
 - [x] Full suite: **177 passed, 6 subtests passed**; `node --test` 9/9.
   Headless Chromium verified view-cube clicks and the ORTHO/PERSP toggle, band
   seeking, colour keyframe commits with a gradient lane, Auto Show creation
@@ -521,6 +528,7 @@ Completed in P2 slice 2:
 - Colour keyframes in the inspector and gradient colour lanes.
 - Structure band with sections and collision-free cue labels.
 - Auto Show scaffold from blueprint sections, one undo step.
+- Sidechain Duck `ƒ` generator and a TODO board audit.
 
 Completed in P2 slice 1:
 
@@ -545,6 +553,8 @@ Completed in P1:
 
 Remaining external verification, not code work:
 
+- Rotate/re-pair the Sendspin PSK that was exposed in git history; the files are
+  untracked now but history still contains it.
 - Test against the real Music Assistant/Sendspin instance at
   `192.168.10.13:8927`; confirm pairing token and track metadata keys.
 - Confirm the MQTT broker credentials and that HA discovery creates the four

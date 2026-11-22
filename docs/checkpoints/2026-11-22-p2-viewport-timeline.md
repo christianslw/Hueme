@@ -24,8 +24,8 @@ section, in a single undoable commit. It never edits existing tracks.
 
 - `hueme_studio/static/studio.js` — view cube draw/hit-test, camera command
   refactor, viewport help binding, structure band, colour lanes, keyframe
-  navigator, inline expression chips, Auto Show action, tooltip/translation
-  polish.
+  navigator, inline expression chips, Auto Show action, Sidechain Duck
+  generator, tooltip/translation polish.
 - `hueme_studio/static/autoshow.js` — new pure section→track builder.
 - `hueme_studio/static/studio.html` — viewport toolbar, hint, `?` button,
   Auto Show transport button and Datei menu command.

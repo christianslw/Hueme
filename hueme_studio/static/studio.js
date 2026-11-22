@@ -4176,6 +4176,7 @@ function openExpressionDialog(clip, param, value, onSaved = null) {
   const generators = [
     ["Beat LFO", "0.5 + 0.5 * sin(beatPhase * TAU)"],
     ["Stem Follower", "clamp(val * (0.35 + 0.65 * energy), 0, 1)"],
+    ["Sidechain Duck", "clamp(val * (1 - 0.75 * env('kick', beatPhase)), 0, 1)"],
     ["Phrase Riser", "clamp(0.25 + 0.75 * sectionProgress + 0.1 * env('kick', beatPhase), 0, 1)"],
     ["Emitter Wave", "0.5 + 0.5 * sin(beat * TAU + barPhase * TAU)"],
     ["Wiggle", "val + 0.12 * sin(t * 17.0) * noise(t * 3.0)"],
