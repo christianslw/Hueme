@@ -404,6 +404,23 @@ class FilterSpec(Model):
     type: FilterKind
     enabled: bool = True
     params: dict[str, Any] = Field(default_factory=dict)
+    uid: str = Field(default="", max_length=80)
+
+
+def _ensure_filter_uids(filters: list[FilterSpec]) -> None:
+    """Give legacy filters stable ids without changing their render order."""
+    seen: set[str] = set()
+    for index, spec in enumerate(filters):
+        uid = spec.uid.strip()
+        if not uid or uid in seen:
+            base = f"f{index}_{spec.type}"
+            uid = base
+            suffix = 1
+            while uid in seen:
+                suffix += 1
+                uid = f"{base}_{suffix}"
+            spec.uid = uid
+        seen.add(uid)
 
 
 class Clip(Model):
@@ -450,6 +467,7 @@ class Clip(Model):
             raise ValueError("clip end_s must be greater than start_s")
         if self.fade_in_s + self.fade_out_s > duration + 1e-9:
             raise ValueError("clip fade in + fade out cannot exceed clip duration")
+        _ensure_filter_uids(self.filters)
         if self.keyframes:
             outside = [k.t_s for k in self.keyframes if k.t_s > duration + 1e-9]
             if outside:
@@ -501,6 +519,45 @@ class Clip(Model):
                     # expression and saving rejects it before it reaches disk.
                     continue
         return params
+
+    def effective_filters(
+        self, local_t: float, context: dict[str, Any] | None = None
+    ) -> list[FilterSpec]:
+        """Return filter copies with keyframe/expression parameter overrides.
+
+        Paths are ``filter:<uid>:<param>``. The stored FilterSpec is never
+        mutated, so reordering, undo and offline rendering stay predictable.
+        """
+        if not self.filters:
+            return []
+        keyed = evaluate_keyframes(self.keyframes, local_t)
+        eval_context = dict(context or {})
+        eval_context.setdefault("local_t", float(local_t))
+        out: list[FilterSpec] = []
+        for spec in self.filters:
+            copy = spec.model_copy(deep=True)
+            params = dict(spec.params)
+            prefix = f"filter:{spec.uid}:"
+            for path, value in keyed.items():
+                if path.startswith(prefix):
+                    params[path[len(prefix) :]] = value
+            for path, expression in self.expressions.items():
+                if not path.startswith(prefix):
+                    continue
+                param = path[len(prefix) :]
+                current = params.get(param, 0.0)
+                if isinstance(current, (list, tuple)):
+                    continue
+                eval_context["val"] = float(current or 0.0)
+                try:
+                    params[param] = float(
+                        evaluate_expression(expression, eval_context)
+                    )
+                except ExpressionError:
+                    continue
+            copy.params = params
+            out.append(copy)
+        return out
 
     def effective_opacity(
         self, local_t: float, context: dict[str, Any] | None = None

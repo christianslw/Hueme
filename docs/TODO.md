@@ -3,7 +3,7 @@
 > **Read this after `docs/PROGRESS.md`.** Update this file whenever a task starts,
 > lands or is deliberately deferred. One checkbox = one shippable change.
 
-Last updated: 2026-11-22 (Phase 2 slice 2: presets complete)
+Last updated: 2026-11-22 (Phase 2 slice 3: filter keyframes complete)
 
 ## Current state
 
@@ -53,13 +53,13 @@ Last updated: 2026-11-22 (Phase 2 slice 2: presets complete)
 
 ### 2.3 Filter keyframes
 
-- [ ] Add a stable filter instance id to `FilterSpec` (backward compatible).
-- [ ] Define `filter:<uid>:<param>` keyframe paths; never use display names.
-- [ ] Evaluate filter keyframes and expressions in the compositor without
+- [x] Add a stable filter instance id to `FilterSpec` (backward compatible).
+- [x] Define `filter:<uid>:<param>` keyframe paths; never use display names.
+- [x] Evaluate filter keyframes and expressions in the compositor without
       mutating the stored `FilterSpec`.
-- [ ] Add ◇ / ƒ buttons to each filter parameter row and active-key highlight.
-- [ ] Show filter parameter lanes in the timeline.
-- [ ] Tests for reorder, enable/disable, easing and colour interpolation.
+- [x] Add ◇ / ƒ buttons to each filter parameter row and active-key highlight.
+- [x] Show filter parameter lanes in the timeline.
+- [x] Tests for reorder, enable/disable, easing and colour interpolation.
 
 ### 2.4 Blueprint FX + Effect Builder
 

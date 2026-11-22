@@ -127,14 +127,20 @@ Coordinates are normalised room coordinates 0..1, independent of metres.
 
 ## Filters
 
-`filters: [{"type": "...", "params": {...}, "enabled": true}]`
+`filters: [{"uid": "f0_beat_gate", "type": "...", "params": {...}, "enabled": true}]`
 
+- `uid` is a stable instance id. Legacy filters without one receive
+  `f<index>_<type>` when the clip is validated, so reordering never retargets
+  automation.
+- Filter parameter automation uses the path `filter:<uid>:<param>` in
+  `clip.keyframes[].param` and `clip.expressions`. Evaluation happens on a copy;
+  the stored `FilterSpec` is never mutated.
 - `mirror_symmetry` — axis, mix. Mirror maps are cached per compositor.
 - `beat_gate` — division, duty, floor, softness.
 - `dim2warm` — amount, curve, warm_color.
 - `inertia` — mix, tau_s. Deterministic look-back sampling, no frame state.
 - `audio_mod` — source, depth, mode, warm_color. Uses the deterministic
-  envelope; Sprint 3's AudioBlueprint replaces it when one is attached.
+  envelope; the AudioBlueprint replaces it when one is attached.
 
 Filters run in declared order on the clip buffer. The compositor then applies
 target group + spatial mask.

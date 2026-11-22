@@ -2144,6 +2144,41 @@ function xToTime(x) {
   return view.start + ((x - view.labelW) / Math.max(1, timelineSize.w - view.labelW)) * span;
 }
 
+function filterPathInfo(param) {
+  if (!String(param).startsWith("filter:")) return null;
+  const parts = String(param).split(":");
+  return parts.length >= 3 ? { uid: parts[1], key: parts.slice(2).join(":") } : null;
+}
+
+function filterSpecForPath(track, param) {
+  const parsed = filterPathInfo(param);
+  if (!parsed) return null;
+  for (const clip of track?.clips || []) {
+    const filter = (clip.filters || []).find((item) => item.uid === parsed.uid);
+    if (!filter) continue;
+    const info = state?.filters?.find((item) => item.id === filter.type);
+    return { filter, info, spec: info?.params?.find((item) => item.key === parsed.key), key: parsed.key };
+  }
+  return null;
+}
+
+function laneParamRange(track, param) {
+  const found = filterSpecForPath(track, param);
+  if (!found?.spec) return [0, 1];
+  return [Number(found.spec.min ?? 0), Number(found.spec.max ?? 1)];
+}
+
+function laneParamNorm(track, param, value) {
+  const [lo, hi] = laneParamRange(track, param);
+  return clamp((Number(value) - lo) / Math.max(1e-9, hi - lo), 0, 1);
+}
+
+function laneParamLabel(track, param) {
+  const found = filterSpecForPath(track, param);
+  if (!found) return param;
+  return `${found.info?.name || found.filter.type} / ${found.spec?.label || found.key}`;
+}
+
 function paramLanes(track) {
   const params = new Set();
   if (!track) return [];
@@ -2465,7 +2500,7 @@ function drawTimeline() {
       context.fillRect(view.labelW, laneY, w - view.labelW, row.laneH);
       context.fillStyle = "#7c8089";
       context.font = "8px JetBrains Mono, monospace";
-      context.fillText(`◇ ${info.param}`, view.labelW + 4, laneY + 11);
+      context.fillText(`◇ ${laneParamLabel(track, info.param)}`, view.labelW + 4, laneY + 11, view.labelW - 8);
       for (const clip of track.clips) {
         const keys = (clip.keyframes || [])
           .filter((keyframe) => keyframe.param === info.param && typeof keyframe.value === "number")
@@ -2493,7 +2528,7 @@ function drawTimeline() {
             } catch {
               value = Number(clip.params?.[info.param] ?? 0.5);
             }
-            const py = laneY + row.laneH - 3 - clamp(value, 0, 1) * (row.laneH - 5);
+            const py = laneY + row.laneH - 3 - laneParamNorm(track, info.param, value) * (row.laneH - 5);
             if (px === cx0) context.moveTo(px, py);
             else context.lineTo(px, py);
           }
@@ -2505,7 +2540,7 @@ function drawTimeline() {
           context.beginPath();
           keys.forEach((keyframe, keyIndex) => {
             const x = timeToX(clip.start_s + keyframe.t_s);
-            const py = laneY + row.laneH - 3 - clamp(keyframe.value, 0, 1) * (row.laneH - 5);
+            const py = laneY + row.laneH - 3 - laneParamNorm(track, info.param, keyframe.value) * (row.laneH - 5);
             if (keyIndex === 0) context.moveTo(x, py);
             else context.lineTo(x, py);
           });
@@ -2514,7 +2549,7 @@ function drawTimeline() {
         for (const keyframe of keys) {
           const x = timeToX(clip.start_s + keyframe.t_s);
           if (x < view.labelW || x > w) continue;
-          const py = laneY + row.laneH - 3 - clamp(keyframe.value, 0, 1) * (row.laneH - 5);
+          const py = laneY + row.laneH - 3 - laneParamNorm(track, info.param, keyframe.value) * (row.laneH - 5);
           context.fillStyle = "#e8862e";
           context.beginPath();
           context.moveTo(x, py - 3);
@@ -3298,16 +3333,22 @@ function toggleParamKeyframe(clip, param, value) {
 
 function addParamKeyframe(clip, param, value) {
   const local = clamp(currentTime() - clip.start_s, 0, Math.max(0, clip.end_s - clip.start_s));
-  const numeric = Number(value);
-  if (!Number.isFinite(numeric)) {
-    toast("Keyframes need a numeric value", "info");
-    return;
+  let keyValue;
+  if (Array.isArray(value) && [3, 4].includes(value.length) && value.every((part) => Number.isFinite(Number(part)))) {
+    keyValue = value.map(Number);
+  } else {
+    const numeric = Number(value);
+    if (!Number.isFinite(numeric)) {
+      toast("Keyframes need a numeric or colour value", "info");
+      return;
+    }
+    keyValue = numeric;
   }
   commitClip(clip.id, `keyframe ${param}`, (target) => {
     target.keyframes = (target.keyframes || []).filter(
       (keyframe) => !(keyframe.param === param && Math.abs(keyframe.t_s - local) <= 1e-4)
     );
-    target.keyframes.push({ t_s: Number(local.toFixed(4)), param, value: numeric, easing: "linear" });
+    target.keyframes.push({ t_s: Number(local.toFixed(4)), param, value: keyValue, easing: "linear" });
     target.keyframes.sort((a, b) => a.t_s - b.t_s);
   });
 }
@@ -4280,25 +4321,31 @@ function filterParamRows(clip, filter, index) {
   for (const spec of info?.params || []) {
     const value = filter.params?.[spec.key] ?? spec.default;
     const setParam = (next) => commitClip(clip.id, `filter ${filter.type} ${spec.key}`, (target) => {
-      const item = target.filters[index];
+      const item = target.filters.find((entry) => entry.uid === filter.uid) || target.filters[index];
       if (!item) return;
       item.params = { ...(item.params || {}), [spec.key]: next };
     });
+    let control;
     if (spec.type === "color") {
-      rows.push(fieldRow(spec.label, colorField(value, setParam)));
+      control = colorField(value, setParam);
     } else if (spec.type === "vec3") {
       rows.push(vec3Field(spec.label, value, setParam, { step: spec.step ?? 0.01 }));
+      continue;
     } else if (spec.type === "bool") {
       rows.push(toggleRow(spec.label, Boolean(value), setParam));
+      continue;
     } else if (spec.type === "select") {
       rows.push(fieldRow(spec.label, selectInput(String(value), spec.options || [], setParam)));
+      continue;
     } else {
-      rows.push(fieldRow(spec.label, rangeControl(value, setParam, {
+      control = rangeControl(value, setParam, {
         min: spec.min ?? 0,
         max: spec.max ?? 1,
         step: spec.step ?? 0.01,
-      })));
+      });
     }
+    const param = `filter:${filter.uid}:${spec.key}`;
+    rows.push(paramRow(clip, param, spec.label, control, value));
   }
   return rows;
 }

@@ -222,7 +222,7 @@ def render_clip_rgb(
     return _render(
         clip.preset,
         params,
-        clip.filters,
+        clip.effective_filters(local_t, context),
         opacity,
         t=t,
         timing=timing,

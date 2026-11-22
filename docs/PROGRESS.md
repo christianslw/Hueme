@@ -4,7 +4,7 @@ This file is the durable handoff. A new session should read this first, then
 `docs/TODO.md`, then continue at the first unchecked item. Do **not** re-do
 completed work.
 
-Last updated: 2026-11-22 (Phase 2 slice 2: new presets)
+Last updated: 2026-11-22 (Phase 2 slice 3: filter keyframes)
 
 ## Ground rules
 
@@ -233,6 +233,24 @@ systems) is intentionally separate.
   parameters; full suite **168 passed, 6 subtests passed**.
 - [x] Headless Chromium verified all four presets in the library and a lit
   fixture-free FX render of Emitter Swarm with no console errors.
+
+### Phase 2 slice 3 — Filter keyframes — COMPLETE
+
+- [x] `FilterSpec.uid` is stable and backward compatible; legacy filters get
+  `f<index>_<type>` (with a numeric suffix for duplicates) during validation.
+- [x] Filter automation uses `filter:<uid>:<param>` in `clip.keyframes` and
+  `clip.expressions`; display names are never addresses.
+- [x] `Clip.effective_filters()` returns copies with keyframed/expression
+  parameter overrides; the compositor and FX preview use them without mutating
+  the stored stack.
+- [x] Every numeric/colour filter parameter row has ◇ and ƒ controls with an
+  active-key highlight. Timeline lanes show filter paths with readable names
+  and parameter ranges, and reorder/enable still target the same instance.
+- [x] Tests: reorder, disable, expression override and Oklab colour keyframe
+  interpolation; full suite **169 passed, 6 subtests passed**.
+- [x] Headless Chromium verified setting a filter keyframe, opening the ƒ
+  dialog from a filter row, committing a filter expression, and revealing the
+  parameter lane with no console errors.
 
 ## Decisions already made
 

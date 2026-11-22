@@ -332,7 +332,11 @@ class Compositor:
         group_size: int,
         expr_context: dict[str, float] | None = None,
     ) -> np.ndarray:
-        inertia_filters = [f for f in clip.filters if f.enabled and f.type == "inertia"]
+        inertia_filters = [
+            f
+            for f in clip.effective_filters(local_t, expr_context)
+            if f.enabled and f.type == "inertia"
+        ]
         base = self._render_base(
             doc,
             clip,
@@ -396,7 +400,9 @@ class Compositor:
             inertia_reference=inertia_reference,
             mirror_sources=self._mirror_sources,
         )
-        return apply_filter_stack(base, clip.filters, filter_ctx)
+        return apply_filter_stack(
+            base, clip.effective_filters(local_t, expr_context), filter_ctx
+        )
 
     def _render_base(
         self,

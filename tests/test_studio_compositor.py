@@ -334,6 +334,56 @@ def test_filters_are_applied_without_changing_showdoc(rig):
     assert clip.filters[0].params == {"duty": 0.2, "floor": 0.0}
 
 
+def test_filter_keyframes_expressions_and_reorder_use_stable_uids(rig):
+    clip = solid_clip(
+        "fx",
+        [200, 100, 50],
+        filters=[
+            FilterSpec(
+                type="brightness_curve",
+                params={"gain": 1.0, "gamma": 1.0, "mix": 1.0},
+            ),
+            FilterSpec(
+                type="dim2warm",
+                params={"amount": 0.5, "warm_color": [255, 0, 0]},
+            ),
+        ],
+    )
+    gain_uid = clip.filters[0].uid
+    warm_uid = clip.filters[1].uid
+    assert gain_uid and warm_uid and gain_uid != warm_uid
+    clip.keyframes = [
+        Keyframe(t_s=0.0, param=f"filter:{gain_uid}:gain", value=1.0),
+        Keyframe(t_s=2.0, param=f"filter:{gain_uid}:gain", value=0.5),
+        Keyframe(
+            t_s=0.0,
+            param=f"filter:{warm_uid}:warm_color",
+            value=[255, 0, 0],
+        ),
+        Keyframe(
+            t_s=2.0,
+            param=f"filter:{warm_uid}:warm_color",
+            value=[0, 0, 255],
+        ),
+    ]
+    clip.expressions[f"filter:{gain_uid}:gamma"] = "1.0 + kick"
+    evaluated = clip.effective_filters(1.0, {"kick": 0.5})
+    assert evaluated[0].params["gain"] == pytest.approx(0.75)
+    assert evaluated[0].params["gamma"] == pytest.approx(1.5)
+    colour = evaluated[1].params["warm_color"]
+    assert len(colour) == 3
+    assert colour != [255.0, 0.0, 0.0] and colour != [0.0, 0.0, 255.0]
+    assert clip.filters[0].params["gain"] == 1.0
+
+    clip.filters.reverse()
+    clip.filters[1].enabled = False
+    reordered = clip.effective_filters(1.0, {"kick": 0.5})
+    assert reordered[0].uid == warm_uid
+    assert reordered[1].uid == gain_uid
+    assert reordered[1].params["gain"] == pytest.approx(0.75)
+    assert reordered[1].enabled is False
+
+
 def test_expression_generator_overrides_opacity_and_parameters(rig):
     clip = Clip(
         id="expr",
