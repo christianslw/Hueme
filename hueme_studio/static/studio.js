@@ -1982,6 +1982,8 @@ function drawFxPreview() {
 
 function drawViewport() {
   if (fxMode) {
+    viewCubeHits = [];
+    viewCubeHover = null;
     drawFxPreview();
     return;
   }
