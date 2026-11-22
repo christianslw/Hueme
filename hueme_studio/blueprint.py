@@ -210,16 +210,49 @@ class BlueprintEnvelope:
         self.prominence = np.asarray(curves.get("prominence", []), dtype=np.float64)
         self.energy = np.asarray(curves.get("energy", []), dtype=np.float64)
         self.bass = np.asarray(curves.get("bass", []), dtype=np.float64)
+        self.sections = [
+            section
+            for section in (blueprint.get("sections") or [])
+            if isinstance(section, dict)
+        ]
+        self.drops = [float(value) for value in blueprint.get("drops", [])]
+        self.drop_windows = [
+            window
+            for window in (blueprint.get("drop_windows") or [])
+            if isinstance(window, dict)
+        ]
 
     def _at(self, values: np.ndarray, index: int) -> float:
         if values.size == 0:
             return 0.0
         return float(np.clip(values[min(index, values.size - 1)], 0.0, 1.0))
 
+    def _section_progress(self, t: float) -> float:
+        for section in self.sections:
+            start = float(section.get("start", 0.0))
+            end = float(section.get("end", start))
+            if start <= t < end and end > start:
+                return _clip((t - start) / (end - start))
+        return 0.0
+
+    def _in_drop(self, t: float) -> float:
+        for window in self.drop_windows:
+            start = float(window.get("start", 0.0))
+            end = float(window.get("end", start))
+            if start <= t < end:
+                return 1.0
+        return 0.0
+
     def __call__(self, show: Any, t: float) -> dict[str, float]:
         if not self.beats:
-            return {k: 0.0 for k in ("pulse", "kick", "snare", "hat", "energy",
-                                     "harmonic", "bass", "mid", "high")}
+            return {
+                key: 0.0
+                for key in (
+                    "pulse", "kick", "snare", "hat", "energy", "harmonic",
+                    "percussive", "prominence", "bass", "mid", "high",
+                    "sectionProgress", "beatsToDrop", "inDrop",
+                )
+            }
         index = max(0, bisect_right(self.beats, float(t)) - 1)
         start = self.beats[index]
         if index + 1 < len(self.beats):
@@ -245,6 +278,12 @@ class BlueprintEnvelope:
             bass = self._at(self.bass, index)
         else:
             bass = _clip(0.15 + 0.85 * kick)
+        next_drop = next((drop for drop in self.drops if drop >= float(t)), None)
+        beats_to_drop = (
+            1.0
+            if next_drop is None
+            else _clip((next_drop - float(t)) / (period * 16.0))
+        )
         return {
             "pulse": _clip(pulse),
             "kick": _clip(kick),
@@ -252,9 +291,14 @@ class BlueprintEnvelope:
             "hat": _clip(hat),
             "energy": energy,
             "harmonic": _clip(harm),
+            "percussive": _clip(perc),
+            "prominence": _clip(prom),
             "bass": bass,
             "mid": _clip(0.20 + 0.80 * snare),
             "high": _clip(hat),
+            "sectionProgress": self._section_progress(float(t)),
+            "beatsToDrop": beats_to_drop,
+            "inDrop": self._in_drop(float(t)),
         }
 
 

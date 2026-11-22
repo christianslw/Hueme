@@ -34,6 +34,53 @@ def _round(value: float, digits: int = 0) -> float:
     return float(round(float(value), int(digits)))
 
 
+def _smoothstep(edge0: float, edge1: float, value: float) -> float:
+    if abs(float(edge1) - float(edge0)) < 1e-12:
+        return 1.0 if float(value) >= float(edge1) else 0.0
+    x = max(0.0, min(1.0, (float(value) - float(edge0)) / (float(edge1) - float(edge0))))
+    return x * x * (3.0 - 2.0 * x)
+
+
+def _lerp(a: float, b: float, amount: float) -> float:
+    return float(a) + (float(b) - float(a)) * float(amount)
+
+
+def _step(edge: float, value: float) -> float:
+    return 1.0 if float(value) >= float(edge) else 0.0
+
+
+def _wrap(value: float, lo: float = 0.0, hi: float = 1.0) -> float:
+    span = float(hi) - float(lo)
+    if abs(span) < 1e-12:
+        return float(lo)
+    return float(lo) + _fract((float(value) - float(lo)) / span) * span
+
+
+def _pulse(phase: float, width: float = 0.5) -> float:
+    return 1.0 if _fract(phase) < max(0.0, min(1.0, float(width))) else 0.0
+
+
+def _fbm(x: float, y: float, z: float, scale: float = 1.0) -> float:
+    total = 0.0
+    amplitude = 1.0
+    norm = 0.0
+    for octave in range(3):
+        frequency = (2.0**octave) * float(scale)
+        total += amplitude * _noise(
+            float(x) * frequency + octave * 17.0,
+            float(y) * frequency,
+            float(z) * frequency,
+        )
+        norm += amplitude
+        amplitude *= 0.5
+    return total / max(1e-9, norm)
+
+
+def _env_placeholder(name: Any, phase: Any) -> float:
+    # Replaced at evaluation time so the function can see the caller's scope.
+    raise ExpressionError("env() is only available during evaluation")
+
+
 FUNCTIONS: dict[str, Callable[..., float]] = {
     "sin": math.sin,
     "cos": math.cos,
@@ -45,6 +92,13 @@ FUNCTIONS: dict[str, Callable[..., float]] = {
     "round": _round,
     "noise": _noise,
     "clamp": lambda value, lo, hi: max(float(lo), min(float(hi), float(value))),
+    "smoothstep": _smoothstep,
+    "lerp": _lerp,
+    "step": _step,
+    "wrap": _wrap,
+    "pulse": _pulse,
+    "env": _env_placeholder,
+    "fbm": _fbm,
 }
 
 _ALLOWED_NODES = (
@@ -93,11 +147,27 @@ def compile_expression(expression: str) -> ast.Expression:
         tree = ast.parse(text, mode="eval")
     except SyntaxError as exc:
         raise ExpressionError(f"invalid expression: {exc.msg}") from exc
+    env_names: set[int] = set()
+    for node in ast.walk(tree):
+        if (
+            isinstance(node, ast.Call)
+            and isinstance(node.func, ast.Name)
+            and node.func.id == "env"
+            and node.args
+            and isinstance(node.args[0], ast.Constant)
+            and isinstance(node.args[0].value, str)
+        ):
+            env_names.add(id(node.args[0]))
     for node in ast.walk(tree):
         if not isinstance(node, _ALLOWED_NODES):
             raise ExpressionError(
                 f"unsupported syntax '{type(node).__name__}' in expression"
             )
+        if isinstance(node, ast.Constant) and isinstance(node.value, str):
+            if id(node) not in env_names:
+                raise ExpressionError(
+                    "string literals are only allowed as the name argument to env()"
+                )
         if isinstance(node, ast.Call):
             if not isinstance(node.func, ast.Name) or node.func.id not in FUNCTIONS:
                 raise ExpressionError("only whitelisted maths functions are allowed")
@@ -180,6 +250,17 @@ def _eval_node(node: ast.AST, scope: dict[str, Any]) -> Any:
     if isinstance(node, ast.Call):
         if not isinstance(node.func, ast.Name) or node.func.id not in FUNCTIONS:
             raise ExpressionError("only whitelisted maths functions are allowed")
+        if node.func.id == "env":
+            if (
+                len(node.args) != 2
+                or not isinstance(node.args[0], ast.Constant)
+                or not isinstance(node.args[0].value, str)
+            ):
+                raise ExpressionError("env(name, phase) needs a curve name and a phase")
+            name = node.args[0].value
+            phase = _eval_node(node.args[1], scope)
+            value = float(scope.get(name, 0.0))
+            return value * math.exp(-_fract(float(phase)) * 3.0)
         args = [_eval_node(arg, scope) for arg in node.args]
         return FUNCTIONS[node.func.id](*args)
     raise ExpressionError(f"unsupported syntax '{type(node).__name__}'")

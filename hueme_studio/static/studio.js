@@ -304,11 +304,25 @@ function envelopeAt(t) {
     const hat = (0.25 + 0.75 * perc) * Math.exp(-eighth * 10);
     const energy = curveAt(curves.energy, index) || clamp(0.3 + 0.4 * harm + 0.3 * perc, 0, 1);
     const bass = curveAt(curves.bass, index) || clamp(0.15 + 0.85 * kick, 0, 1);
+    const section = (blueprint.sections || []).find((item) => Number(item.start) <= time && time < Number(item.end));
+    const sectionProgress = section && Number(section.end) > Number(section.start)
+      ? clamp((time - Number(section.start)) / (Number(section.end) - Number(section.start)), 0, 1)
+      : 0;
+    const nextDrop = (blueprint.drops || []).map(Number).find((drop) => drop >= time);
+    const beatsToDrop = nextDrop === undefined
+      ? 1
+      : clamp((nextDrop - time) / (Math.max(0.001, 60 / Math.max(1, bpm)) * 16), 0, 1);
+    const inDrop = (blueprint.drop_windows || []).some(
+      (window) => Number(window.start) <= time && time < Number(window.end)
+    ) ? 1 : 0;
     return {
       pulse: clamp(pulse, 0, 1), kick: clamp(kick, 0, 1), snare: clamp(snare, 0, 1),
       hat: clamp(hat, 0, 1), energy, harmonic: harm, percussive: perc,
       prominence: prom, bass, mid: clamp(0.2 + 0.8 * snare, 0, 1), high: clamp(hat, 0, 1),
-      beatPos, beatPhase, barPos, bpm,
+      sectionProgress, beatsToDrop, inDrop,
+      beatPos, beatPhase, bar: Math.floor(beatPos / 4), barPos,
+      barPhase: (barPos + beatPhase) / 4, phrase: Math.floor(beatPos / 16),
+      phrasePhase: ((Math.floor(beatPos) % 16) + beatPhase) / 16, bpm,
     };
   }
   const eighth = (beatPos * 2) % 1;
@@ -319,11 +333,17 @@ function envelopeAt(t) {
   const duration = Math.max(1, Number(doc?.duration_s || 60));
   const energy = clamp(0.48 + 0.16 * Math.sin((2 * Math.PI * time) / (duration * 2)) + 0.1 * pulse, 0, 1);
   const harmonic = 0.5 + 0.5 * Math.sin((2 * Math.PI * beatPos) / 16);
+  const phraseBeat = ((beatPos % 32) + 32) % 32;
   return {
     pulse: clamp(pulse, 0, 1), kick: clamp(kick, 0, 1), snare: clamp(snare, 0, 1),
-    hat: clamp(hat, 0, 1), energy, harmonic, percussive: 0, prominence: 0,
+    hat: clamp(hat, 0, 1), energy, harmonic, percussive: clamp(0.25 + 0.75 * kick, 0, 1),
+    prominence: clamp(0.5 * pulse + 0.5 * energy, 0, 1),
     bass: clamp(0.2 + 0.8 * kick, 0, 1), mid: clamp(0.3 + 0.3 * snare, 0, 1),
-    high: clamp(hat, 0, 1), beatPos, beatPhase, barPos, bpm,
+    high: clamp(hat, 0, 1), sectionProgress: phraseBeat / 32,
+    beatsToDrop: clamp((32 - phraseBeat) / 32, 0, 1), inDrop: phraseBeat >= 24 ? 1 : 0,
+    beatPos, beatPhase, bar: Math.floor(beatPos / 4), barPos,
+    barPhase: (barPos + beatPhase) / 4, phrase: Math.floor(beatPos / 16),
+    phrasePhase: ((Math.floor(beatPos) % 16) + beatPhase) / 16, bpm,
   };
 }
 
@@ -2749,14 +2769,43 @@ function keyframeAtPoint(x, y) {
 function evalUiExpression(expression, context) {
   // Mirrors the backend's safe evaluator for the small expression lane preview.
   // The authoritative value still comes from the Python compositor.
-  const names = ["sin", "cos", "abs", "exp", "min", "max", "floor", "round", "noise", "clamp"];
+  const names = [
+    "sin", "cos", "abs", "exp", "min", "max", "floor", "round", "noise", "clamp",
+    "smoothstep", "lerp", "step", "wrap", "pulse", "fbm", "env",
+  ];
+  const fract = (value) => value - Math.floor(value);
+  const hash = (x, y, z) => fract(Math.sin(x * 127.1 + y * 311.7 + z * 74.7) * 43758.5453123);
+  const fbm = (x, y, z, scale = 1) => {
+    let total = 0;
+    let amplitude = 1;
+    let norm = 0;
+    for (let octave = 0; octave < 3; octave += 1) {
+      const frequency = (2 ** octave) * Number(scale);
+      total += amplitude * hash(Number(x) * frequency + octave * 17, Number(y) * frequency, Number(z) * frequency);
+      norm += amplitude;
+      amplitude *= 0.5;
+    }
+    return total / Math.max(1e-9, norm);
+  };
+  const env = (name, phase) => Number(context[name] || 0) * Math.exp(-fract(Number(phase || 0)) * 3);
   const fn = {
     sin: Math.sin, cos: Math.cos, abs: Math.abs, exp: Math.exp, min: Math.min, max: Math.max,
     floor: Math.floor, round: Math.round, clamp: (value, lo, hi) => Math.max(lo, Math.min(hi, value)),
-    noise: (value) => {
-      const raw = Math.sin(Number(value) * 12.9898) * 43758.5453123;
-      return raw - Math.floor(raw);
+    smoothstep: (edge0, edge1, value) => {
+      if (Math.abs(edge1 - edge0) < 1e-12) return value >= edge1 ? 1 : 0;
+      const x = Math.max(0, Math.min(1, (value - edge0) / (edge1 - edge0)));
+      return x * x * (3 - 2 * x);
     },
+    lerp: (a, b, amount) => a + (b - a) * amount,
+    step: (edge, value) => (value >= edge ? 1 : 0),
+    wrap: (value, lo = 0, hi = 1) => {
+      const span = hi - lo;
+      return Math.abs(span) < 1e-12 ? lo : lo + fract((value - lo) / span) * span;
+    },
+    pulse: (phase, width = 0.5) => (fract(phase) < Math.max(0, Math.min(1, width)) ? 1 : 0),
+    fbm,
+    env,
+    noise: (value) => fract(Math.sin(Number(value) * 12.9898) * 43758.5453123),
   };
   let text = String(expression || "").replace(/TAU/g, String(Math.PI * 2)).replace(/\bpi\b/g, String(Math.PI));
   for (const name of names) text = text.replace(new RegExp(`\\b${name}\\(`, "g"), `__fn.${name}(`);
@@ -3263,66 +3312,144 @@ function addParamKeyframe(clip, param, value) {
   });
 }
 
-function expressionEditor(clip, param, value) {
-  const key = paramKey(clip, param);
-  if (!openExpressions.has(key)) return null;
-  const expression = clip.expressions?.[param] || "";
+function expressionContext(clip, value) {
+  const time = currentTime();
+  const env = envelopeAt(time);
+  return {
+    ...env,
+    t: time,
+    local_t: clamp(time - clip.start_s, 0, Math.max(0, clip.end_s - clip.start_s)),
+    val: Number(value) || 0,
+    beat: env.beatPos,
+  };
+}
+
+function openExpressionDialog(clip, param, value) {
+  const current = clip.expressions?.[param] || "";
+  const dialog = document.createElement("dialog");
+  const form = document.createElement("form");
+  form.method = "dialog";
   const input = el("input", {
-    class: "input",
+    class: "input mono",
     type: "text",
-    value: expression,
+    value: current,
     placeholder: "0.5 + 0.5 * sin(beatPhase * TAU)",
     spellcheck: "false",
   });
-  const setExpression = () => {
-    const text = input.value.trim();
-    commitClip(clip.id, text ? `expression ${param}` : `clear expression ${param}`, (target) => {
-      target.expressions = { ...(target.expressions || {}) };
-      if (text) target.expressions[param] = text;
-      else delete target.expressions[param];
-    });
-  };
-  const presets = [
-    ["Sinus 1Hz", "0.5 + 0.5 * sin(t * TAU)"],
-    ["Beat Pulse 1/4", "0.5 + 0.5 * sin(beatPhase * TAU)"],
-    ["Kick Envelope", "clamp(val * (0.25 + 0.75 * kick), 0, 1)"],
+  const diagnostic = el("div", { class: "expr-diagnostic mono" });
+  const live = el("div", { class: "mono muted", style: "font-size:9px" });
+  const generators = [
+    ["Beat LFO", "0.5 + 0.5 * sin(beatPhase * TAU)"],
+    ["Stem Follower", "clamp(val * (0.35 + 0.65 * energy), 0, 1)"],
+    ["Phrase Riser", "clamp(0.25 + 0.75 * sectionProgress + 0.1 * env('kick', beatPhase), 0, 1)"],
+    ["Emitter Wave", "0.5 + 0.5 * sin(beat * TAU + barPhase * TAU)"],
     ["Wiggle", "val + 0.12 * sin(t * 17.0) * noise(t * 3.0)"],
-    ["Bar Square", "0.35 + 0.65 * (1 - (barPos % 2))"],
   ];
-  const tokens = ["t", "beat", "beatPhase", "barPos", "bpm", "kick", "energy", "val", "sin(", "cos(", "clamp(", "noise(", "TAU"];
+  const tokens = [
+    "t", "beat", "beatPhase", "barPhase", "phrasePhase", "kick", "snare", "hat",
+    "energy", "harmonic", "percussive", "prominence", "bass", "mid", "high",
+    "sectionProgress", "beatsToDrop", "inDrop", "val", "sin(", "cos(", "clamp(",
+    "smoothstep(", "lerp(", "step(", "wrap(", "pulse(", "env('kick', ",
+    "fbm(", "noise(", "TAU",
+  ];
   const insert = (text) => {
     const start = input.selectionStart ?? input.value.length;
     const end = input.selectionEnd ?? input.value.length;
     input.value = `${input.value.slice(0, start)}${text}${input.value.slice(end)}`;
     input.focus();
     input.selectionStart = input.selectionEnd = start + text.length;
+    updatePreview();
   };
-  const editor = el(
-    "div",
-    { class: "expression-editor" },
+  const updatePreview = () => {
+    const text = input.value.trim();
+    if (!text) {
+      live.textContent = `val = ${Number(value).toFixed(3)}`;
+      diagnostic.textContent = "";
+      return true;
+    }
+    try {
+      const result = evalUiExpression(text, expressionContext(clip, value));
+      live.textContent = `val = ${Number(value).toFixed(3)} → ${Number(result).toFixed(4)} at ${currentTime().toFixed(2)}s`;
+      diagnostic.textContent = "";
+      diagnostic.classList.remove("danger");
+      return true;
+    } catch (error) {
+      live.textContent = `val = ${Number(value).toFixed(3)}`;
+      diagnostic.textContent = error.message || String(error);
+      diagnostic.classList.add("danger");
+      return false;
+    }
+  };
+  input.addEventListener("input", updatePreview);
+  const save = async (text) => {
+    const trimmed = text.trim();
+    if (trimmed && !updatePreview()) return;
+    if (trimmed) {
+      try {
+        const check = await client.post("/api/expressions/validate", {
+          expression: trimmed,
+          context: expressionContext(clip, value),
+        });
+        if (!check.ok) {
+          diagnostic.textContent = check.error || "expression failed";
+          diagnostic.classList.add("danger");
+          return;
+        }
+      } catch (error) {
+        diagnostic.textContent = error.message;
+        diagnostic.classList.add("danger");
+        return;
+      }
+    }
+    commitClip(clip.id, trimmed ? `expression ${param}` : `clear expression ${param}`, (target) => {
+      target.expressions = { ...(target.expressions || {}) };
+      if (trimmed) target.expressions[param] = trimmed;
+      else delete target.expressions[param];
+    });
+    dialog.close("apply");
+  };
+  form.append(
+    el("div", { class: "dialog-head", text: `ƒ ${param}` }),
     el(
       "div",
-      { class: "expr-row" },
-      input,
-      el("button", { class: "button small", type: "button", text: "Set", onclick: setExpression })
+      { class: "dialog-body" },
+      el("div", { class: "expr-row" }, input),
+      el("div", { class: "expr-presets" },
+        ...generators.map(([label, text]) =>
+          el("button", {
+            type: "button",
+            text: label,
+            onclick: () => { input.value = text; input.focus(); updatePreview(); },
+          })
+        )
+      ),
+      el("div", { class: "expr-tokens" },
+        ...tokens.map((token) =>
+          el("button", { type: "button", text: token, onclick: () => insert(token) })
+        )
+      ),
+      live,
+      diagnostic,
+      el("p", { class: "empty-state", style: "padding:0", text: "Functions: sin cos abs exp min max floor round noise clamp smoothstep lerp step wrap pulse env fbm. Audio and structure variables stay deterministic; no script runtime." })
     ),
     el(
       "div",
-      { class: "expr-presets" },
-      ...presets.map(([label, text]) =>
-        el("button", { type: "button", text: label, onclick: () => { input.value = text; input.focus(); } })
-      )
-    ),
-    el(
-      "div",
-      { class: "expr-tokens" },
-      ...tokens.map((token) =>
-        el("button", { type: "button", text: token, onclick: () => insert(token) })
-      )
-    ),
-    el("div", { class: "mono muted", style: "font-size:8px", text: `val = ${Number(value).toFixed(3)} | deterministic, audio optional` })
+      { class: "dialog-actions" },
+      el("button", { class: "button", type: "button", text: "Abbrechen", onclick: () => dialog.close("cancel") }),
+      el("button", { class: "button", type: "button", text: "Löschen", onclick: () => save("") }),
+      el("button", { class: "button primary", type: "button", text: "Set", onclick: () => save(input.value) })
+    )
   );
-  return editor;
+  dialog.append(form);
+  dialog.addEventListener("close", () => dialog.remove());
+  document.body.append(dialog);
+  updatePreview();
+  dialog.showModal();
+  input.focus();
+}
+
+function expressionEditor(clip, param, value) {
+  return null;
 }
 
 function paramRow(clip, param, labelText, control, value, options = {}) {
@@ -3347,11 +3474,7 @@ function paramRow(clip, param, labelText, control, value, options = {}) {
           type: "button",
           title: `Function generator for ${param}`,
           "aria-label": `Function generator ${param}`,
-          onclick: () => {
-            if (openExpressions.has(key)) openExpressions.delete(key);
-            else openExpressions.add(key);
-            renderInspector();
-          },
+          onclick: () => openExpressionDialog(clip, param, value),
         }, icon("function"))
       );
   return el(

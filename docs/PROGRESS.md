@@ -4,7 +4,7 @@ This file is the durable handoff. A new session should read this first, then
 `docs/TODO.md`, then continue at the first unchecked item. Do **not** re-do
 completed work.
 
-Last updated: 2026-11-22 (Sprint 5 UI phase 1 + review fixes + EffectCraft analysis)
+Last updated: 2026-11-22 (Phase 2 slice 1: expressions)
 
 ## Ground rules
 
@@ -193,6 +193,27 @@ systems) is intentionally separate.
 - [x] Pushed `main` to GitHub at `0c0af10`, tag `phase1-ui-2026-11-22`.
 - [x] Added `AGENTS.md`, `docs/TODO.md` and `docs/effectcraft-analysis.md`.
 - [x] Full suite after fixes: **162 passed, 6 subtests passed**.
+
+### Phase 2 slice 1 — Expressions — COMPLETE
+
+- [x] Safe expression vocabulary now includes `smoothstep`, `lerp`, `step`,
+  `wrap`, `pulse`, `env(name, phase)` and `fbm(x, y, z, scale)`. String
+  literals are accepted only as the `env()` curve name; attribute access,
+  subscripts and all other non-numeric constants stay rejected.
+- [x] `EXPRESSION_VARIABLES` and `Compositor._expression_context` carry `bass`,
+  `mid`, `high`, `harmonic`, `percussive`, `prominence`, `bar`, `barPhase`,
+  `phrase`, `phrasePhase`, `sectionProgress`, `beatsToDrop` and `inDrop`.
+- [x] Both envelope providers return the full basis set; `BlueprintEnvelope`
+  reads sections, drops and drop windows from the cached blueprint.
+- [x] The `ƒ` button opens a non-blocking generator dialog with Beat LFO, Stem
+  Follower, Phrase Riser, Emitter Wave and Wiggle presets, token chips, live
+  playhead value and inline diagnostics.
+- [x] `POST /api/expressions/validate` returns syntax/symbol errors and a
+  deterministic value; the dialog checks it before committing.
+- [x] Tests: `tests/test_studio_expressions.py`; full suite **167 passed,
+  6 subtests passed**.
+- [x] Headless Chromium verified the generator dialog, live value, validation
+  call and committed expression chip with no console errors.
 
 ## Decisions already made
 

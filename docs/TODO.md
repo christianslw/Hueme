@@ -3,7 +3,7 @@
 > **Read this after `docs/PROGRESS.md`.** Update this file whenever a task starts,
 > lands or is deliberately deferred. One checkbox = one shippable change.
 
-Last updated: 2026-11-22 (after Sprint 5 UI phase 1, code-review fixes and push)
+Last updated: 2026-11-22 (Phase 2 slice 1: expressions complete)
 
 ## Current state
 
@@ -18,21 +18,21 @@ Last updated: 2026-11-22 (after Sprint 5 UI phase 1, code-review fixes and push)
 
 ### 2.1 Expressions
 
-- [ ] Extend `hueme_studio/expressions.py` with `smoothstep`, `lerp`, `step`,
+- [x] Extend `hueme_studio/expressions.py` with `smoothstep`, `lerp`, `step`,
       `wrap`, `pulse`, `env(name, phase)`, `fbm(x, y, z, scale)`.
-- [ ] Allow string literals only where a function needs a named curve; keep
+- [x] Allow string literals only where a function needs a named curve; keep
       attribute access and subscripts rejected.
-- [ ] Extend `Compositor._expression_context` with `bass`, `mid`, `high`,
+- [x] Extend `Compositor._expression_context` with `bass`, `mid`, `high`,
       `harmonic`, `percussive`, `prominence`, `bar`, `barPhase`, `phrase`,
       `phrasePhase`, `sectionProgress`, `beatsToDrop`, `inDrop`.
-- [ ] Add `sectionProgress`, `beatsToDrop`, `inDrop` to both envelope providers
+- [x] Add `sectionProgress`, `beatsToDrop`, `inDrop` to both envelope providers
       (`deterministic_envelope` and `BlueprintEnvelope`).
-- [ ] Update `EXPRESSION_VARIABLES` and all validation/tests.
-- [ ] Mirror the same functions in the UI preview (`evalUiExpression`).
-- [ ] Upgrade the `ƒ` dialog: generator presets (Beat LFO, Stem Follower,
+- [x] Update `EXPRESSION_VARIABLES` and all validation/tests.
+- [x] Mirror the same functions in the UI preview (`evalUiExpression`).
+- [x] Upgrade the `ƒ` dialog: generator presets (Beat LFO, Stem Follower,
       Phrase Riser, Emitter Wave, Wiggle), live value, error message, token
       chips, readable expression output.
-- [ ] Add server-side expression diagnostics endpoint or reuse ShowDoc
+- [x] Add server-side expression diagnostics endpoint or reuse ShowDoc
       validation; show inline errors without blocking edits.
 
 ### 2.2 New presets

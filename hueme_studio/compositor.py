@@ -54,6 +54,8 @@ def deterministic_envelope(show: ShowDoc, t: float) -> dict[str, float]:
         + 0.10 * pulse
     )
     harmonic = 0.5 + 0.5 * math.sin(2.0 * math.pi * beat_pos / 16.0)
+    phrase_beats = 32.0
+    beat_in_phrase = beat_pos % phrase_beats
     return {
         "pulse": pulse,
         "kick": kick,
@@ -61,9 +63,14 @@ def deterministic_envelope(show: ShowDoc, t: float) -> dict[str, float]:
         "hat": hat,
         "energy": energy,
         "harmonic": harmonic,
+        "percussive": _clip01(0.25 + 0.75 * kick),
+        "prominence": _clip01(0.5 * pulse + 0.5 * energy),
         "bass": _clip01(0.2 + 0.8 * kick),
         "mid": _clip01(0.3 + 0.3 * snare),
         "high": hat,
+        "sectionProgress": _clip01(beat_in_phrase / phrase_beats),
+        "beatsToDrop": _clip01((phrase_beats - beat_in_phrase) / phrase_beats),
+        "inDrop": 1.0 if beat_in_phrase >= phrase_beats - 8.0 else 0.0,
     }
 
 
@@ -211,16 +218,33 @@ class Compositor:
     ) -> dict[str, float]:
         grid = max(1e-6, float(doc.timing.beat_grid_s))
         beat_pos = (float(t) - doc.timing.beat_offset_s) / grid
+        bar = int(beat.get("bar_index", 0))
+        bar_phase = float(beat.get("bar_phase", 0.0))
+        phrase = bar // 4
         return {
             "t": float(t),
             "beat": float(beat_pos),
             "beatPhase": float(beat.get("beat_phase", 0.0)),
+            "bar": float(bar),
             "barPos": float(beat.get("bar_pos", 0)),
+            "barPhase": bar_phase,
+            "phrase": float(phrase),
+            "phrasePhase": ((bar % 4) + float(beat.get("beat_phase", 0.0))) / 4.0,
             "bpm": float(doc.timing.bpm),
+            "pulse": float(env.get("pulse", 0.0)),
             "kick": float(env.get("kick", 0.0)),
             "snare": float(env.get("snare", 0.0)),
             "hat": float(env.get("hat", 0.0)),
             "energy": float(env.get("energy", 0.0)),
+            "harmonic": float(env.get("harmonic", 0.0)),
+            "percussive": float(env.get("percussive", 0.0)),
+            "prominence": float(env.get("prominence", 0.0)),
+            "bass": float(env.get("bass", 0.0)),
+            "mid": float(env.get("mid", 0.0)),
+            "high": float(env.get("high", 0.0)),
+            "sectionProgress": float(env.get("sectionProgress", 0.0)),
+            "beatsToDrop": float(env.get("beatsToDrop", 0.0)),
+            "inDrop": float(env.get("inDrop", 0.0)),
         }
 
     def _render_track(

@@ -47,6 +47,11 @@ from pydantic import BaseModel, ConfigDict, Field, ValidationError
 from hueme_studio import __version__
 from hueme_studio.blueprint import BlueprintStore
 from hueme_studio.compositor import Compositor, FrameResult, deterministic_envelope
+from hueme_studio.expressions import (
+    ExpressionError,
+    evaluate_expression,
+    expression_names,
+)
 from hueme_studio.filters import (
     FILTERS,
     FilterContext,
@@ -77,6 +82,7 @@ from hueme_studio.rig import (
 )
 from hueme_studio.showdoc import (
     Clip,
+    EXPRESSION_VARIABLES,
     FilterSpec,
     Keyframe,
     Marker,
@@ -191,6 +197,13 @@ class AutoKeyframesPatch(BaseModel):
     division: str = "1/4"
     depth: float = Field(default=0.65, ge=0.0, le=1.0)
     threshold: float = Field(default=0.18, ge=0.0, le=1.0)
+
+
+class ExpressionCheck(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    expression: str = Field(min_length=1, max_length=500)
+    context: dict[str, float] = Field(default_factory=dict)
 
 
 def _deep_merge(base: dict[str, Any], patch: dict[str, Any]) -> dict[str, Any]:
@@ -1734,6 +1747,24 @@ def create_app(
             media_type="image/png",
             headers={"Cache-Control": "no-store"},
         )
+
+    @app.post("/api/expressions/validate")
+    async def validate_expression(payload: ExpressionCheck) -> dict[str, Any]:
+        try:
+            symbols = sorted(expression_names(payload.expression))
+            unknown = sorted(set(symbols) - EXPRESSION_VARIABLES)
+            if unknown:
+                return {
+                    "ok": False,
+                    "error": f"unknown symbols: {', '.join(unknown)}",
+                    "symbols": symbols,
+                }
+            context = {name: 0.0 for name in EXPRESSION_VARIABLES}
+            context.update(payload.context)
+            value = evaluate_expression(payload.expression, context)
+            return {"ok": True, "value": value, "symbols": symbols, "error": None}
+        except ExpressionError as exc:
+            return {"ok": False, "error": str(exc), "symbols": []}
 
     # -- palette library --------------------------------------------------
     @app.get("/api/palettes")
