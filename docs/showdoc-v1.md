@@ -127,11 +127,13 @@ Coordinates are normalised room coordinates 0..1, independent of metres.
 
 ## Filters
 
-`filters: [{"uid": "f0_beat_gate", "type": "...", "params": {...}, "enabled": true}]`
+`filters: [{"uid": "f0_beat_gate", "type": "...", "params": {...}, "enabled": true, "color": ""}]`
 
 - `uid` is a stable instance id. Legacy filters without one receive
   `f<index>_<type>` when the clip is validated, so reordering never retargets
   automation.
+- `color` is an optional editor label colour on the filter card. It has no
+  effect on rendering and defaults to `""`.
 - Filter parameter automation uses the path `filter:<uid>:<param>` in
   `clip.keyframes[].param` and `clip.expressions`. Evaluation happens on a copy;
   the stored `FilterSpec` is never mutated.

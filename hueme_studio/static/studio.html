@@ -172,6 +172,7 @@
   <aside class="right-panel library-panel">
     <div class="library-head">
       <input id="library-search" class="input" type="search" placeholder="Presets &amp; Effekte suchen…" aria-label="Search presets and effects" spellcheck="false">
+      <button id="library-sort" class="button small" type="button" aria-pressed="false">Cat</button>
       <span id="library-count" class="mono muted library-count"></span>
     </div>
     <div class="library-scroll">
@@ -198,7 +199,7 @@
         </div>
       </section>
     </div>
-    <div class="library-hint">Klick = anwenden &middot; Drag = auf Track/Clip &middot; Rechtsklick = Menü</div>
+    <div class="library-hint">Klick = anwenden &middot; Stern = Favorit &middot; Drag = auf Track/Clip &middot; Rechtsklick = Menü</div>
   </aside>
 
   <div class="splitter split-h" id="split-timeline" role="separator" aria-orientation="horizontal" title="Timeline-Höhe ziehen"></div>
@@ -244,7 +245,7 @@
         <button id="timeline-layers" class="button small active" type="button">Layers</button>
         <button id="timeline-analysis" class="button small" type="button">Analysis</button>
       </div>
-      <span class="mono muted timeline-hint">Alt+Klick Header = Clipping &middot; Alt+Wheel = Spurhöhe &middot; Rechtsklick = Menü</span>
+      <span class="mono muted timeline-hint">Alt+Klick Header = Clipping &middot; Alt+Wheel = Spurhöhe &middot; U/Shift+U = Lanes &middot; Rechtsklick = Menü</span>
     </div>
     <div id="analysis-legend" class="analysis-legend hidden" aria-label="Analysis curves"></div>
     <canvas id="timeline" class="timeline-canvas" tabindex="0" aria-label="Show timeline"></canvas>

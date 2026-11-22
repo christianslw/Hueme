@@ -4,7 +4,7 @@ This file is the durable handoff. A new session should read this first, then
 `docs/TODO.md`, then continue at the first unchecked item. Do **not** re-do
 completed work.
 
-Last updated: 2026-11-22 (Phase 2 slice 5: Timeline Analysis complete)
+Last updated: 2026-11-22 (P1 usability polish complete)
 
 ## Ground rules
 
@@ -293,6 +293,35 @@ systems) is intentionally separate.
   persistence, audio-less empty state, hover/scrub readout and a 20.8s seek
   with no console errors.
 
+### P1 — usability polish — COMPLETE
+
+- [x] Library rows are keyboard-operable divs with a star button. **Favorites**
+  and **Recently Used** groups persist in `localStorage`
+  (`hueme.studio.libraryFavorites.v1`, `hueme.studio.libraryRecents.v1`), also
+  available from the row context menu.
+- [x] Search matches are highlighted with `<mark>`; the new **Cat / A–Z**
+  button switches category grouping for an alphabetical list and persists the
+  choice (`hueme.studio.librarySort.v1`).
+- [x] Filter cards reorder by dragging the card title; the up/down buttons
+  remain for keyboard users. Drop target and dragged card have explicit states.
+- [x] Double-clicking any parameter label opens its track lanes, focuses that
+  parameter first and switches the timeline to Layers when needed.
+- [x] `U` reveals animated parameter lanes for the selected clip/track;
+  `Shift+U` collapses all lanes.
+- [x] Filter header gains a colour-label button (cycles the five track identity
+  colours), an info popover with the filter description and parameter count,
+  and keeps enable/reset/reorder/delete.
+- [x] `Alt+click` a parameter label opens the expression generator;
+  `Alt+click` an active `ƒ` button removes the expression in one transaction.
+- [x] `FilterSpec.color` is optional editor metadata only; it does not affect
+  rendering and defaults to `""`.
+- [x] Tests: filter colour label round-trip; full suite **176 passed, 6
+  subtests passed**.
+- [x] Headless Chromium verified favourites/recents, search highlighting,
+  Cat/A–Z toggle, preset/filter recents, colour label commit, about popover,
+  drag reorder, lane reveal, `U` / `Shift+U` and Alt+click expression removal
+  with no console errors.
+
 ## Decisions already made
 
 - Coordinates metres, Z up. Room defaults to `[6.5, 8.0, 5.1]` only in the
@@ -363,8 +392,13 @@ systems) is intentionally separate.
   data. They store preset + params + mask + filter stack, not timing.
 - Analysis mode is a scope over the same `envelopeAt()` values as expressions;
   it does not add a compositor effect or write to the show.
-- The Studio may live at `/root/Hueme/test` in the current workspace; commands
-  below use that project root.
+- Library favourites, recents and the category/alphabetical choice are local
+  UI preferences, not show data. Filter colour labels are show data
+  (`FilterSpec.color`) because they describe a specific effect instance.
+- Animated-parameter lanes are editor state (`openTracks`), persisted with the
+  layout in `localStorage`; they are never written to the ShowDoc.
+- The Studio project root in this workspace is `/root/Hueme`; commands below
+  use that project root.
 
 ## Open questions / external values to confirm
 
@@ -382,7 +416,7 @@ systems) is intentionally separate.
 ## Verification commands
 
 ```bash
-cd /root/Hueme/test
+cd /root/Hueme
 python3 -m pytest tests/test_studio_*.py -q -W error
 python3 -m pytest -q -W error
 python3 -m compileall -q hueme_studio
@@ -397,14 +431,14 @@ curl -s localhost:8090/mcp -H 'Content-Type: application/json' \
 
 ## Next session start point
 
-Phase 2 (slices 2.1–2.5) is complete. Read `docs/PROGRESS.md`, `docs/TODO.md`,
-`docs/effectcraft-analysis.md`, `docs/ui-system.md` and
-`docs/studio-server.md` first.
+Phase 2 (slices 2.1–2.5) and P1 usability polish are complete. Read
+`docs/PROGRESS.md`, `docs/TODO.md`, `docs/effectcraft-analysis.md`,
+`docs/ui-system.md` and `docs/studio-server.md` first.
 
-The next board is **P1 usability polish** in `docs/TODO.md`: library favourites
-and recents, filter drag reorder, double-click parameter lane reveal, effect
-header polish and keyboard reveal shortcuts. P2 (full graph editor,
-syntax-highlighted editor, preset import/export) remains later.
+The next board is **P2** in `docs/TODO.md`: full keyframe graph editor,
+syntax-highlighted expression editor, user preset import/export, additional
+blend modes only when a look needs them, and live FFT spectrum. The P0 renderer
+memory investigation still needs a long-run check.
 
 Completed in Phase 2:
 
@@ -414,6 +448,13 @@ Completed in Phase 2:
 - Stable filter uids, filter parameter keyframes/expressions and timeline lanes.
 - Blueprint-backed FX preview, global user looks and the Effect Builder.
 - Timeline Analysis view with all envelope bases, spectrum and dominance.
+
+Completed in P1:
+
+- Library favourites, recents, search highlighting and Cat/A–Z grouping.
+- Filter drag reorder plus header colour label and info popover.
+- Double-click parameter lane reveal, `U` / `Shift+U` lane shortcuts and
+  `Alt+click` expression add/remove.
 
 Remaining external verification, not code work:
 

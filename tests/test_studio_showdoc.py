@@ -8,6 +8,7 @@ from pydantic import ValidationError
 
 from hueme_studio.showdoc import (
     Clip,
+    FilterSpec,
     Keyframe,
     Marker,
     ShowDoc,
@@ -167,6 +168,18 @@ def test_showdoc_validation_rejects_bad_geometry_and_ids():
             duration_s=4.0,
             timing=Timing(markers=[Marker(t_s=9.0, name="Too late")]),
         )
+
+
+def test_filter_colour_label_roundtrips_without_affecting_uid():
+    clip = Clip(
+        id="fx",
+        start_s=0.0,
+        end_s=1.0,
+        filters=[FilterSpec(type="bloom", color="#d06b4a")],
+    )
+    restored = Clip.model_validate(clip.model_dump())
+    assert restored.filters[0].color == "#d06b4a"
+    assert restored.filters[0].uid
 
 
 def test_default_show_loads_with_valid_structure():

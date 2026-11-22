@@ -69,6 +69,8 @@ const ICONS = {
   waveform: MDI.waveform,
   color: MDI["format-color-fill"],
   sparkles: MDI.creation,
+  star: MDI.star,
+  starOutline: MDI["star-outline"],
 };
 
 function icon(name, className = "") {
@@ -121,6 +123,7 @@ const dom = {
   audio: $("#preview-audio"),
   audioVolume: $("#audio-volume"),
   librarySearch: $("#library-search"),
+  librarySort: $("#library-sort"),
   libraryCount: $("#library-count"),
   splitLeft: $("#split-left"),
   splitRight: $("#split-right"),
@@ -240,6 +243,7 @@ let heightDrag = null;
 let heightCommitTimer = 0;
 const collapsedFolders = new Set();
 const openLanes = new Set();
+const laneFocus = new Map();
 const openExpressions = new Set();
 let timelineMode = "layers";
 let analysisHover = null;
@@ -254,6 +258,34 @@ try {
 }
 let lastHistory = { undo_depth: 0, redo_depth: 0 };
 let libraryQuery = "";
+const LIBRARY_FAVORITES_KEY = "hueme.studio.libraryFavorites.v1";
+const LIBRARY_RECENTS_KEY = "hueme.studio.libraryRecents.v1";
+const LIBRARY_SORT_KEY = "hueme.studio.librarySort.v1";
+const libraryFavorites = new Set(
+  (() => {
+    try {
+      const stored = JSON.parse(localStorage.getItem(LIBRARY_FAVORITES_KEY) || "[]");
+      return Array.isArray(stored) ? stored.filter((item) => typeof item === "string") : [];
+    } catch {
+      return [];
+    }
+  })()
+);
+let libraryRecents = (() => {
+  try {
+    const stored = JSON.parse(localStorage.getItem(LIBRARY_RECENTS_KEY) || "[]");
+    return Array.isArray(stored) ? stored.filter((item) => typeof item === "string").slice(0, 16) : [];
+  } catch {
+    return [];
+  }
+})();
+let librarySort = (() => {
+  try {
+    return localStorage.getItem(LIBRARY_SORT_KEY) === "alpha" ? "alpha" : "category";
+  } catch {
+    return "category";
+  }
+})();
 const collapsedCategories = new Set();
 const openTracks = new Set();
 let contextMenu = null;
@@ -1081,6 +1113,108 @@ function libraryQueryMatch(text) {
   return String(text || "").toLowerCase().includes(libraryQuery);
 }
 
+function libraryKey(kind, id) {
+  return `${kind}:${id}`;
+}
+
+function saveLibraryList(key, values) {
+  try {
+    localStorage.setItem(key, JSON.stringify(values));
+  } catch {
+    // Library preferences are a convenience, not required for editing.
+  }
+}
+
+function rememberLibraryItem(kind, id) {
+  const key = libraryKey(kind, id);
+  libraryRecents = [key, ...libraryRecents.filter((item) => item !== key)].slice(0, 16);
+  saveLibraryList(LIBRARY_RECENTS_KEY, libraryRecents);
+  if (kind === "preset") renderPresets();
+  else renderFilters();
+}
+
+function toggleLibraryFavorite(kind, id) {
+  const key = libraryKey(kind, id);
+  if (libraryFavorites.has(key)) libraryFavorites.delete(key);
+  else libraryFavorites.add(key);
+  saveLibraryList(LIBRARY_FAVORITES_KEY, [...libraryFavorites]);
+  if (kind === "preset") renderPresets();
+  else renderFilters();
+}
+
+function updateLibrarySort() {
+  if (!dom.librarySort) return;
+  const alpha = librarySort === "alpha";
+  dom.librarySort.textContent = alpha ? "A–Z" : "Cat";
+  dom.librarySort.setAttribute("aria-pressed", String(alpha));
+  dom.librarySort.title = alpha
+    ? "Alphabetisch — Klick: nach Kategorie"
+    : "Nach Kategorie — Klick: alphabetisch";
+}
+
+function highlightText(value) {
+  const text = String(value ?? "");
+  if (!libraryQuery) return text;
+  const lower = text.toLowerCase();
+  const chunks = [];
+  let start = 0;
+  while (start < lower.length) {
+    const hit = lower.indexOf(libraryQuery, start);
+    if (hit < 0) {
+      chunks.push(text.slice(start));
+      break;
+    }
+    if (hit > start) chunks.push(text.slice(start, hit));
+    chunks.push(el("mark", { text: text.slice(hit, hit + libraryQuery.length) }));
+    start = hit + libraryQuery.length;
+  }
+  return chunks.length ? chunks : text;
+}
+
+function libraryStar(kind, id) {
+  const key = libraryKey(kind, id);
+  const active = libraryFavorites.has(key);
+  return el("button", {
+    class: `library-star${active ? " active" : ""}`,
+    type: "button",
+    title: active ? "Aus Favoriten entfernen" : "Zu Favoriten hinzufügen",
+    "aria-label": active ? "Remove from favorites" : "Add to favorites",
+    "aria-pressed": String(active),
+    "data-library-key": key,
+    onclick: (event) => {
+      event.stopPropagation();
+      const keyboard = event.detail === 0;
+      toggleLibraryFavorite(kind, id);
+      if (keyboard) {
+        requestAnimationFrame(() => {
+          document
+            .querySelector(`.library-star[data-library-key="${CSS.escape(key)}"]`)
+            ?.focus({ preventScroll: true });
+        });
+      }
+    },
+  }, icon(active ? "star" : "starOutline"));
+}
+
+function libraryQuickGroups(kind, entries, buildRows) {
+  const nodes = [];
+  const keyOf = (entry) => libraryKey(kind, entry.id);
+  const byKey = new Map(entries.map((entry) => [keyOf(entry), entry]));
+  const favourites = entries.filter((entry) => libraryFavorites.has(keyOf(entry)));
+  if (favourites.length) {
+    nodes.push(categoryGroup("Favorites", favourites, buildRows, { key: `${kind}:favorites` }));
+  }
+  const recents = libraryRecents
+    .filter((key) => key.startsWith(`${kind}:`))
+    .map((key) => byKey.get(key))
+    .filter(Boolean)
+    .slice(0, 8);
+  if (recents.length) {
+    nodes.push(categoryGroup("Recently Used", recents, buildRows, { key: `${kind}:recents` }));
+  }
+  return nodes;
+}
+
 // A native double-click fires click twice. Apply a library action once per
 // short window so a double-click cannot create two commits/undo entries.
 const libraryActionTimes = new Map();
@@ -1092,8 +1226,9 @@ function libraryActionOnce(key, action) {
   action();
 }
 
-function categoryGroup(category, entries, buildBody) {
-  const closed = !libraryQuery && collapsedCategories.has(category);
+function categoryGroup(category, entries, buildBody, options = {}) {
+  const key = options.key || category;
+  const closed = !libraryQuery && collapsedCategories.has(key);
   const head = el(
     "button",
     {
@@ -1101,8 +1236,8 @@ function categoryGroup(category, entries, buildBody) {
       type: "button",
       "aria-expanded": String(!closed),
       onclick: () => {
-        if (collapsedCategories.has(category)) collapsedCategories.delete(category);
-        else collapsedCategories.add(category);
+        if (collapsedCategories.has(key)) collapsedCategories.delete(key);
+        else collapsedCategories.add(key);
         renderPresets();
         renderFilters();
       },
@@ -1138,55 +1273,126 @@ function previewImage(kind, item) {
   return img;
 }
 
-function renderPresets() {
-  const presets = state.presets || [];
-  const selected = findClip()?.clip.preset;
-  const groups = new Map();
-  for (const preset of presets) {
-    const category = preset.category || "Presets";
-    if (!libraryQueryMatch(`${preset.name} ${preset.description || ""} ${category}`)) continue;
-    if (!groups.has(category)) groups.set(category, []);
-    groups.get(category).push(preset);
-  }
-  const nodes = [];
-  for (const [category, entries] of groups) {
-    nodes.push(categoryGroup(category, entries, (items) =>
-      items.map((preset) => {
-        const row = el(
-          "button",
+function presetRow(preset, selected) {
+  const category = preset.category || "Presets";
+  const favourite = libraryFavorites.has(libraryKey("preset", preset.id));
+  return el(
+    "div",
+    {
+      class: `list-row preset-row${selected === preset.id ? " selected" : ""}`,
+      role: "button",
+      tabindex: "0",
+      title: preset.description,
+      draggable: "true",
+      onclick: () => libraryActionOnce(`preset:${preset.id}`, () => applyPreset(preset.id)),
+      onkeydown: (event) => {
+        if (event.target !== event.currentTarget) return;
+        if (event.key === "Enter" || event.code === "Space") {
+          event.preventDefault();
+          libraryActionOnce(`preset:${preset.id}`, () => applyPreset(preset.id));
+        }
+      },
+      oncontextmenu: (event) => {
+        event.preventDefault();
+        showContextMenu(event.clientX, event.clientY, [
+          { label: "Auf ausgewählten Clip anwenden", fn: () => applyPreset(preset.id) },
+          { label: "In Timeline am Playhead einfügen", fn: () => addPresetClipAtPlayhead(preset.id) },
           {
-            class: `list-row preset-row${selected === preset.id ? " selected" : ""}`,
-            type: "button",
-            title: preset.description,
-            draggable: "true",
-            onclick: () => libraryActionOnce(`preset:${preset.id}`, () => applyPreset(preset.id)),
-            oncontextmenu: (event) => {
-              event.preventDefault();
-              showContextMenu(event.clientX, event.clientY, [
-                { label: "Auf ausgewählten Clip anwenden", fn: () => applyPreset(preset.id) },
-                { label: "In Timeline am Playhead einfügen", fn: () => addPresetClipAtPlayhead(preset.id) },
-                { separator: true },
-                { label: "Preset-Info", fn: () => modalConfirm(preset.name, preset.description || preset.name, "OK"), disabled: !preset.description },
-              ]);
-            },
-            ondragstart: (event) => {
-              event.dataTransfer.setData(
-                "application/x-hueme-preset",
-                JSON.stringify({ preset: preset.id })
-              );
-              event.dataTransfer.effectAllowed = "copy";
-            },
+            label: favourite ? "Aus Favoriten entfernen" : "Zu Favoriten hinzufügen",
+            fn: () => toggleLibraryFavorite("preset", preset.id),
           },
-          previewImage("preset", preset),
-          el("span", { class: "row-text" },
-            el("span", { class: "row-name", text: preset.name }),
-            el("span", { class: "row-desc", text: preset.description || category })
-          ),
-          el("span", { class: "row-meta", text: `${preset.params.length}p` })
+          { separator: true },
+          { label: "Preset-Info", fn: () => modalConfirm(preset.name, preset.description || preset.name, "OK"), disabled: !preset.description },
+        ]);
+      },
+      ondragstart: (event) => {
+        event.dataTransfer.setData(
+          "application/x-hueme-preset",
+          JSON.stringify({ preset: preset.id })
         );
-        return row;
-      })
-    ));
+        event.dataTransfer.effectAllowed = "copy";
+      },
+    },
+    previewImage("preset", preset),
+    el("span", { class: "row-text" },
+      el("span", { class: "row-name" }, highlightText(preset.name)),
+      el("span", { class: "row-desc" }, highlightText(preset.description || category))
+    ),
+    el("span", { class: "row-meta", text: `${preset.params.length}p` }),
+    libraryStar("preset", preset.id)
+  );
+}
+
+function filterRow(filter, category) {
+  const favourite = libraryFavorites.has(libraryKey("filter", filter.id));
+  return el(
+    "div",
+    {
+      class: "list-row filter-row",
+      role: "button",
+      tabindex: "0",
+      title: filter.description,
+      draggable: "true",
+      onclick: () => libraryActionOnce(`filter:${filter.id}`, () => addFilter(filter.id)),
+      onkeydown: (event) => {
+        if (event.target !== event.currentTarget) return;
+        if (event.key === "Enter" || event.code === "Space") {
+          event.preventDefault();
+          libraryActionOnce(`filter:${filter.id}`, () => addFilter(filter.id));
+        }
+      },
+      oncontextmenu: (event) => {
+        event.preventDefault();
+        showContextMenu(event.clientX, event.clientY, [
+          { label: "Auf ausgewählten Clip anwenden", fn: () => addFilter(filter.id) },
+          {
+            label: favourite ? "Aus Favoriten entfernen" : "Zu Favoriten hinzufügen",
+            fn: () => toggleLibraryFavorite("filter", filter.id),
+          },
+          { label: "Filter-Info", fn: () => modalConfirm(filter.name, filter.description || filter.name, "OK"), disabled: !filter.description },
+        ]);
+      },
+      ondragstart: (event) => {
+        event.dataTransfer.setData(
+          "application/x-hueme-filter",
+          JSON.stringify({ filter: filter.id })
+        );
+        event.dataTransfer.effectAllowed = "copy";
+      },
+    },
+    previewImage("filter", filter),
+    el("span", { class: "row-text" },
+      el("span", { class: "row-name" }, highlightText(filter.name)),
+      el("span", { class: "row-desc" }, highlightText(filter.description || category))
+    ),
+    el("span", { class: "row-meta", text: filter.params.length ? `${filter.params.length}p` : "" }),
+    libraryStar("filter", filter.id)
+  );
+}
+
+function renderPresets() {
+  const selected = findClip()?.clip.preset;
+  const entries = (state.presets || []).filter((preset) => {
+    const category = preset.category || "Presets";
+    return libraryQueryMatch(`${preset.name} ${preset.description || ""} ${category}`);
+  });
+  const buildRows = (items) => items.map((preset) => presetRow(preset, selected));
+  const nodes = libraryQuickGroups("preset", entries, buildRows);
+  if (librarySort === "alpha") {
+    const sorted = [...entries].sort((a, b) => a.name.localeCompare(b.name));
+    if (sorted.length) {
+      nodes.push(categoryGroup("A–Z", sorted, buildRows, { key: "preset:alpha" }));
+    }
+  } else {
+    const groups = new Map();
+    for (const preset of entries) {
+      const category = preset.category || "Presets";
+      if (!groups.has(category)) groups.set(category, []);
+      groups.get(category).push(preset);
+    }
+    for (const [category, items] of groups) {
+      nodes.push(categoryGroup(category, items, buildRows, { key: `preset:${category}` }));
+    }
   }
   if (!nodes.length) nodes.push(el("div", { class: "library-empty", text: libraryQuery ? "Keine Presets gefunden." : "Keine Presets geladen." }));
   dom.presetList.replaceChildren(...nodes);
@@ -1194,54 +1400,31 @@ function renderPresets() {
 }
 
 function renderFilters() {
-  const filters = state.filters || [];
-  const groups = new Map();
-  for (const filter of filters) {
-    if (!libraryQueryMatch(`${filter.name} ${filter.description || ""}`)) continue;
-    const category = FILTER_CATEGORIES[filter.id] || "Utility";
-    if (!groups.has(category)) groups.set(category, []);
-    groups.get(category).push(filter);
-  }
-  const nodes = [];
   const filterOrder = ["Spatial", "Colour", "Time", "Texture", "Audio", "Utility"];
-  const orderedGroups = [...groups.entries()].sort(
-    (a, b) => filterOrder.indexOf(a[0]) - filterOrder.indexOf(b[0])
+  const categoryOf = (filter) => FILTER_CATEGORIES[filter.id] || "Utility";
+  const entries = (state.filters || []).filter((filter) =>
+    libraryQueryMatch(`${filter.name} ${filter.description || ""}`)
   );
-  for (const [category, entries] of orderedGroups) {
-    nodes.push(categoryGroup(`${category} FX`, entries, (items) =>
-      items.map((filter) =>
-        el(
-          "button",
-          {
-            class: "list-row filter-row",
-            type: "button",
-            title: filter.description,
-            draggable: "true",
-            onclick: () => libraryActionOnce(`filter:${filter.id}`, () => addFilter(filter.id)),
-            oncontextmenu: (event) => {
-              event.preventDefault();
-              showContextMenu(event.clientX, event.clientY, [
-                { label: "Auf ausgewählten Clip anwenden", fn: () => addFilter(filter.id) },
-                { label: "Filter-Info", fn: () => modalConfirm(filter.name, filter.description || filter.name, "OK"), disabled: !filter.description },
-              ]);
-            },
-            ondragstart: (event) => {
-              event.dataTransfer.setData(
-                "application/x-hueme-filter",
-                JSON.stringify({ filter: filter.id })
-              );
-              event.dataTransfer.effectAllowed = "copy";
-            },
-          },
-          previewImage("filter", filter),
-          el("span", { class: "row-text" },
-            el("span", { class: "row-name", text: filter.name }),
-            el("span", { class: "row-desc", text: filter.description || category })
-          ),
-          el("span", { class: "row-meta", text: filter.params.length ? `${filter.params.length}p` : "" })
-        )
-      )
-    ));
+  const buildRows = (items) => items.map((filter) => filterRow(filter, categoryOf(filter)));
+  const nodes = libraryQuickGroups("filter", entries, buildRows);
+  if (librarySort === "alpha") {
+    const sorted = [...entries].sort((a, b) => a.name.localeCompare(b.name));
+    if (sorted.length) {
+      nodes.push(categoryGroup("A–Z", sorted, buildRows, { key: "filter:alpha" }));
+    }
+  } else {
+    const groups = new Map();
+    for (const filter of entries) {
+      const category = categoryOf(filter);
+      if (!groups.has(category)) groups.set(category, []);
+      groups.get(category).push(filter);
+    }
+    const orderedGroups = [...groups.entries()].sort(
+      (a, b) => filterOrder.indexOf(a[0]) - filterOrder.indexOf(b[0])
+    );
+    for (const [category, items] of orderedGroups) {
+      nodes.push(categoryGroup(`${category} FX`, items, buildRows, { key: `filter:${category}` }));
+    }
   }
   if (!nodes.length) nodes.push(el("div", { class: "library-empty", text: libraryQuery ? "Keine Effekte gefunden." : "Keine Effekte geladen." }));
   dom.filterList.replaceChildren(...nodes);
@@ -2219,7 +2402,53 @@ function paramLanes(track) {
     for (const keyframe of clip.keyframes || []) params.add(keyframe.param);
     for (const param of Object.keys(clip.expressions || {})) params.add(param);
   }
-  return [...params].slice(0, 6).map((param) => ({ param, expression: null }));
+  const ordered = [...params];
+  const focus = laneFocus.get(track.id);
+  if (focus && ordered.includes(focus)) {
+    ordered.splice(ordered.indexOf(focus), 1);
+    ordered.unshift(focus);
+  }
+  return ordered.slice(0, 6).map((param) => ({ param, expression: null }));
+}
+
+function revealParamLane(clip, param) {
+  const found = findClip(clip.id);
+  if (!found) return;
+  openLanes.add(clip.id);
+  openTracks.add(found.track.id);
+  laneFocus.set(found.track.id, param);
+  saveLayout();
+  setTimelineMode("layers");
+  renderInspector();
+  requestDraw();
+  const animated = (found.track.clips || []).some((item) =>
+    (item.keyframes || []).some((keyframe) => keyframe.param === param) ||
+    Object.hasOwn(item.expressions || {}, param)
+  );
+  if (!animated) toast(`Noch keine Keyframes für ${param}.`, "info", 1800);
+}
+
+function revealAnimatedParams(collapse) {
+  if (collapse) {
+    openTracks.clear();
+    openLanes.clear();
+    laneFocus.clear();
+    saveLayout();
+    requestDraw();
+    return;
+  }
+  const found = findClip();
+  const track = found?.track || findTrack();
+  if (!track) {
+    toast("Keine Spur ausgewählt.", "info");
+    return;
+  }
+  openTracks.add(track.id);
+  if (found) openLanes.add(found.clip.id);
+  saveLayout();
+  setTimelineMode("layers");
+  renderInspector();
+  requestDraw();
 }
 
 function buildTimelineRows() {
@@ -3823,6 +4052,19 @@ function paramRow(clip, param, labelText, control, value, options = {}) {
   const key = paramKey(clip, param);
   const expression = Boolean(clip.expressions?.[param]);
   const keyed = Boolean(keyframeAtPlayhead(clip, param));
+  const label = el("label", {
+    text: labelText,
+    title: `${labelText} — Doppelklick: Lane zeigen · Alt+Klick: Ausdruck`,
+    ondblclick: (event) => {
+      event.preventDefault();
+      revealParamLane(clip, param);
+    },
+    onclick: (event) => {
+      if (!event.altKey) return;
+      event.preventDefault();
+      openExpressionDialog(clip, param, value);
+    },
+  });
   const actions = options.noActions
     ? null
     : el(
@@ -3839,15 +4081,26 @@ function paramRow(clip, param, labelText, control, value, options = {}) {
         el("button", {
           class: `button small${openExpressions.has(key) || expression ? " active" : ""}`,
           type: "button",
-          title: `Function generator for ${param}`,
+          title: expression
+            ? `Ausdruck für ${param} (Alt+Klick entfernt ihn)`
+            : `Function generator for ${param}`,
           "aria-label": `Function generator ${param}`,
-          onclick: () => openExpressionDialog(clip, param, value),
+          onclick: (event) => {
+            if (event.altKey && expression) {
+              event.preventDefault();
+              commitClip(clip.id, "remove expression", (target) => {
+                if (target.expressions) delete target.expressions[param];
+              });
+              return;
+            }
+            openExpressionDialog(clip, param, value);
+          },
         }, icon("function"))
       );
   return el(
     "div",
     { class: "param-row" },
-    el("label", { text: labelText }),
+    label,
     control,
     actions
   );
@@ -4680,15 +4933,59 @@ function renderFiltersSection(clip) {
   const filters = clip.filters || [];
   const cards = filters.map((filter, index) => {
     const info = state.filters?.find((item) => item.id === filter.type);
+    const patchFilter = (label, mutate) => commitClip(clip.id, label, (target) => {
+      const item = target.filters.find((entry) => entry.uid === filter.uid) || target.filters[index];
+      if (item) mutate(item);
+    });
     const move = (delta) => commitClip(clip.id, "reorder filter", (target) => {
       const next = index + delta;
       if (next < 0 || next >= target.filters.length) return;
       const [item] = target.filters.splice(index, 1);
       target.filters.splice(next, 0, item);
     });
+    const colours = ["", ...TRACK_COLORS];
+    const cycleColor = () => {
+      const next = colours[(colours.indexOf(filter.color || "") + 1) % colours.length];
+      patchFilter("filter colour label", (item) => {
+        item.color = next;
+      });
+    };
+    const about = (event) => {
+      const rect = event.currentTarget.getBoundingClientRect();
+      showContextMenu(rect.left - 130, rect.bottom + 3, [
+        { label: info?.name || filter.type, disabled: true },
+        info?.description ? { note: info.description } : null,
+        { note: `${info?.params?.length || 0} Parameter · ${FILTER_CATEGORIES[filter.type] || "Utility"}` },
+      ]);
+    };
     return el(
       "div",
-      { class: `filter-card${filter.enabled ? " enabled" : ""}` },
+      {
+        class: `filter-card${filter.enabled ? " enabled" : ""}`,
+        style: filter.color ? `box-shadow: inset 2px 0 0 ${filter.color}` : "",
+        ondragover: (event) => {
+          if (!event.dataTransfer.types.includes("application/x-hueme-filter-index")) return;
+          event.preventDefault();
+          event.currentTarget.classList.add("drop-target");
+        },
+        ondragleave: (event) => {
+          if (event.relatedTarget instanceof Node && event.currentTarget.contains(event.relatedTarget)) return;
+          event.currentTarget.classList.remove("drop-target");
+        },
+        ondrop: (event) => {
+          event.currentTarget.classList.remove("drop-target");
+          const raw = event.dataTransfer.getData("application/x-hueme-filter-index");
+          if (raw === "") return;
+          event.preventDefault();
+          const from = Number(raw);
+          if (!Number.isInteger(from) || from === index) return;
+          commitClip(clip.id, "reorder filter", (target) => {
+            if (from < 0 || from >= target.filters.length) return;
+            const [item] = target.filters.splice(from, 1);
+            target.filters.splice(index, 0, item);
+          });
+        },
+      },
       el(
         "div",
         { class: "filter-card-head" },
@@ -4698,15 +4995,38 @@ function renderFiltersSection(clip) {
           title: filter.enabled ? "Filter ausschalten" : "Filter einschalten",
           "aria-label": filter.enabled ? "Disable filter" : "Enable filter",
           style: `color:${filter.enabled ? "var(--ok)" : "var(--text-2)"}`,
-          onclick: () => commitClip(clip.id, "toggle filter", (target) => {
-            const item = target.filters[index];
-            if (item) item.enabled = !item.enabled;
+          onclick: () => patchFilter("toggle filter", (item) => {
+            item.enabled = !item.enabled;
           }),
         }, icon(filter.enabled ? "eye" : "eyeOff")),
-        el("span", { class: "filter-card-title" },
+        el("span", {
+          class: "filter-card-title",
+          title: "Ziehen zum Umsortieren",
+          draggable: "true",
+          ondragstart: (event) => {
+            event.dataTransfer.setData("application/x-hueme-filter-index", String(index));
+            event.dataTransfer.effectAllowed = "move";
+            event.currentTarget.closest(".filter-card")?.classList.add("dragging");
+          },
+          ondragend: (event) => event.currentTarget.closest(".filter-card")?.classList.remove("dragging"),
+        },
+          icon("drag"),
           el("strong", { text: info?.name || filter.type }),
           el("span", { class: "mono muted", text: info ? `${info.params.length}p` : "?" })
         ),
+        el("button", {
+          class: "button small icon-button filter-color",
+          type: "button",
+          title: filter.color ? `Farblabel ${filter.color}` : "Farblabel setzen",
+          "aria-label": "Filter colour label",
+          style: filter.color ? `color:${filter.color}` : "",
+          onclick: cycleColor,
+        }, icon("circle-outline")),
+        el("button", {
+          class: "button small icon-button", type: "button", title: "Filter-Info",
+          "aria-label": "Filter info",
+          onclick: about,
+        }, icon("info")),
         el("button", {
           class: "button small icon-button", type: "button", title: "Nach oben",
           "aria-label": "Move filter up", disabled: index === 0,
@@ -4720,9 +5040,8 @@ function renderFiltersSection(clip) {
         el("button", {
           class: "button small icon-button", type: "button", title: "Parameter zurücksetzen",
           "aria-label": "Reset filter parameters",
-          onclick: () => commitClip(clip.id, "reset filter", (target) => {
-            const item = target.filters[index];
-            if (item) item.params = {};
+          onclick: () => patchFilter("reset filter", (item) => {
+            item.params = {};
           }),
         }, icon("refresh")),
         el("button", {
@@ -5340,6 +5659,7 @@ function applyPreset(presetId) {
     toast("Select a clip in the timeline first.", "info");
     return;
   }
+  rememberLibraryItem("preset", presetId);
   commitClip(found.clip.id, "change preset", (target) => {
     target.preset = presetId;
     target.params = defaultParams(presetId);
@@ -5360,6 +5680,7 @@ async function addPresetClipAtPlayhead(presetId) {
     toast("No room for a clip at the playhead.", "info");
     return;
   }
+  rememberLibraryItem("preset", presetId);
   const ids = new Set(doc.tracks.flatMap((item) => item.clips.map((clip) => clip.id)));
   const id = uniqueId("clip", ids);
   await commitShow(`insert ${presetId}`, (target) => {
@@ -5573,6 +5894,7 @@ function addFilter(filterId) {
     toast("Select a clip in the timeline first.", "info");
     return;
   }
+  rememberLibraryItem("filter", filterId);
   commitClip(found.clip.id, "add filter", (target) => {
     const existing = target.filters.find((filter) => filter.type === filterId);
     if (existing) existing.enabled = true;
@@ -6827,6 +7149,10 @@ function fillContextMenu(menu, items) {
       menu.append(el("div", { class: "ctx-sep" }));
       continue;
     }
+    if (item.note) {
+      menu.append(el("p", { class: "ctx-note", text: item.note }));
+      continue;
+    }
     if (item.children?.length) {
       const submenu = el("div", { class: "ctx-menu ctx-sub", role: "menu" });
       fillContextMenu(submenu, item.children);
@@ -7164,6 +7490,18 @@ function bindEvents() {
     renderPresets();
     renderFilters();
   });
+  dom.librarySort?.addEventListener("click", () => {
+    librarySort = librarySort === "alpha" ? "category" : "alpha";
+    try {
+      localStorage.setItem(LIBRARY_SORT_KEY, librarySort);
+    } catch {
+      // Fall back to the session-only preference.
+    }
+    updateLibrarySort();
+    renderPresets();
+    renderFilters();
+  });
+  updateLibrarySort();
   dom.paletteNew?.addEventListener("click", () => openPaletteEditor(null, { onApply: applyPaletteToClip }));
   dom.fxToggle?.addEventListener("click", () => setFxMode(!fxMode));
   dom.syncMarkers?.addEventListener("click", syncMarkersFromBlueprint);
@@ -8045,6 +8383,7 @@ function bindTimeline() {
           snap_zcl: false,
         });
       });
+      rememberLibraryItem("preset", payload.preset);
       selectedClipId = id;
       selectedTrackId = trackId;
       renderInspector();
@@ -8059,6 +8398,7 @@ function bindTimeline() {
         toast("Drop the filter directly on a clip.", "info");
         return;
       }
+      rememberLibraryItem("filter", payload.filter);
       await commitClip(hit.clip.id, "add filter", (target) => {
         target.filters = target.filters || [];
         target.filters.push({ type: payload.filter, enabled: true, params: {} });
@@ -8237,6 +8577,11 @@ function bindKeyboard() {
       }
     }
     const key = event.key.toLowerCase();
+    if (!meta && !event.altKey && key === "u") {
+      event.preventDefault();
+      revealAnimatedParams(event.shiftKey);
+      return;
+    }
     if (meta && (key === "c" || key === "x")) {
       const found = findClip();
       if (found) {

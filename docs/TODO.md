@@ -3,13 +3,13 @@
 > **Read this after `docs/PROGRESS.md`.** Update this file whenever a task starts,
 > lands or is deliberately deferred. One checkbox = one shippable change.
 
-Last updated: 2026-11-22 (Phase 2 complete; P1 next)
+Last updated: 2026-11-22 (P1 complete; P2 next)
 
 ## Current state
 
 - Phase 2 is complete: expressions and diagnostics, four new presets, filter
   keyframes/lanes, blueprint FX + Effect Builder, and Timeline Analysis.
-- Phase 1 UI and code-review bugs remain in place. Full suite: 175 passed.
+- P1 usability polish is complete. Full suite: 176 passed.
 - GitHub: `main` includes the Phase 2 slices, tag `phase1-ui-2026-11-22` is the
   earlier checkpoint.
 - Reference analysis: `docs/effectcraft-analysis.md` (read-only).
@@ -104,14 +104,14 @@ basis be overlaid.
       preview socket. Add a bounded cache and a long-run leak check before the
       next production session. Do not assume the host bump fixed it.
 
-## P1 — usability polish
+## P1 — usability polish — COMPLETE
 
-- [ ] Library: Favorites and Recently Used sections (persist locally), search
+- [x] Library: Favorites and Recently Used sections (persist locally), search
       match highlighting, category/alphabetical toggle.
-- [ ] Filter card drag reorder (keep up/down buttons for keyboard users).
-- [ ] Double-click a parameter name to reveal its lane in the timeline.
-- [ ] Effect header colour labels / reset / about popover.
-- [ ] Keyboard: `U` / `Shift+U` reveal animated params, `Alt+click` expression.
+- [x] Filter card drag reorder (keep up/down buttons for keyboard users).
+- [x] Double-click a parameter name to reveal its lane in the timeline.
+- [x] Effect header colour labels / reset / about popover.
+- [x] Keyboard: `U` / `Shift+U` reveal animated params, `Alt+click` expression.
 
 ## P2 — later
 

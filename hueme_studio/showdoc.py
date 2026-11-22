@@ -405,6 +405,7 @@ class FilterSpec(Model):
     enabled: bool = True
     params: dict[str, Any] = Field(default_factory=dict)
     uid: str = Field(default="", max_length=80)
+    color: str = Field(default="", max_length=32)
 
 
 def _ensure_filter_uids(filters: list[FilterSpec]) -> None:

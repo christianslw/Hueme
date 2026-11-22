@@ -94,3 +94,25 @@ aiosendspin.noise.driver.HandshakeAbortedError: no PSK matches psk_id='KfjalAX1L
 17:17:54 [INFO] aiosendspin.client.client: Connecting to Sendspin server at ws://192.168.10.13:8927/sendspin
 17:17:54 [WARNING] aiosendspin.client.connection: Server aWDR0-Q8LP6j1zjFEBBc9Sonjvg1ohTuekD9F4Lgzik referenced a credential this client cannot use; continuing unpaired on the Sentinel PSK until re-paired
 17:17:54 [INFO] hueme.sendspin: Sendspin connected (server: Music Assistant (d5369777-music-assistant))
+INFO:     Started server process [20999]
+INFO:     Waiting for application startup.
+INFO:     Application startup complete.
+INFO:     Uvicorn running on http://0.0.0.0:8090 (Press CTRL+C to quit)
+2026-11-22 16:10:33,548 INFO hueme.sendspin Sendspin pairing token: SP:07X4Y5YIA6S5ARTOTZ5IZLRUN3DIG9R7FMOR444HQW5W5MIK53BJW593DS4D53IQRE47N6WTLR5IAHXFNG57PEXECZL6AJQKSZPC3T7A
+2026-11-22 16:10:33,548 INFO hueme.sendspin Connecting to Sendspin server at ws://192.168.10.13:8927/sendspin ...
+2026-11-22 16:10:33,549 INFO aiosendspin.client.client Connecting to Sendspin server at ws://192.168.10.13:8927/sendspin
+2026-11-22 16:10:33,563 INFO hueme.sendspin Sendspin connected (server: Music Assistant (d5369777-music-assistant), paired: True)
+INFO:     192.168.10.207:12828 - "WebSocket /ws/preview" [accepted]
+INFO:     connection open
+INFO:     127.0.0.1:57012 - "WebSocket /ws/preview" [accepted]
+INFO:     connection open
+INFO:     127.0.0.1:44608 - "WebSocket /ws/preview" [accepted]
+INFO:     connection open
+INFO:     127.0.0.1:58046 - "WebSocket /ws/preview" [accepted]
+INFO:     connection open
+INFO:     127.0.0.1:37438 - "WebSocket /ws/preview" [accepted]
+INFO:     connection open
+INFO:     192.168.10.207:57139 - "WebSocket /ws/preview" [accepted]
+INFO:     connection open
+INFO:     192.168.10.207:25548 - "WebSocket /ws/preview" [accepted]
+INFO:     connection open

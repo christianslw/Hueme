@@ -85,21 +85,35 @@
         {
           "id": "clip_1",
           "start_s": 0.0,
-          "end_s": 132.110208,
+          "end_s": 132.1102,
           "fade_in_s": 0.0,
           "fade_out_s": 0.0,
-          "preset": "noise_plasma",
+          "preset": "gradient_3d",
           "opacity": 1.0,
           "params": {
-            "palette": "synth",
-            "scale": 3.2,
-            "speed": 0.16,
-            "warp": 0.35,
-            "contrast": 0.9,
+            "mode": "radial",
+            "color_a": [
+              12,
+              18,
+              58
+            ],
+            "color_b": [
+              255,
+              90,
+              24
+            ],
+            "color_c": [
+              255,
+              230,
+              180
+            ],
+            "angle": 35,
+            "drift": 0.27,
+            "speed": 0.08,
             "brightness": 1
           },
           "expressions": {
-            "speed": "energy"
+            "speed": "0.1*energy"
           },
           "keyframes": [],
           "spatial_mask": {
@@ -128,18 +142,76 @@
             "softness": 0.08,
             "invert": false
           },
-          "filters": [
-            {
-              "type": "audio_mod",
-              "enabled": true,
-              "params": {
-                "depth": 1,
-                "source": "kick"
-              }
-            }
-          ],
+          "filters": [],
           "snap_zcl": false,
           "name": "Shockwave 3D",
+          "color": null
+        }
+      ]
+    },
+    {
+      "id": "track_1",
+      "name": "Solid Field",
+      "name_auto": true,
+      "target_group": "galerie_oben",
+      "blend_mode": "normal",
+      "opacity": 1.0,
+      "muted": false,
+      "solo": false,
+      "kind": "layer",
+      "parent_id": null,
+      "clipped_to_below": false,
+      "height_px": 36,
+      "clips": [
+        {
+          "id": "clip_2",
+          "start_s": 0.0,
+          "end_s": 56.8808,
+          "fade_in_s": 0.0,
+          "fade_out_s": 0.0,
+          "preset": "solid",
+          "opacity": 1.0,
+          "params": {
+            "color": [
+              255,
+              255,
+              255
+            ],
+            "brightness": 0.22
+          },
+          "expressions": {
+            "opacity": "snare"
+          },
+          "keyframes": [],
+          "spatial_mask": {
+            "kind": "none",
+            "axis": "x",
+            "position": 0.5,
+            "width": 0.25,
+            "center": [
+              0.5,
+              0.5,
+              0.5
+            ],
+            "radius": 0.3,
+            "box_min": [
+              0.0,
+              0.0,
+              0.0
+            ],
+            "box_max": [
+              1.0,
+              1.0,
+              1.0
+            ],
+            "modulo": 2,
+            "remainder": 0,
+            "softness": 0.08,
+            "invert": false
+          },
+          "filters": [],
+          "snap_zcl": false,
+          "name": null,
           "color": null
         }
       ]

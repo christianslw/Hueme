@@ -134,8 +134,9 @@ Track identity colours (only for the top edge + clip tint, never large fills):
   manual one.
 - **Playhead:** 1 px amber line, 7 px triangular head, no glow.
 - **Filter card:** 1 px bordered block in the clip inspector. Header carries
-  enable, name, parameter count, reorder, reset and delete; body exposes every
-  parameter inline. No hidden “advanced” drawer.
+  enable, colour label, name, parameter count, info, drag/up/down reorder,
+  reset and delete; body exposes every parameter inline. No hidden “advanced”
+  drawer.
 - **Palette strip:** 52×16 px swatch bar, 1 px border, Oklab gradient. Palette
   rows are 30 px and apply on single click; double click opens the editor.
 - **Context menu:** 24 px rows, optional leading icon, trailing shortcut and
@@ -174,7 +175,15 @@ Track identity colours (only for the top edge + clip tint, never large fills):
 - `Name folgt Effekt` is explicit per track. New tracks start auto; manually
   renaming a track or clip freezes that name until the user re-enables auto.
 - Filter parameters are edited in place; changing one is one undoable ShowDoc
-  transaction. Reordering the stack changes render order immediately.
+  transaction. Reordering the stack changes render order immediately; drag the
+  card title or use the up/down buttons.
+- Library rows: click applies, star toggles a local favourite. Favorites and
+  Recently Used stay above category groups; Cat/A–Z switches grouping and
+  search terms are highlighted. These are local UI preferences, not show data.
+- Double-click a parameter label to reveal its timeline lane. `U` reveals the
+  selected track's animated lanes; `Shift+U` collapses them.
+- `Alt+click` a parameter label opens the expression generator; `Alt+click` an
+  active `ƒ` button removes the expression.
 - Applying a palette from the library writes the clip's palette parameter in
   one transaction; a custom palette can be created from any built-in copy.
 - Space = play/pause, S = split at playhead, M = mute selected track,

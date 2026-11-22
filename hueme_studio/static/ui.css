@@ -468,6 +468,37 @@ button.list-row {
   width: 100%;
 }
 
+.list-row[role="button"] {
+  cursor: pointer;
+}
+
+.library-star {
+  display: inline-flex;
+  width: 18px;
+  height: 18px;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--text-2);
+}
+
+.library-star:hover {
+  color: var(--text-0);
+}
+
+.library-star.active {
+  color: var(--accent);
+}
+
+mark {
+  padding: 0;
+  background: #4a3413;
+  color: var(--text-0);
+}
+
 .list-row:hover {
   background: var(--bg-2);
   color: var(--text-0);
@@ -815,6 +846,14 @@ button.list-row {
   border-color: var(--line-strong);
 }
 
+.filter-card.dragging {
+  opacity: 0.45;
+}
+
+.filter-card.drop-target {
+  border-color: var(--accent);
+}
+
 .filter-card-head {
   display: flex;
   align-items: center;
@@ -829,9 +868,19 @@ button.list-row {
   display: flex;
   flex: 1;
   min-width: 0;
-  align-items: baseline;
-  gap: 5px;
+  align-items: center;
+  gap: 4px;
   overflow: hidden;
+  cursor: grab;
+  user-select: none;
+}
+
+.filter-card-title .icon {
+  color: var(--text-2);
+}
+
+.filter-card-title:active {
+  cursor: grabbing;
 }
 
 .filter-card-title strong {
@@ -1766,6 +1815,8 @@ input[type="number"]::-webkit-inner-spin-button {
   font-size: 10px;
   text-overflow: ellipsis;
   white-space: nowrap;
+  cursor: default;
+  user-select: none;
 }
 
 .param-actions {
@@ -2228,6 +2279,16 @@ input[type="number"]::-webkit-inner-spin-button {
 
 .ctx-menu button.danger {
   color: var(--danger);
+}
+
+.ctx-note {
+  max-width: 248px;
+  margin: 0;
+  padding: 4px 8px;
+  color: var(--text-2);
+  font-size: 10px;
+  line-height: 1.45;
+  white-space: normal;
 }
 
 .ctx-menu button:disabled {
