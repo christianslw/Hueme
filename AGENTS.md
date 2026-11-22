@@ -34,6 +34,9 @@ node --check hueme_studio/static/client.js
 node --check hueme_studio/static/studio.js
 node --check hueme_studio/static/live.js
 node --check hueme_studio/static/icons.js
+node --check hueme_studio/static/snap.js
+node --check hueme_studio/static/autoshow.js
+node --test tests/test_snap.mjs tests/test_autoshow.mjs
 ```
 
 For UI work, also open `/studio` in headless Chromium and check the console.

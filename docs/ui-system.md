@@ -30,7 +30,7 @@ Four-panel After Effects geometry, edge-to-edge, 1 px separators:
 │ Rig Manager   │ (Three.js canvas)                │ Clip / Fixture      │
 │ Filter Library│ camera presets, gizmo overlay    │ tabs, numeric fields│
 ├───────────────┴──────────────────────────────────┴─────────────────────┤
-│ TIMELINE: Canvas2D, ruler, tracks, waveform, beat/bar grid, markers    │ 300px
+│ TIMELINE: Canvas2D, ruler + structure band, tracks, waveform, grid, cues   │ 300px
 └────────────────────────────────────────────────────────────────────────┘
 ```
 
@@ -39,11 +39,18 @@ Four-panel After Effects geometry, edge-to-edge, 1 px separators:
 - Timeline is the visual anchor: bars alternate only by a barely perceptible
   value shift; clips are flat rectangles with 2 px radius and a colored top
   edge for track identity.
+- The ruler is two rows: time labels and beat ticks on top, a **structure band**
+  below. Blueprint sections are colour-coded strips; cue and drop markers are
+  vertical ticks with labels that yield to each other instead of overlapping.
+  Clicking either row seeks with snapping.
 - **Layers / Analysis** mode switch. Analysis hides tracks and draws the audio
   waveform full-height with beat grid, sections, drops and toggleable envelope
   overlays. The legend carries All/None, colour keys and playhead values; the
   spectrum strip and dominance readout answer what the music is doing here.
   Analysis is a scope, not a compositor effect.
+- **Auto Show** turns blueprint sections into one ordinary layer track with one
+  editable clip per section (preset per section label, beat gate on build/drop).
+  It is one undo step and never touches existing tracks.
 - MCP drawer slides over the right panel, 360 px, JSON-RPC log with monospace
   timestamps and a tool filter. It must not resize the timeline.
 
@@ -155,7 +162,11 @@ Track identity colours (only for the top edge + clip tint, never large fills):
 - Volumetric cones use additive transparency; floor pools are soft elliptical
   gradients. Keep cone opacity low enough to read fixture positions.
 - Camera presets: Persp, Front, Top, Side. Orbit with LMB, pan with MMB/Shift,
-  zoom with wheel. Show a compact axis triad bottom-right.
+  zoom with wheel. The top-right **view cube** has clickable faces (Front, Back,
+  Left, Right, Top, Bottom) and a Persp/Ortho pill; every face is a straight
+  orthographic view, Shift+click the opposite side. The viewport status moves to
+  the bottom-right; the shortcut hint stays short and the `?` button opens the
+  shortcut list.
 - **FX** is a fifth viewport mode: a full-frame front render of the selected
   (or playhead-active) clip through its preset and filter stack, with no
   fixture discs, strips, cones or room box. The status line reads
@@ -168,7 +179,12 @@ Track identity colours (only for the top edge + clip tint, never large fills):
 
 - Single click selects; shift-click adds to selection; drag on empty canvas
   marquee-selects.
-- Clip drag/trim is magnetic to the beat grid by default; hold Alt to bypass.
+- Clip drag/trim is magnetic to the beat grid, markers, clip edges and the
+  playhead within 8 px; hold Alt to bypass. `Alt+Wheel` resizes track heights.
+- Parameter rows carry a keyframe navigator (`◀ ◆ ▶`) once the parameter is
+  animated; expressions appear as an inline `ƒ` chip with the live value and
+  open the generator on click. Colour parameters are keyframed as swatches and
+  shown as a gradient strip in their lane.
 - Right-click a layer header for copy/cut/paste/duplicate/rename, the blend-mode
   submenu, mute/solo, clipping, sub-layer and delete. Right-click a clip for the
   same clipboard actions plus split, preset change and ZCL snap.

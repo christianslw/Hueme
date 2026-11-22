@@ -9,6 +9,7 @@ import {
 } from "./client.js";
 import { MDI } from "./icons.js";
 import { nearestSnap } from "./snap.js";
+import { buildAutoShowTrack } from "./autoshow.js";
 
 const client = new StudioClient();
 const $ = (selector) => document.querySelector(selector);
@@ -31,6 +32,8 @@ const ICONS = {
   folder: MDI["folder-outline"],
   folderOpen: MDI["folder-open-outline"],
   chevron: MDI["chevron-right"],
+  chevronLeft: MDI["chevron-left"],
+  chevronRight: MDI["chevron-right"],
   chevronDown: MDI["chevron-down"],
   keyframe: MDI["rhombus-outline"],
   function: MDI["function-variant"],
@@ -210,10 +213,23 @@ const camera = {
   ortho: false,
   orthoSize: 12,
 };
-let axisTriadHits = [];
-let axisTriadHover = null;
+let viewCubeHits = [];
+let viewCubeHover = null;
 let lastFlatView = { axis: 1, opposite: false };
-const view = { start: 0, end: 0, labelW: 140, rulerH: 28, trackH: 28, audioH: 74, scrollY: 0 };
+const view = { start: 0, end: 0, labelW: 140, rulerH: 52, trackH: 28, audioH: 74, scrollY: 0 };
+const RULER_TIME_H = 28;
+const SECTION_COLORS = {
+  intro: "#5e9aa8",
+  verse: "#8fa65a",
+  chorus: "#b3925a",
+  build: "#c9a34a",
+  drop: "#d06b4a",
+  bridge: "#9b7fb5",
+  break: "#6f7480",
+  breakdown: "#6f7480",
+  outro: "#5e9aa8",
+  pre_drop: "#e8862e",
+};
 let viewportSize = { w: 1, h: 1 };
 let timelineSize = { w: 1, h: 1 };
 let timelineRows = [];
@@ -820,6 +836,7 @@ async function syncBlueprint() {
   if (!meta) {
     blueprint = null;
     blueprintKey = null;
+    updateAutoShowButton();
     requestDraw();
     return;
   }
@@ -831,6 +848,7 @@ async function syncBlueprint() {
   } catch {
     blueprint = null;
   }
+  updateAutoShowButton();
   requestDraw();
 }
 
@@ -1811,6 +1829,24 @@ function toggleCameraProjection() {
   requestDraw();
 }
 
+// Menu and keyboard camera commands; the view cube uses setOrthoView directly.
+function setCameraNamed(name) {
+  if (fxMode) setFxMode(false);
+  fitCamera(false);
+  camera.ortho = name !== "persp";
+  if (name === "front") {
+    camera.yaw = 0;
+    camera.pitch = 0;
+  } else if (name === "side") {
+    camera.yaw = Math.PI / 2;
+    camera.pitch = 0;
+  } else if (name === "top") {
+    camera.yaw = 0;
+    camera.pitch = Math.PI / 2 - 1e-4;
+  }
+  requestDraw();
+}
+
 function cameraViewLabel() {
   if (Math.abs(camera.pitch) > 1.5) return camera.pitch > 0 ? "TOP" : "BOTTOM";
   const tau = Math.PI * 2;
@@ -2166,7 +2202,7 @@ function drawViewport() {
     context.setLineDash([]);
   }
 
-  drawAxisTriad(context, basis);
+  drawViewCube(context, basis);
   drawTransformGizmo(context);
   dom.viewportStatus.textContent = `${camera.ortho ? "ORTHO" : "PERSP"} ${cameraViewLabel()}  |  ${state.rig.compiled.voxel_count} VOX  |  ${selectedFixtures.size} SELECTED`;
 }
@@ -2286,51 +2322,127 @@ function drawAxisHandles(context, center) {
   }
 }
 
-function drawAxisTriad(context, basis) {
-  axisTriadHits = [];
-  const origin = [viewportSize.w - 54, 58];
-  const length = 22;
-  const axes = [
-    { vector: [1, 0, 0], label: "X", color: "#e05a5a" },
-    { vector: [0, 1, 0], label: "Y", color: "#58a66b" },
-    { vector: [0, 0, 1], label: "Z", color: "#5e9aa8" },
+function drawViewCube(context, basis) {
+  viewCubeHits = [];
+  const cx = viewportSize.w - 64;
+  const cy = 68;
+  const size = 23;
+  const active = camera.ortho ? cameraViewLabel() : "";
+  const faces = [
+    { key: "right", label: "RIGHT", normal: [1, 0, 0], axis: 0, opposite: false, corners: [[1, -1, -1], [1, 1, -1], [1, 1, 1], [1, -1, 1]] },
+    { key: "left", label: "LEFT", normal: [-1, 0, 0], axis: 0, opposite: true, corners: [[-1, -1, -1], [-1, -1, 1], [-1, 1, 1], [-1, 1, -1]] },
+    { key: "back", label: "BACK", normal: [0, 1, 0], axis: 1, opposite: true, corners: [[-1, 1, -1], [-1, 1, 1], [1, 1, 1], [1, 1, -1]] },
+    { key: "front", label: "FRONT", normal: [0, -1, 0], axis: 1, opposite: false, corners: [[-1, -1, -1], [1, -1, -1], [1, -1, 1], [-1, -1, 1]] },
+    { key: "top", label: "TOP", normal: [0, 0, 1], axis: 2, opposite: false, corners: [[-1, -1, 1], [1, -1, 1], [1, 1, 1], [-1, 1, 1]] },
+    { key: "bottom", label: "BOTTOM", normal: [0, 0, -1], axis: 2, opposite: true, corners: [[-1, -1, -1], [1, -1, -1], [1, 1, -1], [-1, 1, -1]] },
   ];
+  const toScreen = (point) => [
+    cx + dot(point, basis.right) * size,
+    cy - dot(point, basis.up) * size,
+  ];
+
   context.save();
-  context.fillStyle = "rgba(17,18,20,0.66)";
+  context.beginPath();
+  context.arc(cx, cy, 50, 0, Math.PI * 2);
+  context.fillStyle = "rgba(12, 13, 15, 0.88)";
+  context.fill();
   context.strokeStyle = "#2b2e34";
   context.lineWidth = 1;
+  context.stroke();
+
+  // Painter's order: faces pointing away from the camera first.
+  const visible = faces
+    .map((face) => ({
+      face,
+      depth: dot(face.normal, basis.forward),
+      points: face.corners.map(toScreen),
+    }))
+    .filter((entry) => entry.depth < -0.08)
+    .sort((a, b) => b.depth - a.depth);
+
+  const labelBoxes = [];
+  for (const { face, points, depth } of visible) {
+    const hovered = viewCubeHover === face.key;
+    const selected = active === face.label;
+    context.beginPath();
+    context.moveTo(points[0][0], points[0][1]);
+    for (let index = 1; index < points.length; index += 1) {
+      context.lineTo(points[index][0], points[index][1]);
+    }
+    context.closePath();
+    const lit = face.normal[2] > 0 ? 8 : 0;
+    context.fillStyle = selected
+      ? "#3a2a18"
+      : hovered
+        ? "#3d4149"
+        : `rgb(${30 + lit}, ${33 + lit}, ${38 + lit})`;
+    context.fill();
+    context.strokeStyle = selected ? "#e8862e" : hovered ? "#d4d7dd" : "#4a4e56";
+    context.stroke();
+
+    // Label only readable faces and skip collisions, so an isometric view does
+    // not stack LEFT/FRONT text into the same pixels.
+    if (depth < -0.35) {
+      const area = Math.abs(
+        points.reduce((sum, [x, y], index) => {
+          const [nextX, nextY] = points[(index + 1) % points.length];
+          return sum + x * nextY - nextX * y;
+        }, 0) / 2
+      );
+      const centerX = points.reduce((sum, [x]) => sum + x, 0) / points.length;
+      const centerY = points.reduce((sum, [, y]) => sum + y, 0) / points.length;
+      context.font = "7px JetBrains Mono, monospace";
+      const width = context.measureText(face.label).width;
+      const box = { x0: centerX - width / 2 - 2, y0: centerY - 6, x1: centerX + width / 2 + 2, y1: centerY + 3 };
+      const collides = labelBoxes.some((other) =>
+        box.x0 < other.x1 && box.x1 > other.x0 && box.y0 < other.y1 && box.y1 > other.y0
+      );
+      if (area > 220 && !collides) {
+        labelBoxes.push(box);
+        context.fillStyle = selected ? "#f6c089" : "#b9bcc3";
+        context.textAlign = "center";
+        context.fillText(face.label, centerX, centerY + 2.5);
+      }
+    }
+    viewCubeHits.push({ key: face.key, axis: face.axis, opposite: face.opposite, points });
+  }
+
+  const pillY = cy + 58;
+  const pillHovered = viewCubeHover === "toggle";
+  context.fillStyle = pillHovered ? "#34383f" : "#17191c";
+  context.strokeStyle = pillHovered ? "#e8862e" : camera.ortho ? "#7a5a35" : "#33373e";
   context.beginPath();
-  context.arc(origin[0], origin[1], 34, 0, Math.PI * 2);
+  context.rect(cx - 24, pillY - 7, 48, 14);
   context.fill();
   context.stroke();
-  context.font = "9px JetBrains Mono, monospace";
-  for (let index = 0; index < axes.length; index += 1) {
-    const axis = axes[index];
-    const dx = dot(axis.vector, basis.right) * length;
-    const dy = -dot(axis.vector, basis.up) * length;
-    const endX = origin[0] + dx;
-    const endY = origin[1] + dy;
-    const hovered = axisTriadHover === index;
-    context.strokeStyle = hovered ? "#e8862e" : axis.color;
-    context.fillStyle = hovered ? "#e8862e" : axis.color;
-    context.lineWidth = hovered ? 2.5 : 1.6;
-    context.beginPath();
-    context.moveTo(origin[0], origin[1]);
-    context.lineTo(endX, endY);
-    context.stroke();
-    context.fillText(axis.label, endX + dx * 0.18, endY + dy * 0.18 + 3);
-    axisTriadHits.push({ axis: index, x: endX, y: endY, label: axis.label });
-  }
-  context.fillStyle = camera.ortho ? "#e8862e" : "#7c8089";
+  context.fillStyle = camera.ortho ? "#e8862e" : "#9da1aa";
   context.font = "8px JetBrains Mono, monospace";
-  context.fillText(camera.ortho ? "ORTHO" : "PERSP", origin[0] - 15, origin[1] + 47);
-  axisTriadHits.push({ toggle: true, x: origin[0], y: origin[1] + 44 });
+  context.textAlign = "center";
+  context.fillText(camera.ortho ? "ORTHO" : "PERSP", cx, pillY + 3);
+  context.textAlign = "left";
+  viewCubeHits.push({ toggle: true, x: cx, y: pillY });
   context.restore();
 }
 
-function axisTriadAt(x, y) {
-  for (const hit of axisTriadHits) {
-    if (Math.hypot(hit.x - x, hit.y - y) <= (hit.toggle ? 16 : 12)) return hit;
+function pointInPolygon(x, y, points) {
+  let inside = false;
+  for (let index = 0, previous = points.length - 1; index < points.length; previous = index, index += 1) {
+    const [xi, yi] = points[index];
+    const [xj, yj] = points[previous];
+    if ((yi > y) !== (yj > y) && x < ((xj - xi) * (y - yi)) / (yj - yi) + xi) {
+      inside = !inside;
+    }
+  }
+  return inside;
+}
+
+function viewCubeAt(x, y) {
+  for (const hit of viewCubeHits) {
+    if (hit.toggle) {
+      if (Math.abs(x - hit.x) <= 26 && Math.abs(y - hit.y) <= 9) return hit;
+    } else if (pointInPolygon(x, y, hit.points)) {
+      return hit;
+    }
   }
   return null;
 }
@@ -2412,10 +2524,53 @@ function laneParamNorm(track, param, value) {
   return clamp((Number(value) - lo) / Math.max(1e-9, hi - lo), 0, 1);
 }
 
+function cssColour(value, alpha = 1) {
+  if (!Array.isArray(value) || value.length < 3) return `rgba(128, 130, 136, ${alpha})`;
+  const [r, g, b] = value.slice(0, 3).map((part) => Math.round(clamp(Number(part) || 0, 0, 255)));
+  return `rgba(${r}, ${g}, ${b}, ${alpha})`;
+}
+
+// Colour keyframes have no scalar range, so their lane is a gradient strip with
+// swatch diamonds. The strip interpolates in sRGB; the compositor still blends
+// the actual colour keyframes in Oklab.
+function drawColourLane(context, clip, keys, x0, x1, laneY, laneH) {
+  const stripH = 6;
+  const stripY = laneY + Math.max(3, Math.round((laneH - stripH) / 2));
+  const span = Math.max(1, x1 - x0);
+  const gradient = context.createLinearGradient(x0, 0, x0 + span, 0);
+  for (const keyframe of keys) {
+    const offset = clamp((timeToX(clip.start_s + keyframe.t_s) - x0) / span, 0, 1);
+    gradient.addColorStop(offset, cssColour(keyframe.value));
+  }
+  context.fillStyle = gradient;
+  context.fillRect(x0, stripY, span, stripH);
+  context.fillStyle = "#101216";
+  context.fillRect(x0, stripY + stripH, span, 1);
+  for (const keyframe of keys) {
+    const x = timeToX(clip.start_s + keyframe.t_s);
+    if (x < view.labelW || x > x1) continue;
+    context.fillStyle = cssColour(keyframe.value);
+    context.strokeStyle = "#101216";
+    context.lineWidth = 1;
+    context.beginPath();
+    context.moveTo(x, stripY - 2);
+    context.lineTo(x + 4, stripY + 3);
+    context.lineTo(x, stripY + 8);
+    context.lineTo(x - 4, stripY + 3);
+    context.closePath();
+    context.fill();
+    context.stroke();
+  }
+}
+
 function laneParamLabel(track, param) {
   const found = filterSpecForPath(track, param);
-  if (!found) return param;
-  return `${found.info?.name || found.filter.type} / ${found.spec?.label || found.key}`;
+  if (found) return `${found.info?.name || found.filter.type} / ${found.spec?.label || found.key}`;
+  for (const clip of track.clips || []) {
+    const spec = (presetById(clip.preset)?.params || []).find((item) => item.key === param);
+    if (spec) return spec.label;
+  }
+  return param;
 }
 
 function paramLanes(track) {
@@ -2664,6 +2819,8 @@ function drawTimelineAnalysis(context, w, h, doc) {
     context.stroke();
   }
 
+  drawStructureBand(context, w, doc);
+
   for (const window of blueprint?.drop_windows || []) {
     const x0 = Math.max(left, timeToX(Number(window.start)));
     const x1 = Math.min(w, timeToX(Number(window.end)));
@@ -2678,20 +2835,15 @@ function drawTimelineAnalysis(context, w, h, doc) {
     context.strokeStyle = marker.kind === "drop" ? "#d06b4a" : "#6f7480";
     context.setLineDash([3, 3]);
     context.beginPath();
-    context.moveTo(x + 0.5, 12);
+    context.moveTo(x + 0.5, view.rulerH);
     context.lineTo(x + 0.5, bottom);
     context.stroke();
     context.setLineDash([]);
-    context.fillStyle = marker.kind === "drop" ? "#d06b4a" : "#7c8089";
-    context.font = "9px Inter, sans-serif";
-    context.fillText(marker.name, x + 3, 22);
   }
 
   context.fillStyle = "#9da1aa";
   context.font = "9px JetBrains Mono, monospace";
-  context.fillText("ANALYSIS · WAVEFORM + ENVELOPE BASIS", 8, 16);
-  context.fillStyle = "#4a4e56";
-  context.fillText("click/scrub = seek + snap", 8, 29);
+  context.fillText("ANALYSIS · WAVEFORM + ENVELOPE BASIS · seek + snap", 8, 16);
 
   if (!analysisHasAudio()) {
     context.fillStyle = "#7c8089";
@@ -2856,6 +3008,59 @@ function drawAnalysisPlayhead(context, w, h, bottom) {
 }
 
 
+function drawStructureBand(context, w, doc) {
+  const top = RULER_TIME_H;
+  const bandH = view.rulerH - top;
+  context.fillStyle = "#101216";
+  context.fillRect(view.labelW, top, w - view.labelW, bandH);
+  context.strokeStyle = "#26292f";
+  context.lineWidth = 1;
+  context.beginPath();
+  context.moveTo(0, view.rulerH + 0.5);
+  context.lineTo(w, view.rulerH + 0.5);
+  context.stroke();
+
+  context.fillStyle = "#4a4e56";
+  context.font = "8px JetBrains Mono, monospace";
+  context.fillText("STRUCTURE", 8, top + 13);
+
+  // Section strip: colour tells the part of the song at a glance.
+  for (const section of blueprint?.sections || []) {
+    const x0 = Math.max(view.labelW, timeToX(Number(section.start)));
+    const x1 = Math.min(w, timeToX(Number(section.end)));
+    if (x1 <= x0) continue;
+    const color = SECTION_COLORS[section.label] || "#6f7480";
+    context.fillStyle = `${color}40`;
+    context.fillRect(x0, top + 2, x1 - x0, bandH - 4);
+    context.fillStyle = color;
+    context.fillRect(x0, top + 2, x1 - x0, 2);
+  }
+
+  // Cue markers sit on the lower half. Labels yield to each other instead of
+  // stacking; the tick still marks every cue.
+  const markers = [...(doc.timing?.markers || [])].sort((a, b) => a.t_s - b.t_s);
+  let lastLabelRight = view.labelW - 2;
+  context.font = "8px Inter, sans-serif";
+  for (const marker of markers) {
+    const x = timeToX(Number(marker.t_s));
+    if (x < view.labelW || x > w) continue;
+    const isDrop = marker.kind === "drop";
+    const color = isDrop ? "#d06b4a" : "#8b8f98";
+    context.strokeStyle = color;
+    context.beginPath();
+    context.moveTo(x + 0.5, top + 1);
+    context.lineTo(x + 0.5, view.rulerH - 1);
+    context.stroke();
+    const label = String(marker.name || "");
+    const width = context.measureText(label).width;
+    if (label && x + 3 > lastLabelRight + 4 && x + width + 6 < w) {
+      context.fillStyle = isDrop ? "#e59a7d" : "#a9adb5";
+      context.fillText(label, x + 3, view.rulerH - 4);
+      lastLabelRight = x + width + 8;
+    }
+  }
+}
+
 function drawTimeline() {
   const context = dom.timeline.getContext("2d");
   const { w, h } = timelineSize;
@@ -2906,6 +3111,7 @@ function drawTimeline() {
     }
   }
 
+  drawStructureBand(context, w, doc);
   drawAudioLane(context, w);
 
   // Track rows must never paint over the ruler or audio lane while scrolling.
@@ -3082,11 +3288,18 @@ function drawTimeline() {
         const keys = (clip.keyframes || [])
           .filter((keyframe) => keyframe.param === info.param && typeof keyframe.value === "number")
           .sort((a, b) => a.t_s - b.t_s);
+        const colourKeys = (clip.keyframes || [])
+          .filter((keyframe) => keyframe.param === info.param && Array.isArray(keyframe.value))
+          .sort((a, b) => a.t_s - b.t_s);
         const expression = clip.expressions?.[info.param];
-        if (!keys.length && !expression) continue;
+        if (!keys.length && !colourKeys.length && !expression) continue;
         const cx0 = Math.max(view.labelW, timeToX(clip.start_s));
         const cx1 = Math.min(w, timeToX(clip.end_s));
         if (cx1 <= view.labelW || cx0 >= w) continue;
+        if (colourKeys.length) {
+          drawColourLane(context, clip, colourKeys, cx0, cx1, laneY, row.laneH);
+          continue;
+        }
         if (expression) {
           context.strokeStyle = "#e8862e99";
           context.beginPath();
@@ -3185,13 +3398,10 @@ function drawTimeline() {
     context.strokeStyle = marker.kind === "drop" ? "#d06b4a" : "#6f7480";
     context.setLineDash([3, 3]);
     context.beginPath();
-    context.moveTo(x + 0.5, 12);
+    context.moveTo(x + 0.5, view.rulerH);
     context.lineTo(x + 0.5, laneBottom);
     context.stroke();
     context.setLineDash([]);
-    context.fillStyle = marker.kind === "drop" ? "#d06b4a" : "#7c8089";
-    context.font = "9px Inter, sans-serif";
-    context.fillText(marker.name, x + 3, 22);
   }
 
   // Vertical scrollbar for the track area.
@@ -3306,18 +3516,6 @@ function drawAudioLane(context, w) {
       context.fillRect(x, mid - amp, 1, Math.max(1, amp * 2));
     }
   }
-  const SECTION_COLORS = {
-    intro: "#5e9aa8",
-    verse: "#8fa65a",
-    chorus: "#b3925a",
-    build: "#c9a34a",
-    drop: "#d06b4a",
-    bridge: "#9b7fb5",
-    break: "#6f7480",
-    breakdown: "#6f7480",
-    outro: "#5e9aa8",
-    pre_drop: "#e8862e",
-  };
   for (const section of blueprint?.sections || []) {
     const x = timeToX(Number(section.start));
     if (x < view.labelW || x > w) continue;
@@ -3437,6 +3635,7 @@ function fieldRow(labelText, control, options = {}) {
   const label = el("label", {
     for: control.id || id,
     text: labelText,
+    title: options.title || undefined,
     "data-scrub-label": options.scrub ? control.id || id : undefined,
   });
   if (!control.id) control.id = id;
@@ -3894,6 +4093,22 @@ function keyframeAtPlayhead(clip, param) {
   );
 }
 
+function paramKeyframes(clip, param) {
+  return (clip.keyframes || [])
+    .filter((keyframe) => keyframe.param === param)
+    .sort((a, b) => a.t_s - b.t_s);
+}
+
+function jumpParamKeyframe(clip, param, direction) {
+  const frames = paramKeyframes(clip, param);
+  const local = currentTime() - clip.start_s;
+  const target = direction < 0
+    ? [...frames].reverse().find((frame) => frame.t_s < local - 1e-3)
+    : frames.find((frame) => frame.t_s > local + 1e-3);
+  if (!target) return;
+  client.seek(clamp(clip.start_s + target.t_s, 0, duration()));
+}
+
 function toggleParamKeyframe(clip, param, value) {
   const existing = keyframeAtPlayhead(clip, param);
   if (existing) {
@@ -4068,22 +4283,50 @@ function openExpressionDialog(clip, param, value, onSaved = null) {
 }
 
 function expressionEditor(clip, param, value) {
-  return null;
+  const expression = clip.expressions?.[param];
+  if (!expression) return null;
+  let live = "–";
+  try {
+    const result = evalUiExpression(expression, expressionContext(clip, value));
+    live = Number.isFinite(Number(result)) ? Number(result).toFixed(3) : String(result);
+  } catch {
+    live = "error";
+  }
+  return el(
+    "div",
+    { class: "expression-row" },
+    el(
+      "button",
+      {
+        class: "expression-chip mono",
+        type: "button",
+        title: `${expression}\nKlick: bearbeiten`,
+        onclick: () => openExpressionDialog(clip, param, value),
+      },
+      icon("function"),
+      el("span", { text: expression })
+    ),
+    el("span", { class: "mono muted expression-value", text: `= ${live}` })
+  );
 }
 
 function paramRow(clip, param, labelText, control, value, options = {}) {
   const key = paramKey(clip, param);
   const expression = Boolean(clip.expressions?.[param]);
   const keyed = Boolean(keyframeAtPlayhead(clip, param));
+  const frames = paramKeyframes(clip, param);
+  const local = currentTime() - clip.start_s;
+  const previousKey = [...frames].reverse().find((frame) => frame.t_s < local - 1e-3);
+  const nextKey = frames.find((frame) => frame.t_s > local + 1e-3);
   const label = el("label", {
     text: labelText,
-    title: `${labelText} — Doppelklick: Lane zeigen · Alt+Klick: Ausdruck`,
+    title: `${labelText} — Doppelklick: Lane zeigen${options.noExpression ? "" : " · Alt+Klick: Ausdruck"}`,
     ondblclick: (event) => {
       event.preventDefault();
       revealParamLane(clip, param);
     },
     onclick: (event) => {
-      if (!event.altKey) return;
+      if (!event.altKey || options.noExpression) return;
       event.preventDefault();
       openExpressionDialog(clip, param, value);
     },
@@ -4093,6 +4336,26 @@ function paramRow(clip, param, labelText, control, value, options = {}) {
     : el(
         "div",
         { class: "param-actions" },
+        frames.length
+          ? el("button", {
+              class: "button small icon-button key-nav",
+              type: "button",
+              title: "Vorheriger Keyframe",
+              "aria-label": `Previous keyframe ${param}`,
+              disabled: !previousKey,
+              onclick: () => jumpParamKeyframe(clip, param, -1),
+            }, icon("chevronLeft"))
+          : null,
+        frames.length
+          ? el("button", {
+              class: "button small icon-button key-nav",
+              type: "button",
+              title: "Nächster Keyframe",
+              "aria-label": `Next keyframe ${param}`,
+              disabled: !nextKey,
+              onclick: () => jumpParamKeyframe(clip, param, 1),
+            }, icon("chevronRight"))
+          : null,
         el("button", {
           class: `button small${keyed ? " keyed" : ""}`,
           type: "button",
@@ -4101,24 +4364,26 @@ function paramRow(clip, param, labelText, control, value, options = {}) {
           "aria-pressed": String(keyed),
           onclick: () => toggleParamKeyframe(clip, param, value),
         }, icon("keyframe")),
-        el("button", {
-          class: `button small${openExpressions.has(key) || expression ? " active" : ""}`,
-          type: "button",
-          title: expression
-            ? `Ausdruck für ${param} (Alt+Klick entfernt ihn)`
-            : `Function generator for ${param}`,
-          "aria-label": `Function generator ${param}`,
-          onclick: (event) => {
-            if (event.altKey && expression) {
-              event.preventDefault();
-              commitClip(clip.id, "remove expression", (target) => {
-                if (target.expressions) delete target.expressions[param];
-              });
-              return;
-            }
-            openExpressionDialog(clip, param, value);
-          },
-        }, icon("function"))
+        options.noExpression
+          ? null
+          : el("button", {
+              class: `button small${openExpressions.has(key) || expression ? " active" : ""}`,
+              type: "button",
+              title: expression
+                ? `Ausdruck für ${param} (Alt+Klick entfernt ihn)`
+                : `Function generator for ${param}`,
+              "aria-label": `Function generator ${param}`,
+              onclick: (event) => {
+                if (event.altKey && expression) {
+                  event.preventDefault();
+                  commitClip(clip.id, "remove expression", (target) => {
+                    if (target.expressions) delete target.expressions[param];
+                  });
+                  return;
+                }
+                openExpressionDialog(clip, param, value);
+              },
+            }, icon("function"))
       );
   return el(
     "div",
@@ -4458,11 +4723,18 @@ function renderClipInspector() {
       for (const spec of preset.params) {
         const value = clip.params?.[spec.key] ?? spec.default;
         if (spec.type === "color") {
-          rows.push(fieldRow(spec.label, colorField(value, (next) => {
-            commitClip(clip.id, `param ${spec.key}`, (target) => {
-              target.params = { ...target.params, [spec.key]: next };
-            });
-          })));
+          rows.push(paramRow(
+            clip,
+            spec.key,
+            spec.label,
+            colorField(value, (next) => {
+              commitClip(clip.id, `param ${spec.key}`, (target) => {
+                target.params = { ...target.params, [spec.key]: next };
+              });
+            }),
+            value,
+            { noExpression: true }
+          ));
         } else if (spec.type === "palette") {
           rows.push(fieldRow(spec.label, paletteControl(clip, spec, value)));
         } else if (spec.type === "vec3") {
@@ -4694,7 +4966,7 @@ function renderShowSection(doc) {
         const longest = target.tracks.reduce((max, track) => Math.max(max, ...track.clips.map((clip) => clip.end_s)), 0);
         target.duration_s = Math.max(value, longest + 1, 1);
       }), { step: 0.1, min: 1 }), { scrub: true }),
-      el("p", { class: "empty-state", text: "Select a clip in the timeline to edit its preset, mask, filters and keyframes." })
+      el("p", { class: "empty-state", text: "Clip in der Timeline wählen, um Preset, Maske, Filter und Keyframes zu bearbeiten." })
     ),
     section(
       "Music Assistant",
@@ -4712,14 +4984,13 @@ function renderShowSection(doc) {
         target.match = target.match || {};
         target.match.duration_s = Math.max(0, value);
       }), { step: 0.1, min: 0 }), { scrub: true }),
-      fieldRow("Sync-Offset", numberInput(Number((state?.sync?.offset_s || 0) * 1000), setSyncOffset, { step: 10, min: -20000, max: 20000 }), { scrub: true }),
+      fieldRow("Sync-Offset", numberInput(Number((state?.sync?.offset_s || 0) * 1000), setSyncOffset, { step: 10, min: -20000, max: 20000 }), { scrub: true, title: "Positiv = Licht später, negativ = Licht früher (bis ±20 s). Wird automatisch aus der Sendspin-Zeit berechnet; der Offset gilt nur für die Speaker-/AVR-Kette." }),
       el("div", { class: "section-actions", style: "margin-top:5px" },
         el("button", { class: "button small", type: "button", text: "−500", onclick: () => setSyncOffset(Number((state?.sync?.offset_s || 0) * 1000) - 500) }),
         el("button", { class: "button small", type: "button", text: "−50", onclick: () => setSyncOffset(Number((state?.sync?.offset_s || 0) * 1000) - 50) }),
         el("button", { class: "button small", type: "button", text: "+50", onclick: () => setSyncOffset(Number((state?.sync?.offset_s || 0) * 1000) + 50) }),
         el("button", { class: "button small", type: "button", text: "+500", onclick: () => setSyncOffset(Number((state?.sync?.offset_s || 0) * 1000) + 500) })
       ),
-      el("p", { class: "empty-state", text: "Positiv = Licht später, negativ = Licht früher (bis ±20 s). Wird automatisch aus der Sendspin-Zeit berechnet, Offset nur für die Speaker-/AVR-Kette." }),
       el("div", { class: "section-actions", style: "margin-top:5px" },
         el("button", { class: "button small", type: "button", text: "Aktuellen MA-Track binden", onclick: bindCurrentMaTrack }),
         el("button", { class: "button small", type: "button", text: "Als Alias hinzufügen", onclick: addCurrentMaTrackAlias }),
@@ -4947,7 +5218,9 @@ function filterParamRows(clip, filter, index) {
       });
     }
     const param = `filter:${filter.uid}:${spec.key}`;
-    rows.push(paramRow(clip, param, spec.label, control, value));
+    rows.push(paramRow(clip, param, spec.label, control, value, { noExpression: spec.type === "color" }));
+    const expression = expressionEditor(clip, param, value);
+    if (expression) rows.push(expression);
   }
   return rows;
 }
@@ -6083,8 +6356,62 @@ async function toggleClipping() {
   requestDraw();
 }
 
-async function autoKeyframes(source = "kick", param = "opacity") {
-  const id = activeShowId();
+function updateAutoShowButton() {
+  const button = $("#auto-show");
+  if (!button) return;
+  const count = (blueprint?.sections || []).length;
+  button.disabled = !count;
+  button.title = count
+    ? `Aus ${count} erkannten Sections einen bearbeitbaren Auto-Show-Track erzeugen`
+    : "Audio importieren, um Sections zu erkennen";
+}
+
+async function autoShowFromAnalysis() {
+  const doc = showDoc();
+  const sections = blueprint?.sections || [];
+  if (!doc || !sections.length) {
+    updateAutoShowButton();
+    toast("Kein Audio-Blueprint mit Sections. Erst Audio importieren.", "info");
+    return;
+  }
+  const trackCount = doc.tracks.filter((track) => track.id.startsWith("auto_")).length;
+  const trackName = trackCount ? `Auto Show ${trackCount + 1}` : "Auto Show";
+  const trackId = uniqueId("auto", new Set(doc.tracks.map((track) => track.id)));
+  const existingClipIds = new Set(
+    doc.tracks.flatMap((track) => track.clips.map((clip) => clip.id))
+  );
+  const track = buildAutoShowTrack({
+    sections,
+    duration: doc.duration_s,
+    trackId,
+    trackName,
+    idPrefix: trackId,
+    existingClipIds,
+    defaults: defaultParams,
+  });
+  if (!track) {
+    toast("Die Analyse enthält keine nutzbaren Sections.", "info");
+    return;
+  }
+  const confirmed = await modalConfirm(
+    "Auto-Show aus Analyse",
+    `${sections.length} Sections → neuer Track „${trackName}“ mit ${track.clips.length} Clips. Bestehende Spuren bleiben unverändert; ein Undo entfernt den Track.`,
+    "Erzeugen"
+  );
+  if (!confirmed) return;
+  await commitShow("auto show", (target) => {
+    target.tracks.push(track);
+  });
+  selectedTrackId = track.id;
+  selectedClipId = track.clips[0]?.id || null;
+  if (selectedClipId) inspectorTab = "clip";
+  updateTabButtons();
+  renderInspector();
+  requestDraw();
+  toast(`Auto-Show: ${track.clips.length} Clips aus ${sections.length} Sections`, "success");
+}
+
+async function autoKeyframes(source = "kick", param = "opacity") {  const id = activeShowId();
   const found = findClip();
   if (!id) {
     toast("No active show.", "info");
@@ -7268,7 +7595,6 @@ function openMcpDrawer(open) {
 
 /* ------------------------------------------------------------------ events */
 function runCommand(command) {
-  const cameraButton = document.querySelector(`[data-camera="${command.replace("camera-", "")}"]`);
   switch (command) {
     case "new-show": newShow(); break;
     case "load-audio": dom.blueprintFile.click(); break;
@@ -7290,11 +7616,12 @@ function runCommand(command) {
       break;
     case "clear-filters": clearClipFilters(); break;
     case "auto-keys": autoKeyframes("kick", "opacity"); break;
+    case "auto-show": autoShowFromAnalysis(); break;
     case "camera-persp":
     case "camera-front":
     case "camera-top":
     case "camera-side":
-      cameraButton?.click();
+      setCameraNamed(command.replace("camera-", ""));
       break;
     case "fit-show":
       view.start = 0;
@@ -7451,6 +7778,7 @@ function bindEvents() {
   dom.addGlobal?.addEventListener("click", () => addTrack("global"));
   dom.addSub?.addEventListener("click", () => addTrack("sub"));
   dom.autoKeys?.addEventListener("click", () => autoKeyframes("kick", "opacity"));
+  $("#auto-show")?.addEventListener("click", autoShowFromAnalysis);
 
   dom.showSelect.addEventListener("change", async () => {
     try {
@@ -7594,33 +7922,8 @@ function bindEvents() {
     requestDraw();
   });
 
-  document.querySelectorAll("[data-camera]").forEach((button) => {
-    button.addEventListener("click", () => {
-      if (fxMode) setFxMode(false);
-      const room = roomDoc();
-      camera.target = room.min.map((value, index) => (value + room.max[index]) / 2);
-      if (button.dataset.camera === "front") {
-        camera.yaw = 0;
-        camera.pitch = 0;
-      } else if (button.dataset.camera === "top") {
-        camera.yaw = 0;
-        camera.pitch = 1.45;
-      } else if (button.dataset.camera === "side") {
-        camera.yaw = Math.PI / 2;
-        camera.pitch = 0;
-      } else {
-        camera.yaw = -0.78;
-        camera.pitch = 0.52;
-      }
-      fitCamera(false);
-      if (button.dataset.camera !== "persp") {
-        camera.yaw = button.dataset.camera === "side" ? Math.PI / 2 : 0;
-        camera.pitch = button.dataset.camera === "top" ? 1.45 : 0;
-      }
-      requestDraw();
-    });
-  });
   $("#camera-fit").addEventListener("click", () => fitCamera());
+  $("#viewport-help")?.addEventListener("click", () => runCommand("shortcuts"));
 
   window.addEventListener("resize", resizeAll);
   window.addEventListener("pointermove", (event) => {
@@ -7673,10 +7976,10 @@ function bindViewport() {
       return;
     }
     if (event.button !== 0) return;
-    const triad = axisTriadAt(x, y);
-    if (triad) {
-      if (triad.toggle) toggleCameraProjection();
-      else setOrthoView(triad.axis, event.shiftKey);
+    const cube = viewCubeAt(x, y);
+    if (cube) {
+      if (cube.toggle) toggleCameraProjection();
+      else setOrthoView(cube.axis, cube.opposite !== event.shiftKey);
       return;
     }
     const hit = fixtureAt(x, y);
@@ -7719,13 +8022,13 @@ function bindViewport() {
       const rect = canvas.getBoundingClientRect();
       const x = event.clientX - rect.left;
       const y = event.clientY - rect.top;
-      const triad = axisTriadAt(x, y);
-      const nextHover = triad && !triad.toggle ? triad.axis : null;
-      if (axisTriadHover !== nextHover) {
-        axisTriadHover = nextHover;
+      const cube = viewCubeAt(x, y);
+      const nextHover = cube ? (cube.toggle ? "toggle" : cube.key) : null;
+      if (viewCubeHover !== nextHover) {
+        viewCubeHover = nextHover;
         requestDraw();
       }
-      canvas.style.cursor = triad ? "pointer" : fixtureAt(x, y) ? "move" : "crosshair";
+      canvas.style.cursor = cube ? "pointer" : fixtureAt(x, y) ? "move" : "crosshair";
       return;
     }
     const rect = canvas.getBoundingClientRect();
@@ -7866,8 +8169,8 @@ function bindViewport() {
   });
 
   canvas.addEventListener("pointerleave", () => {
-    if (axisTriadHover !== null) {
-      axisTriadHover = null;
+    if (viewCubeHover !== null) {
+      viewCubeHover = null;
       requestDraw();
     }
   });

@@ -19,6 +19,7 @@
         <div class="menu-drop">
           <button type="button" data-command="new-show">Neue Show</button>
           <button type="button" data-command="load-audio">Audio importieren</button>
+          <button type="button" data-command="auto-show">Auto-Show aus Analyse</button>
           <button type="button" data-command="snapshot">Snapshot speichern</button>
           <button type="button" data-command="live-deck">Live Deck</button>
           <button type="button" data-command="system-restart">Studio neu starten</button>
@@ -154,15 +155,12 @@
     <canvas id="viewport" class="viewport" tabindex="0" aria-label="3D rig viewport"></canvas>
     <canvas id="fx-preview" class="fx-preview hidden" aria-label="Fixture-free effect preview"></canvas>
     <div class="viewport-tools">
-      <button class="button" type="button" data-camera="persp">Persp</button>
-      <button class="button" type="button" data-camera="front">Front</button>
-      <button class="button" type="button" data-camera="top">Top</button>
-      <button class="button" type="button" data-camera="side">Side</button>
       <button class="button" type="button" id="camera-fit">Fit</button>
       <button class="button" type="button" id="fx-toggle" title="Effect-Vorschau ohne Fixtures">FX</button>
+      <button class="button" type="button" id="viewport-help" title="Tastenkürzel" aria-label="Tastenkürzel">?</button>
     </div>
     <div id="viewport-status" class="viewport-status"></div>
-    <div class="viewport-hint">G Move &middot; R Rotate &middot; S Scale &middot; X/Y/Z Achse &middot; Shift fein &middot; Ctrl Snap &middot; Alt Einzel-Pivot &middot; Numpad 1/3/7 ortho &middot; 5 persp/ortho &middot; 9 opposite &middot; Achsen-Gizmo oben rechts</div>
+    <div class="viewport-hint">G/R/S transform &middot; Alt orbit &middot; Wheel zoom &middot; ? shortcuts</div>
     <div id="transform-hud" class="transform-hud hidden" aria-live="polite"></div>
   </main>
 
@@ -221,6 +219,7 @@
       <button id="add-clip" class="button small icon-button" type="button" title="Add clip at playhead" aria-label="Add clip"></button>
       <button id="effect-builder" class="button small" type="button" title="Pop-up effect builder with live preview">Effect Builder…</button>
       <button id="auto-keys" class="button small" type="button" title="Generate rhythm keyframes from the ML analysis">AI KEYS</button>
+      <button id="auto-show" class="button small" type="button" disabled title="Audio importieren, um Sections zu erkennen">Auto Show</button>
       <button id="blueprint-load" class="button small" type="button" title="Attach audio (WAV, MP3, FLAC, M4A, MP4, OGG)">Audio</button>
       <input id="blueprint-file" class="hidden" type="file" accept=".wav,.mp3,.flac,.m4a,.mp4,.ogg,audio/*,video/mp4">
       <button id="sync-markers" class="button small" type="button" title="Dauer, BPM und Marker aus dem Audio neu synchronisieren">Sync Markers</button>
@@ -245,7 +244,7 @@
         <button id="timeline-layers" class="button small active" type="button">Layers</button>
         <button id="timeline-analysis" class="button small" type="button">Analysis</button>
       </div>
-      <span class="mono muted timeline-hint">Alt+Klick Header = Clipping &middot; Alt+Wheel = Spurhöhe &middot; U/Shift+U = Lanes &middot; Rechtsklick = Menü</span>
+      <span class="mono muted timeline-hint">Alt+Klick Header = Clipping &middot; Alt+Wheel = Spurhöhe &middot; Alt+Drag = Snap aus &middot; U/Shift+U = Lanes &middot; Rechtsklick = Menü</span>
     </div>
     <div id="analysis-legend" class="analysis-legend hidden" aria-label="Analysis curves"></div>
     <canvas id="timeline" class="timeline-canvas" tabindex="0" aria-label="Show timeline"></canvas>

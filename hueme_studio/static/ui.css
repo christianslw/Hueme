@@ -660,7 +660,7 @@ mark {
   position: absolute;
   z-index: 3;
   right: 10px;
-  top: 10px;
+  bottom: 8px;
   color: var(--text-2);
   font-family: var(--mono);
   font-size: 9px;
@@ -1802,7 +1802,7 @@ input[type="number"]::-webkit-inner-spin-button {
 
 .param-row {
   display: grid;
-  grid-template-columns: 84px minmax(0, 1fr) 40px;
+  grid-template-columns: 84px minmax(0, 1fr) auto;
   align-items: center;
   gap: 4px;
   min-height: 24px;
@@ -1835,6 +1835,60 @@ input[type="number"]::-webkit-inner-spin-button {
 .param-actions .button.active {
   border-color: var(--accent-dim);
   color: var(--accent);
+}
+
+.param-actions .key-nav {
+  width: 15px;
+  border-color: transparent;
+  background: transparent;
+}
+
+.param-actions .key-nav:disabled {
+  opacity: 0.25;
+}
+
+.param-actions .key-nav .icon svg {
+  width: 10px;
+  height: 10px;
+}
+
+.expression-row {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  min-width: 0;
+  margin: -1px 0 4px 88px;
+}
+
+.expression-chip {
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  min-width: 0;
+  max-width: 100%;
+  padding: 1px 4px;
+  border: 1px solid var(--line-strong);
+  background: #15171a;
+  color: var(--accent);
+  font-size: 9px;
+  cursor: pointer;
+}
+
+.expression-chip span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.expression-chip .icon svg {
+  width: 10px;
+  height: 10px;
+}
+
+.expression-value {
+  flex: none;
+  margin-left: auto;
+  font-size: 9px;
 }
 
 .expression-editor {

@@ -4,7 +4,7 @@ This file is the durable handoff. A new session should read this first, then
 `docs/TODO.md`, then continue at the first unchecked item. Do **not** re-do
 completed work.
 
-Last updated: 2026-11-22 (P2 slice 1: preview-cache bound + magnetic timeline snap)
+Last updated: 2026-11-22 (P2 slice 2: view cube, structure band, colour keys, auto-show)
 
 ## Ground rules
 
@@ -343,6 +343,40 @@ systems) is intentionally separate.
 - [x] Full suite: **177 passed, 6 subtests passed**. Headless Chromium verified
   `/studio` seek snapping and `/live` with no console or server errors.
 
+### P2 slice 2 — viewport, timeline and inspector polish + Auto Show — COMPLETE
+
+- [x] The viewport axis triad is now a **view cube** at the top-right: six
+  clickable faces (Front/Back/Left/Right/Top/Bottom), an ORTHO/PERSP pill and
+  hover states. Face clicks are straight orthographic views; Shift+click shows
+  the opposite side. The old Persp/Front/Top/Side buttons were removed from the
+  viewport toolbar; menu/keyboard camera commands use `setCameraNamed()`.
+- [x] Viewport chrome decluttered: the status moved to the bottom-right, the
+  hint is one short line, and a `?` button opens the shortcut list.
+- [x] Parameter rows gained a keyframe navigator (`◀ ◆ ▶`) that jumps the
+  playhead to the previous/next key of that parameter, and an inline `ƒ` chip
+  with the current expression and live value. Filter parameter rows use the
+  same expression chip.
+- [x] Colour parameters are keyframeable (◇ only, no scalar ƒ). Their timeline
+  lane is a gradient strip with colour-swatch diamonds; preset parameter lanes
+  now use readable labels instead of raw keys.
+- [x] The timeline ruler grew a **structure band** (ruler 28 px time row + 24 px
+  band). Blueprint sections are colour-coded strips, cue/drop markers are ticks
+  with collision-free labels, and both Layers and Analysis show it. Clicking
+  the band still seeks with snapping because the band stays inside `rulerH`.
+- [x] **Auto Show** (`static/autoshow.js`): blueprint sections become one
+  ordinary layer track with one clip per section, numbered names (`Verse 1/2`),
+  a preset per section label, `beat_gate` on build/drop, fades and clamped,
+  non-overlapping ranges. It is one `commitShow` transaction and never touches
+  existing tracks. Button in the transport plus Datei menu.
+- [x] `tests/test_autoshow.mjs` covers preset mapping, numbering, clamping,
+  overlap trimming and unique ids (5 cases).
+- [x] Long inspector help moved into tooltips (Sync-Offset); the Show tab hint
+  is translated and shortened.
+- [x] Full suite: **177 passed, 6 subtests passed**; `node --test` 9/9.
+  Headless Chromium verified view-cube clicks and the ORTHO/PERSP toggle, band
+  seeking, colour keyframe commits with a gradient lane, Auto Show creation
+  (7 sections → 7 clips) on `/studio`, and `/live` with no console errors.
+
 ## Decisions already made
 
 - Coordinates metres, Z up. Room defaults to `[6.5, 8.0, 5.1]` only in the
@@ -416,6 +450,16 @@ systems) is intentionally separate.
 - Timeline snapping prefers the nearest magnet (marker, clip edge, playhead)
   within 8 px of the pointer, otherwise it quantises to the beat grid. `Alt`
   bypasses both while moving or trimming.
+- The view cube is the only viewport orientation control. Its faces are
+  orthographic; the pill toggles projection and the Datei/Ansicht menu commands
+  share `setCameraNamed()`. The status line lives bottom-right.
+- The timeline ruler height includes the 24 px structure band so existing
+  seek/scrub hit tests stay a single path (`y <= view.rulerH`).
+- Auto Show lives in `static/autoshow.js` and maps section labels to presets.
+  It always appends a new layer track in one `ShowStore.commit`, never edits or
+  removes existing tracks, and leaves every generated clip editable.
+- Colour keyframe lanes interpolate in sRGB for the editor strip; the
+  compositor continues to interpolate colour keyframes in Oklab.
 - User looks are global runtime data in `config/user-presets.json`, not show
   data. They store preset + params + mask + filter stack, not timing.
 - Analysis mode is a scope over the same `envelopeAt()` values as expressions;
@@ -459,15 +503,24 @@ curl -s localhost:8090/mcp -H 'Content-Type: application/json' \
 
 ## Next session start point
 
-Phase 2 (slices 2.1–2.5), P1 usability polish and P2 slice 1 are complete.
+Phase 2 (slices 2.1–2.5), P1 usability polish and P2 slices 1–2 are complete.
 Read `docs/PROGRESS.md`, `docs/TODO.md`, `docs/effectcraft-analysis.md`,
 `docs/ui-system.md` and `docs/studio-server.md` first.
 
-The next board in `docs/TODO.md` starts with section 1 (topbar density, inspector
-decluttering, view cube, viewport hints) and section 2 (marker band, layer
-hierarchy, colour/gradient keyframes, auto-show scaffold). The renderer memory
-spike still needs a long-run soak against the production host; the server's
-unbounded preview cache is now capped.
+The next board in `docs/TODO.md`: section 1 visual hierarchy; section 2 layer
+hierarchy, palette/gradient keyframes and easing; section 3 the modular FX
+pipeline; section 4 audio/emitter expressions and event triggers; section 5
+targets, group HW output, start hub and `/live`. The renderer memory spike still
+needs a long-run soak against the production host; the server's preview cache is
+capped.
+
+Completed in P2 slice 2:
+
+- Clickable view cube, decluttered viewport chrome and `?` shortcuts.
+- Keyframe navigator and inline expression chips in the inspector.
+- Colour keyframes in the inspector and gradient colour lanes.
+- Structure band with sections and collision-free cue labels.
+- Auto Show scaffold from blueprint sections, one undo step.
 
 Completed in P2 slice 1:
 

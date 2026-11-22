@@ -3,13 +3,14 @@
 > **Read this after `docs/PROGRESS.md`.** Update this file whenever a task starts,
 > lands or is deliberately deferred. One checkbox = one shippable change.
 
-Last updated: 2026-11-22 (P2 slice 1: preview-cache bound + magnetic timeline snap)
+Last updated: 2026-11-22 (P2 slice 2: view cube, structure band, colour keys, auto-show)
 
 ## Current state
 
 - Core engine, UI shell, presets/filters, expressions, filter keyframes,
   Effect Builder, Timeline Analysis and P1 usability polish are in place
-  (**177 passed**, 6 subtests, plus `node --test tests/test_snap.mjs`).
+  (**177 passed**, 6 subtests; `node --test tests/test_snap.mjs tests/test_autoshow.mjs`
+  adds 9 JS cases).
 - Honest assessment: many pieces exist as isolated features, while overall
   usability, creative flow, Show-building speed, spatial/emitter depth, and
   UI clarity still need substantial improvement.
@@ -40,30 +41,33 @@ Last updated: 2026-11-22 (P2 slice 1: preview-cache bound + magnetic timeline sn
       `Ebenen`, `Filter & Effekte`, `Ansicht`, `Hilfe`), keine abgeschnittenen Badges,
       konsistente Sprache und Symbolik (MDI-Icons) statt Textwüste. Die Menüs und
       Icons existieren bereits; offen sind responsive Dichte und Badge-Verhalten.
-- [ ] Inspector übersichtlicher strukturieren: lange Hilfetexte aus dem Arbeitsbereich
-      in Tooltips/Info-Popovers verlagern, Fokus auf Parameter, Keyframes (`◇`) und
-      Modulatoren (`ƒ`) legen.
-- [ ] Perspektiv-/Achsen-Selector im 3D-Viewport als interaktiven View-Cube
-      ausbauen (klickbare Ansichten/Achsen, klarer Status, `Persp`/`Ortho`-Umschalter).
-- [ ] Viewport-Hinweise entschlacken (kurzer Modus-Hinweis statt langem Textband unten,
-      Shortcuts übersichtlich in Hilfe/Dialog).
+- [x] Inspector übersichtlicher strukturieren: lange Hilfetexte in Tooltips
+      (Sync-Offset), Keyframe-Navigator `◀ ◆ ▶` an animierten Parametern und
+      Inline-`ƒ`-Chips mit Live-Wert; Farbparameter bekommen ◇ ohne ƒ.
+- [x] Perspektiv-/Achsen-Selector im 3D-Viewport als interaktiven View-Cube
+      ausbauen (klickbare Faces je Achse, `Persp`/`Ortho`-Pille, Status unten
+      rechts).
+- [x] Viewport-Hinweise entschlacken (kurzer Modus-Hinweis unten, `?`-Button
+      öffnet die Tastenkürzel).
 - [ ] Visuelle Rückmeldung & Hierarchie im gesamten Studio schärfen (aktive Zustände,
       klare Gruppierung, konsistente Dichte).
 
 ## 2. Timeline-Workflow, Ebenen-Hierarchie & schnelles Show-Bauen
 
-- [ ] Struktur- & Marker-Band über der Timeline übersichtlich darstellen (Sections,
-      Drops, Cues gut lesbar ohne Überlappung im Ruler).
+- [x] Struktur- & Marker-Band über der Timeline übersichtlich darstellen (Sections,
+      Drops, Cues als farbige Strips und kollisionsfreie Labels im Ruler).
 - [x] Timeline-Ergonomie verbessern: magnetisches Snapping auf Grid, Marker,
       Clip-Kanten und Playhead (8 px), mit `Alt` temporär lösbar; Verschieben/
       Trimmen und Spurhöhen (`Alt+Wheel`) sind vorhanden.
 - [ ] Ebenen-Hierarchie & Maskierung intuitiv bedienbar machen (Global-Layer,
       Lampen-Layer, Unterebenen, Clipping-Masken, Mute/Solo, Blend-Modes).
-- [ ] Farbliche & Gradient-Keyframes sauber unterstützen (Farbwechsel, Farbverläufe,
-      Low/High-Bereiche und Easing in Inspector und Timeline-Lanes sichtbar und
-      editierbar).
-- [ ] Show-Erstellung beschleunigen: Auto-Show-Grundgerüst / Section-Vorlagen aus
-      der Songanalyse generieren, die manuell oder hybrid verfeinert werden können.
+- [ ] Farbliche & Gradient-Keyframes sauber unterstützen. Farbkeyframes sind
+      im Inspector keybar und erscheinen als Verlaufsstreifen plus Swatches in
+      der Timeline-Lane; offen sind Palette-/Gradient-Stopp-Keyframes und eine
+      Easing-Auswahl pro Keyframe.
+- [x] Show-Erstellung beschleunigen: Auto-Show-Grundgerüst aus der Songanalyse
+      (ein Track, ein Clip pro Section, Preset-Mapping, Beat-Gate auf Build/Drop,
+      eine Undo-Transaktion, bestehende Spuren bleiben unangetastet).
 
 ## 3. Echter Pop-up Effekt-Baukasten (Modularer FX- & Emitter-Editor)
 
@@ -125,6 +129,6 @@ Last updated: 2026-11-22 (P2 slice 1: preview-cache bound + magnetic timeline sn
 - [x] `python3 -m pytest -q -W error`
 - [x] `python3 -m compileall -q hueme_studio`
 - [x] `node --check hueme_studio/static/*.js`
-- [x] `node --test tests/test_snap.mjs`
+- [x] `node --test tests/test_snap.mjs tests/test_autoshow.mjs`
 - [x] Headless-Browser-Check auf `/studio` und `/live` ohne Konsolen-/Serverfehler.
 - [x] `docs/PROGRESS.md` und Checkpoint unter `docs/checkpoints/` aktualisieren.
