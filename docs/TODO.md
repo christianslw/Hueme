@@ -95,6 +95,15 @@ basis be overlaid.
 - [x] Tests: deterministic curve sampling, toggle rendering, no audio = empty
       state, blueprint min/max normalization.
 
+## P0 follow-up — renderer memory
+
+- [ ] Investigate the `hueme_studio` renderer process memory growth observed
+      after Phase 2 verification (16 GB+ before the temporary host bump).
+      Suspects: unbounded preview-cache keys (preset/filter/time/size), repeated
+      Effect Builder previews while playing, or per-frame allocations in the
+      preview socket. Add a bounded cache and a long-run leak check before the
+      next production session. Do not assume the host bump fixed it.
+
 ## P1 — usability polish
 
 - [ ] Library: Favorites and Recently Used sections (persist locally), search
