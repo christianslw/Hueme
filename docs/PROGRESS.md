@@ -4,7 +4,7 @@ This file is the durable handoff. A new session should read this first, then
 `docs/TODO.md`, then continue at the first unchecked item. Do **not** re-do
 completed work.
 
-Last updated: 2026-11-22 (Phase 2 slice 3: filter keyframes)
+Last updated: 2026-11-22 (Phase 2 slice 4: blueprint FX + Effect Builder)
 
 ## Ground rules
 
@@ -251,6 +251,26 @@ systems) is intentionally separate.
 - [x] Headless Chromium verified setting a filter keyframe, opening the ƒ
   dialog from a filter row, committing a filter expression, and revealing the
   parameter lane with no console errors.
+
+### Phase 2 slice 4 — Blueprint FX + Effect Builder — COMPLETE
+
+- [x] FX previews and preset thumbnails accept an envelope provider. The
+  runtime passes the attached `BlueprintEnvelope` when the active show has
+  audio, so previews use the same sections/drops/curves as playback.
+- [x] `hueme_studio/userpresets.py` + `config/user-presets.json` store global
+  looks (preset, params, spatial mask, filter stack) with atomic writes.
+  REST: `GET/POST /api/user-presets`, `DELETE /api/user-presets/{id}`; the
+  Studio snapshot includes `user_presets`.
+- [x] `Effekt-Baukasten…` non-blocking `<dialog>`: live 320×180 preview,
+  play/pause/scrub, preset and parameter editing with ◇/ƒ, mask controls,
+  filter add/reorder/enable/disable/remove, save look, apply to clip and insert
+  as a new clip. Esc closes; no alert/confirm.
+- [x] Tests: user preset CRUD/persistence/extra-field rejection and
+  blueprint-envelope preview rendering; full suite **172 passed, 6 subtests
+  passed**.
+- [x] Headless Chromium verified opening the builder, a lit live preview,
+  play/pause, adding a bloom filter, saving a look and inserting it as a new
+  clip with no console errors.
 
 ## Decisions already made
 

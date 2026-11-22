@@ -147,6 +147,7 @@ const dom = {
   history: $("#history-label"),
   grid: $("#grid-select"),
   autoKeys: $("#auto-keys"),
+  effectBuilder: $("#effect-builder"),
   addGlobal: $("#add-track-global"),
   addSub: $("#add-track-sub"),
 };
@@ -3365,7 +3366,7 @@ function expressionContext(clip, value) {
   };
 }
 
-function openExpressionDialog(clip, param, value) {
+function openExpressionDialog(clip, param, value, onSaved = null) {
   const current = clip.expressions?.[param] || "";
   const dialog = document.createElement("dialog");
   const form = document.createElement("form");
@@ -3442,11 +3443,12 @@ function openExpressionDialog(clip, param, value) {
         return;
       }
     }
-    commitClip(clip.id, trimmed ? `expression ${param}` : `clear expression ${param}`, (target) => {
+    await commitClip(clip.id, trimmed ? `expression ${param}` : `clear expression ${param}`, (target) => {
       target.expressions = { ...(target.expressions || {}) };
       if (trimmed) target.expressions[param] = trimmed;
       else delete target.expressions[param];
     });
+    if (onSaved) onSaved();
     dialog.close("apply");
   };
   form.append(
@@ -5924,6 +5926,402 @@ async function deleteGroup(group) {
   }
 }
 
+/* ----------------------------------------------------------------- builder */
+function openEffectBuilder() {
+  const doc = showDoc();
+  if (!doc) {
+    toast("Kein ShowDoc geladen.", "info");
+    return;
+  }
+  const selected = findClip();
+  const presetId = selected?.clip.preset || "solid";
+  const recipe = {
+    preset: presetId,
+    params: deepClone(selected?.clip.params || defaultParams(presetId)),
+    spatial_mask: deepClone(selected?.clip.spatial_mask || { kind: "none", softness: 0.08, invert: false }),
+    filters: deepClone(selected?.clip.filters || []),
+    keyframes: deepClone(selected?.clip.keyframes || []),
+    expressions: deepClone(selected?.clip.expressions || {}),
+    opacity: selected?.clip.opacity ?? 1,
+  };
+  const targetId = selected?.clip.id || null;
+  const dialog = document.createElement("dialog");
+  dialog.className = "effect-builder";
+  let time = currentTime();
+  let playing = false;
+  let timer = 0;
+  let previewBusy = false;
+  let previewUrl = "";
+  let filterSeq = 0;
+  const preview = el("img", { class: "builder-preview", alt: "Effect Builder preview" });
+  const timeSlider = el("input", {
+    class: "slider",
+    type: "range",
+    min: 0,
+    max: Math.max(0.1, duration()),
+    step: 0.01,
+    value: time,
+    "aria-label": "Preview time",
+  });
+  const timeReadout = el("span", { class: "mono muted", text: `${time.toFixed(2)} s` });
+  const playButton = el("button", { class: "button small", type: "button", text: "Play" });
+  const body = el("div", { class: "dialog-body builder-body" });
+
+  const currentTarget = () => (targetId ? findClip(targetId)?.clip || null : null);
+  const syncAutomation = () => {
+    const clip = currentTarget();
+    if (!clip) return;
+    recipe.params = deepClone(clip.params || recipe.params);
+    recipe.keyframes = deepClone(clip.keyframes || []);
+    recipe.expressions = deepClone(clip.expressions || {});
+    render();
+    refreshPreview();
+  };
+  const previewClip = () => ({
+    ...deepClone(recipe),
+    id: "builder_preview",
+    start_s: 0,
+    end_s: Math.max(1, duration()),
+  });
+  async function refreshPreview() {
+    if (previewBusy) return;
+    previewBusy = true;
+    try {
+      const response = await fetch("/api/preview/effect", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          clip: previewClip(),
+          t: Number(time.toFixed(3)),
+          timing: showDoc()?.timing,
+          width: 320,
+          height: 180,
+        }),
+      });
+      if (response.ok) {
+        const url = URL.createObjectURL(await response.blob());
+        if (previewUrl) URL.revokeObjectURL(previewUrl);
+        previewUrl = url;
+        preview.src = url;
+      }
+    } catch {
+      // The preview is an editor aid; a failed frame must not close the dialog.
+    } finally {
+      previewBusy = false;
+    }
+  }
+  const setTime = (next) => {
+    time = clamp(Number(next) || 0, 0, Math.max(0, duration()));
+    timeSlider.value = String(time);
+    timeReadout.textContent = `${time.toFixed(2)} s`;
+    refreshPreview();
+  };
+  const stop = () => {
+    playing = false;
+    if (timer) window.clearInterval(timer);
+    timer = 0;
+    playButton.textContent = "Play";
+  };
+  const togglePlay = () => {
+    if (playing) {
+      stop();
+      return;
+    }
+    playing = true;
+    playButton.textContent = "Pause";
+    timer = window.setInterval(() => {
+      const next = time + 0.1;
+      setTime(next > duration() ? 0 : next);
+    }, 120);
+  };
+  playButton.addEventListener("click", togglePlay);
+  timeSlider.addEventListener("input", () => setTime(timeSlider.value));
+
+  function builderParamControl(spec) {
+    const value = recipe.params?.[spec.key] ?? spec.default;
+    const update = (next) => {
+      recipe.params = { ...recipe.params, [spec.key]: next };
+      refreshPreview();
+    };
+    if (spec.type === "color") return colorField(value, update);
+    if (spec.type === "palette") {
+      return selectInput(String(value), (state?.palettes || []).map((item) => [item.id, item.name]), update);
+    }
+    if (spec.type === "vec3") {
+      return vec3Field(spec.label, value, update, { step: spec.step ?? 0.01 }).querySelector(".triple");
+    }
+    if (spec.type === "bool") {
+      const input = el("input", { type: "checkbox" });
+      input.checked = Boolean(value);
+      input.addEventListener("change", () => update(input.checked));
+      return el("label", { class: "toggle" }, input, el("span"));
+    }
+    if (spec.type === "select") {
+      return selectInput(String(value), spec.options || [], update);
+    }
+    return rangeControl(value, update, {
+      min: spec.min ?? 0,
+      max: spec.max ?? 1,
+      step: spec.step ?? 0.01,
+    });
+  }
+
+  function renderPresetSection() {
+    const preset = presetById(recipe.preset);
+    const rows = [
+      fieldRow("Preset", selectInput(recipe.preset, (state.presets || []).map((item) => [item.id, item.name]), (next) => {
+        recipe.preset = next;
+        recipe.params = defaultParams(next);
+        render();
+        refreshPreview();
+      })),
+      toggleRow("Enabled", recipe.opacity > 0.001, (enabled) => {
+        recipe.opacity = enabled ? 1 : 0;
+        refreshPreview();
+      }),
+    ];
+    const target = currentTarget();
+    for (const spec of preset?.params || []) {
+      const control = builderParamControl(spec);
+      if (target && ["range", "number", "color"].includes(spec.type)) {
+        rows.push(paramRow(target, spec.key, spec.label, control, recipe.params?.[spec.key] ?? spec.default));
+      } else {
+        rows.push(fieldRow(spec.label, control));
+      }
+    }
+    return el("div", { class: "builder-column" }, el("h4", { text: "Preset / Parameter" }), ...rows);
+  }
+
+  function addFilter(filterId) {
+    filterSeq += 1;
+    recipe.filters.push({
+      type: filterId,
+      enabled: true,
+      params: {},
+      uid: `builder_${filterSeq}_${filterId}`,
+    });
+    render();
+    refreshPreview();
+  }
+
+  function filterCard(filter, index) {
+    const info = state.filters?.find((item) => item.id === filter.type);
+    const rows = [];
+    for (const spec of info?.params || []) {
+      const value = filter.params?.[spec.key] ?? spec.default;
+      const update = (next) => {
+        filter.params = { ...(filter.params || {}), [spec.key]: next };
+        refreshPreview();
+      };
+      if (spec.type === "color") rows.push(fieldRow(spec.label, colorField(value, update)));
+      else if (spec.type === "bool") rows.push(toggleRow(spec.label, Boolean(value), update));
+      else if (spec.type === "select") rows.push(fieldRow(spec.label, selectInput(String(value), spec.options || [], update)));
+      else {
+        rows.push(fieldRow(spec.label, rangeControl(value, update, {
+          min: spec.min ?? 0,
+          max: spec.max ?? 1,
+          step: spec.step ?? 0.01,
+        })));
+      }
+    }
+    return el(
+      "div",
+      { class: `filter-card${filter.enabled ? " enabled" : ""}` },
+      el(
+        "div",
+        { class: "filter-card-head" },
+        el("button", {
+          class: "button small icon-button", type: "button",
+          title: filter.enabled ? "Filter ausschalten" : "Filter einschalten",
+          "aria-label": "Toggle filter",
+          onclick: () => { filter.enabled = !filter.enabled; render(); refreshPreview(); },
+        }, icon(filter.enabled ? "eye" : "eyeOff")),
+        el("span", { class: "filter-card-title" }, el("strong", { text: info?.name || filter.type })),
+        el("button", {
+          class: "button small icon-button", type: "button", title: "Nach oben",
+          "aria-label": "Move filter up", disabled: index === 0,
+          onclick: () => {
+            const [item] = recipe.filters.splice(index, 1);
+            recipe.filters.splice(index - 1, 0, item);
+            render(); refreshPreview();
+          },
+        }, (() => { const node = icon("chevron"); node.style.transform = "rotate(-90deg)"; return node; })()),
+        el("button", {
+          class: "button small icon-button", type: "button", title: "Nach unten",
+          "aria-label": "Move filter down", disabled: index === recipe.filters.length - 1,
+          onclick: () => {
+            const [item] = recipe.filters.splice(index, 1);
+            recipe.filters.splice(index + 1, 0, item);
+            render(); refreshPreview();
+          },
+        }, (() => { const node = icon("chevron"); node.style.transform = "rotate(90deg)"; return node; })()),
+        el("button", {
+          class: "button small icon-button danger", type: "button", title: "Filter entfernen",
+          "aria-label": "Remove filter",
+          onclick: () => { recipe.filters.splice(index, 1); render(); refreshPreview(); },
+        }, icon("delete"))
+      ),
+      el("div", { class: "filter-card-body" }, ...rows)
+    );
+  }
+
+  function renderRecipeSections() {
+    const preset = el(
+      "div",
+      { class: "builder-column" },
+      renderPresetSection()
+    );
+    const stack = el(
+      "div",
+      { class: "builder-column" },
+      el("h4", { text: "Recipe" }),
+      fieldRow("Maske", selectInput(recipe.spatial_mask.kind || "none", [
+        ["none", "None"], ["plane_sweep", "Plane Sweep"], ["sphere_narrow", "Sphere"],
+        ["box", "Box"], ["parity", "Parity"],
+      ], (kind) => {
+        recipe.spatial_mask = { ...recipe.spatial_mask, kind };
+        render();
+        refreshPreview();
+      })),
+      fieldRow("Softness", rangeControl(recipe.spatial_mask.softness ?? 0.08, (next) => {
+        recipe.spatial_mask = { ...recipe.spatial_mask, softness: next };
+        refreshPreview();
+      }, { min: 0, max: 1, step: 0.01 })),
+      toggleRow("Invert", Boolean(recipe.spatial_mask.invert), (next) => {
+        recipe.spatial_mask = { ...recipe.spatial_mask, invert: next };
+        refreshPreview();
+      }),
+      fieldRow("Filter hinzufügen", selectInput("", [
+        ["", "—"],
+        ...Object.values(state.filters || {}).map((info) => [info.id, info.name]),
+      ], (filterId) => { if (filterId) addFilter(filterId); })),
+      recipe.filters.length
+        ? el("div", { class: "filter-stack" }, ...recipe.filters.map(filterCard))
+        : el("p", { class: "empty-state", text: "Noch keine Filter im Rezept." })
+    );
+    return el("div", { class: "builder-columns" }, preset, stack);
+  }
+
+  function render() {
+    body.replaceChildren(
+      el("div", { class: "builder-transport" },
+        playButton,
+        el("button", { class: "button small", type: "button", text: "Start", onclick: () => { stop(); setTime(0); } }),
+        timeSlider,
+        timeReadout
+      ),
+      preview,
+      renderRecipeSections()
+    );
+  }
+
+  const nameInput = el("input", {
+    class: "input",
+    type: "text",
+    value: `${presetName(recipe.preset)} Look`,
+    placeholder: "Name des Looks",
+  });
+  const save = async () => {
+    try {
+      const saved = await client.post("/api/user-presets", {
+        name: nameInput.value.trim() || `${presetName(recipe.preset)} Look`,
+        preset: recipe.preset,
+        params: recipe.params,
+        spatial_mask: recipe.spatial_mask,
+        filters: recipe.filters,
+      });
+      state.user_presets = [...(state.user_presets || []), saved];
+      toast(`Look gespeichert: ${saved.name}`, "success");
+    } catch (error) {
+      toast(error.message, "danger");
+    }
+  };
+  const apply = async () => {
+    const clip = currentTarget();
+    if (!clip) {
+      toast("Kein Clip ausgewählt. Look speichern oder als neuen Clip einsetzen.", "info");
+      return;
+    }
+    await commitClip(clip.id, "apply effect builder look", (target) => {
+      target.preset = recipe.preset;
+      target.params = deepClone(recipe.params);
+      target.spatial_mask = deepClone(recipe.spatial_mask);
+      target.filters = deepClone(recipe.filters);
+      target.keyframes = deepClone(recipe.keyframes);
+      target.expressions = deepClone(recipe.expressions);
+    });
+    stop();
+    dialog.close("apply");
+  };
+  const insert = async () => {
+    const docNow = showDoc();
+    const track = findTrack() || docNow?.tracks?.[0];
+    if (!docNow || !track) {
+      toast("Erst eine Spur anlegen.", "info");
+      return;
+    }
+    const start = clamp(snapTime(currentTime()), 0, Math.max(0, docNow.duration_s - 0.25));
+    const length = Math.min(Math.max(gridSeconds() * 4, 0.5), docNow.duration_s - start);
+    if (length <= 0.05) {
+      toast("Kein Platz am Playhead.", "info");
+      return;
+    }
+    const ids = new Set(docNow.tracks.flatMap((item) => item.clips.map((clip) => clip.id)));
+    const id = uniqueId("clip", ids);
+    await commitShow("insert builder look", (current) => {
+      const targetTrack = current.tracks.find((item) => item.id === track.id);
+      if (!targetTrack) return;
+      targetTrack.clips.push({
+        id,
+        name: null,
+        start_s: start,
+        end_s: start + length,
+        preset: recipe.preset,
+        opacity: recipe.opacity,
+        params: deepClone(recipe.params),
+        keyframes: deepClone(recipe.keyframes),
+        expressions: deepClone(recipe.expressions),
+        spatial_mask: deepClone(recipe.spatial_mask),
+        filters: deepClone(recipe.filters),
+        snap_zcl: false,
+      });
+    });
+    selectedClipId = id;
+    selectedTrackId = track.id;
+    inspectorTab = "clip";
+    updateTabButtons();
+    renderInspector();
+    requestDraw();
+    stop();
+    dialog.close("insert");
+  };
+
+  const form = document.createElement("form");
+  form.method = "dialog";
+  form.append(
+    el("div", { class: "dialog-head", text: "Effekt-Baukasten" }),
+    body,
+    el("div", { class: "builder-save" }, nameInput,
+      el("button", { class: "button small", type: "button", text: "Save Look", onclick: save })
+    ),
+    el("div", { class: "dialog-actions" },
+      el("button", { class: "button", type: "button", text: "Schließen", onclick: () => dialog.close("cancel") }),
+      el("button", { class: "button", type: "button", text: "Als Clip einsetzen", onclick: insert }),
+      el("button", { class: "button primary", type: "button", text: "Auf Clip anwenden", onclick: apply })
+    )
+  );
+  dialog.append(form);
+  dialog.addEventListener("close", () => {
+    stop();
+    if (previewUrl) URL.revokeObjectURL(previewUrl);
+    dialog.remove();
+  });
+  document.body.append(dialog);
+  render();
+  dialog.showModal();
+  refreshPreview();
+}
+
 /* ----------------------------------------------------------------- dialogs */
 function modalConfirm(title, message, confirmLabel = "Confirm") {
   return new Promise((resolve) => {
@@ -6477,6 +6875,7 @@ function bindEvents() {
   $("#split").addEventListener("click", splitClip);
   $("#mute").addEventListener("click", toggleMute);
   $("#add-clip").addEventListener("click", addClip);
+  dom.effectBuilder?.addEventListener("click", openEffectBuilder);
   dom.grid.addEventListener("change", requestDraw);
   // Optional: an older cached studio.html must not break timeline binding.
   dom.sync?.addEventListener("click", async () => {

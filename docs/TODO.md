@@ -3,7 +3,7 @@
 > **Read this after `docs/PROGRESS.md`.** Update this file whenever a task starts,
 > lands or is deliberately deferred. One checkbox = one shippable change.
 
-Last updated: 2026-11-22 (Phase 2 slice 3: filter keyframes complete)
+Last updated: 2026-11-22 (Phase 2 slice 4: blueprint FX + Effect Builder complete)
 
 ## Current state
 
@@ -63,14 +63,14 @@ Last updated: 2026-11-22 (Phase 2 slice 3: filter keyframes complete)
 
 ### 2.4 Blueprint FX + Effect Builder
 
-- [ ] Pass `BlueprintEnvelope` and blueprint sections/drops into
+- [x] Pass `BlueprintEnvelope` and blueprint sections/drops into
       `/api/preview/effect` and preset thumbnails when the active show has audio.
-- [ ] Add `POST /api/user-presets` + `config/user-presets.json` for saved looks
+- [x] Add `POST /api/user-presets` + `config/user-presets.json` for saved looks
       (preset + params + mask + filter stack).
-- [ ] Add “Effekt-Baukasten…” dialog: live preview, play/pause/scrub, recipe
+- [x] Add “Effekt-Baukasten…” dialog: live preview, play/pause/scrub, recipe
       stack (preset/mask/filters), add/reorder/enable/disable, parameter editing
       with ◇/ƒ, save as user preset, apply to clip, insert as new clip.
-- [ ] Keep it a non-blocking `<dialog>`; Esc closes; no alert/confirm.
+- [x] Keep it a non-blocking `<dialog>`; Esc closes; no alert/confirm.
 
 ### 2.5 Timeline Analysis view (new)
 

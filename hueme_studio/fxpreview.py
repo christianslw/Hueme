@@ -122,6 +122,7 @@ def _render(
     width: int,
     height: int,
     room_size: Sequence[float],
+    env_values: dict[str, float] | None = None,
 ) -> np.ndarray:
     width = max(16, min(MAX_WIDTH, int(width)))
     height = max(9, min(MAX_HEIGHT, int(height)))
@@ -130,7 +131,7 @@ def _render(
     n = int(positions.shape[0])
     show = _preview_show(timing, t)
     beat = timing.beat_context(t)
-    env = deterministic_envelope(show, t)
+    env = env_values if env_values is not None else deterministic_envelope(show, t)
     ctx = PresetContext(
         positions=positions,
         normalized=normalized,
@@ -185,20 +186,25 @@ def render_preset_rgb(
     room_size: Sequence[float] = (6.5, 8.0, 5.1),
     filters: Sequence[FilterSpec] = (),
     opacity: float = 1.0,
+    env_provider: Any | None = None,
 ) -> np.ndarray:
     preset = get_preset(preset_id)
     merged = preset.default_params()
     merged.update(params or {})
+    timing = timing or Timing(bpm=120.0)
+    show = _preview_show(timing, t)
+    env = (env_provider or deterministic_envelope)(show, t)
     return _render(
         preset_id,
         merged,
         filters,
         opacity,
         t=t,
-        timing=timing or Timing(bpm=120.0),
+        timing=timing,
         width=width,
         height=height,
         room_size=room_size,
+        env_values=env,
     )
 
 
@@ -210,11 +216,12 @@ def render_clip_rgb(
     width: int = 128,
     height: int = 72,
     room_size: Sequence[float] = (6.5, 8.0, 5.1),
+    env_provider: Any | None = None,
 ) -> np.ndarray:
     timing = timing or Timing(bpm=120.0)
     show = _preview_show(timing, t)
     beat = timing.beat_context(t)
-    env = deterministic_envelope(show, t)
+    env = (env_provider or deterministic_envelope)(show, t)
     local_t = max(0.0, min(clip.duration_s, clip.local_time(t)))
     context = Compositor._expression_context(show, t, beat, env)
     params = clip.effective_params(local_t, context)
@@ -229,6 +236,7 @@ def render_clip_rgb(
         width=width,
         height=height,
         room_size=room_size,
+        env_values=env,
     )
 
 

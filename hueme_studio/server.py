@@ -93,6 +93,7 @@ from hueme_studio.showdoc import (
     Timing,
 )
 from hueme_studio.sync import MaSync
+from hueme_studio.userpresets import UserPresetStore
 
 log = logging.getLogger("hueme_studio.server")
 
@@ -250,6 +251,10 @@ class StudioRuntime:
         )
         self.palettes = PaletteStore(
             Path(shows_dir).parent / "palettes.json",
+            persist=persist_shows,
+        )
+        self.user_presets = UserPresetStore(
+            Path(shows_dir).parent / "user-presets.json",
             persist=persist_shows,
         )
         self.blueprint: dict[str, Any] | None = None
@@ -461,13 +466,14 @@ class StudioRuntime:
         rank = rig.group_rank("all") if "all" in rig.groups else np.arange(n, dtype=np.int64)
         size = max(1, len(group_idx))
         out: dict[str, list[list[list[Any]]]] = {}
+        env_provider = self._envelope_provider()
         for preset_id, preset in PRESETS.items():
             rendered: list[np.ndarray] = []
             scores: list[int] = []
             for frame in range(frames):
                 t = (frame / max(1, frames - 1)) * span_s
                 beat = doc.beat_context(t)
-                env = deterministic_envelope(doc, t)
+                env = env_provider(doc, t)
                 ctx = PresetContext(
                     positions=rig.positions,
                     normalized=rig.normalized_positions,
@@ -499,6 +505,11 @@ class StudioRuntime:
         with self._preview_lock:
             self._preview_cache.clear()
 
+    def _envelope_provider(self) -> Any:
+        if self.compositor is not None:
+            return self.compositor.env_provider
+        return deterministic_envelope
+
     def effect_preview_png(
         self,
         clip: Clip,
@@ -518,6 +529,7 @@ class StudioRuntime:
                 width=width,
                 height=height,
                 room_size=self.rig.room.size,
+                env_provider=self._envelope_provider(),
             )
             return preview_png(image)
 
@@ -546,6 +558,7 @@ class StudioRuntime:
                     width=width,
                     height=height,
                     room_size=self.rig.room.size,
+                    env_provider=self._envelope_provider(),
                 )
                 for offset in (0.0, 0.55, 1.1)
             ]
@@ -677,6 +690,7 @@ class StudioRuntime:
             "presets": preset_catalog(),
             "filters": filter_catalog(),
             "palettes": self.palettes.list(),
+            "user_presets": self.user_presets.list(),
         }
 
     def health(self) -> dict[str, Any]:
@@ -1783,6 +1797,23 @@ def create_app(
         await asyncio.to_thread(runtime.palettes.delete, palette_id)
         runtime.invalidate_preview_cache()
         runtime._queue_event("palettes")
+        return Response(status_code=204)
+
+    # -- user looks -------------------------------------------------------
+    @app.get("/api/user-presets")
+    async def user_presets() -> dict[str, Any]:
+        return {"presets": runtime.user_presets.list()}
+
+    @app.post("/api/user-presets", status_code=201)
+    async def save_user_preset(payload: dict[str, Any] = Body(...)) -> dict[str, Any]:
+        preset = await asyncio.to_thread(runtime.user_presets.upsert, payload)
+        runtime._queue_event("user-presets")
+        return preset
+
+    @app.delete("/api/user-presets/{preset_id}", status_code=204)
+    async def delete_user_preset(preset_id: str) -> Response:
+        await asyncio.to_thread(runtime.user_presets.delete, preset_id)
+        runtime._queue_event("user-presets")
         return Response(status_code=204)
 
     # -- rig preset library ----------------------------------------------

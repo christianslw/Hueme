@@ -1144,6 +1144,71 @@ dialog::backdrop {
   border-top: 1px solid var(--line);
 }
 
+dialog.effect-builder {
+  width: min(820px, calc(100vw - 24px));
+}
+
+.builder-body {
+  max-height: min(68vh, 720px);
+  overflow: auto;
+}
+
+.builder-transport {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.builder-transport .slider {
+  flex: 1;
+}
+
+.builder-preview {
+  display: block;
+  width: 100%;
+  aspect-ratio: 16 / 9;
+  border: 1px solid var(--line-strong);
+  background: #08090b;
+  object-fit: contain;
+}
+
+.builder-columns {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: 12px;
+}
+
+.builder-column {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
+}
+
+.builder-column h4 {
+  margin: 0 0 2px;
+  color: var(--text-2);
+  font-size: 9px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.builder-column .field-row {
+  grid-template-columns: 82px minmax(0, 1fr);
+}
+
+.builder-save {
+  display: flex;
+  gap: 6px;
+  padding: 8px 12px;
+  border-top: 1px solid var(--line);
+}
+
+.builder-save .input {
+  flex: 1;
+}
+
 /* ------------------------------------------------------------------ live */
 .live {
   display: flex;

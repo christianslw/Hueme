@@ -53,9 +53,13 @@ decides *when* to sample.
 | GET | `/api/filters` | filter catalog |
 | GET | `/api/filters/{id}/preview.png` | filter applied to a test gradient |
 | POST | `/api/preview/effect` | render one clip's preset + filters at a timestamp |
+| POST | `/api/expressions/validate` | syntax/symbol/value diagnostics for a safe expression |
 | GET | `/api/palettes` | built-in + custom palette library |
 | POST | `/api/palettes` | create or update a custom palette |
 | DELETE | `/api/palettes/{id}` | delete a custom palette |
+| GET | `/api/user-presets` | saved looks (preset + params + mask + filters) |
+| POST | `/api/user-presets` | save a look; generates an id when omitted |
+| DELETE | `/api/user-presets/{id}` | delete a saved look |
 | GET | `/api/rigs` | preset list + active id |
 | GET | `/api/rigs/{id}` | preset document from disk |
 | POST | `/api/rigs` | create preset (`name`, optional `preset_id`) |
@@ -115,6 +119,27 @@ The store writes atomically and updates the in-process registry immediately.
 Palette changes invalidate preview PNG caches and ride the normal `palettes`
 invalidation event.
 
+## User looks
+
+`config/user-presets.json` stores full looks: preset id, preset params, spatial
+mask and the filter stack. It is global user data, not show data. The Effect
+Builder loads a selected clip as a recipe, previews it live, saves looks and can
+apply them to the selected clip or insert a new clip. `POST /api/user-presets`
+accepts:
+
+```json
+{
+  "name": "Amber Room",
+  "preset": "color_wash",
+  "params": {"brightness": 0.6},
+  "spatial_mask": {"kind": "none"},
+  "filters": [{"type": "bloom", "enabled": true, "params": {}}]
+}
+```
+
+When `id` is omitted it is slugged from the name and made unique. The Studio
+state snapshot includes `user_presets`.
+
 ## Fixture-free previews
 
 `GET /api/presets/{id}/preview.png` and `GET /api/filters/{id}/preview.png`
@@ -136,7 +161,10 @@ filter code. They are library thumbnails, not hardware frames.
 The response is `image/png` with `Cache-Control: no-store`. Preview renders are
 serialized through one lock because spatial filters are O(n²). Filter previews
 default to 48×27 and the FX viewport uses 48×27 when the clip has filters,
-128×72 otherwise. `GET /api/studio/state` includes `palettes`.
+128×72 otherwise. Preset thumbnails and effect previews use the attached
+AudioBlueprint envelope when the active show has audio; otherwise they use the
+deterministic fallback. `GET /api/studio/state` includes `palettes` and
+`user_presets`.
 
 ## MCP
 
