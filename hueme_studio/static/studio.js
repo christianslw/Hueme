@@ -8,6 +8,7 @@ import {
   toast,
 } from "./client.js";
 import { MDI } from "./icons.js";
+import { nearestSnap } from "./snap.js";
 
 const client = new StudioClient();
 const $ = (selector) => document.querySelector(selector);
@@ -412,11 +413,33 @@ function envelopeAt(t) {
   };
 }
 
-function snapTime(value) {
-  const offset = Number(showDoc()?.timing?.beat_offset_s || 0);
+const SNAP_PIXELS = 8;
+
+// Magnetic snap: grid first, then markers, clip edges and the playhead within
+// SNAP_PIXELS of the pointer.  Callers pass the dragged clip id so a clip does
+// not stick to its own edges.  Alt bypasses snapping at the call site.
+function snapTime(value, excludeClipId = "") {
+  const doc = showDoc();
+  const offset = Number(doc?.timing?.beat_offset_s || 0);
   const step = gridSeconds();
-  const snapped = offset + Math.round((value - offset) / step) * step;
-  return clamp(snapped, 0, duration());
+  const grid = offset + Math.round((value - offset) / step) * step;
+  const candidates = [grid, 0, duration(), currentTime()];
+  for (const marker of doc?.timing?.markers || []) candidates.push(Number(marker.t_s));
+  for (const track of doc?.tracks || []) {
+    for (const clip of track.clips || []) {
+      if (clip.id === excludeClipId) continue;
+      candidates.push(Number(clip.start_s), Number(clip.end_s));
+    }
+  }
+  const width = timelineSize.w - view.labelW;
+  const threshold = width > 0 ? (SNAP_PIXELS * (view.end - view.start)) / width : 0;
+  return nearestSnap(value, {
+    grid,
+    candidates,
+    threshold,
+    min: 0,
+    max: duration(),
+  });
 }
 
 function uniqueId(prefix, existing) {
@@ -8124,8 +8147,8 @@ function bindTimeline() {
     }
     setTimelineCursor(timelineDrag.mode === "move" ? "dragging" : "over-trim");
     const time = xToTime(x);
-    const snap = (value) => (event.altKey ? value : snapTime(value));
     const clip = timelineDrag.clip;
+    const snap = (value) => (event.altKey ? value : snapTime(value, clip.id));
     if (timelineDrag.mode === "move") {
       const delta = snap(clip.start_s + (x - timelineDrag.x0) / Math.max(1, timelineSize.w - view.labelW) * (view.end - view.start)) - clip.start_s;
       const length = clip.end_s - clip.start_s;

@@ -21,7 +21,7 @@ import struct
 import sys
 import threading
 import time
-from collections import deque
+from collections import OrderedDict, deque
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 from pathlib import Path
@@ -105,6 +105,11 @@ FRAME_FLAG_PLAYING = 1
 FRAME_FLAG_BLACKOUT = 2
 FRAME_FLAG_LOOP = 4
 MAX_EVENT_BACKLOG = 200
+# Library thumbnails are cached by preset/filter + time + size.  A scrubbing
+# client can request an unbounded number of times, so keep the cache small and
+# evict least-recently-used entries.  ponytail: fixed cap, make it configurable
+# if preview traffic ever outgrows 64 entries.
+MAX_PREVIEW_CACHE = 64
 
 
 class TransportPatch(BaseModel):
@@ -283,7 +288,7 @@ class StudioRuntime:
         self._sync_shows_at = 0.0
         self._ha_publish_at = 0.0
         self._preview_lock = threading.Lock()
-        self._preview_cache: dict[str, bytes] = {}
+        self._preview_cache: OrderedDict[str, bytes] = OrderedDict()
         self._load_initial()
         self._publish_ha(force=True)
 
@@ -505,6 +510,13 @@ class StudioRuntime:
         with self._preview_lock:
             self._preview_cache.clear()
 
+    def _remember_preview(self, key: str, data: bytes) -> None:
+        """Cache one thumbnail, evicting the least recently used beyond the cap."""
+        self._preview_cache[key] = data
+        self._preview_cache.move_to_end(key)
+        while len(self._preview_cache) > MAX_PREVIEW_CACHE:
+            self._preview_cache.popitem(last=False)
+
     def _envelope_provider(self) -> Any:
         if self.compositor is not None:
             return self.compositor.env_provider
@@ -545,6 +557,7 @@ class StudioRuntime:
         with self._preview_lock:
             cached = self._preview_cache.get(key)
             if cached is not None:
+                self._preview_cache.move_to_end(key)
                 return cached
             timing = self.show.timing if self.show else Timing()
             # Library thumbnails should show the effect at a representative
@@ -564,7 +577,7 @@ class StudioRuntime:
             ]
             image = max(candidates, key=lambda frame: int(frame.sum()))
             data = preview_png(image)
-            self._preview_cache[key] = data
+            self._remember_preview(key, data)
             return data
 
     def filter_preview_png(
@@ -579,6 +592,7 @@ class StudioRuntime:
         with self._preview_lock:
             cached = self._preview_cache.get(key)
             if cached is not None:
+                self._preview_cache.move_to_end(key)
                 return cached
             image = render_preset_rgb(
                 "gradient_3d",
@@ -590,7 +604,7 @@ class StudioRuntime:
                 filters=[FilterSpec(type=filter_id)],
             )
             data = preview_png(image)
-            self._preview_cache[key] = data
+            self._remember_preview(key, data)
             return data
 
     def _set_show_doc(self, doc: ShowDoc | None, show_id: str | None) -> None:

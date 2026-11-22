@@ -3,129 +3,128 @@
 > **Read this after `docs/PROGRESS.md`.** Update this file whenever a task starts,
 > lands or is deliberately deferred. One checkbox = one shippable change.
 
-Last updated: 2026-11-22 (P1 complete; P2 next)
+Last updated: 2026-11-22 (P2 slice 1: preview-cache bound + magnetic timeline snap)
 
 ## Current state
 
-- Phase 2 is complete: expressions and diagnostics, four new presets, filter
-  keyframes/lanes, blueprint FX + Effect Builder, and Timeline Analysis.
-- P1 usability polish is complete. Full suite: 176 passed.
-- GitHub: `main` includes the Phase 2 slices, tag `phase1-ui-2026-11-22` is the
-  earlier checkpoint.
+- Core engine, UI shell, presets/filters, expressions, filter keyframes,
+  Effect Builder, Timeline Analysis and P1 usability polish are in place
+  (**177 passed**, 6 subtests, plus `node --test tests/test_snap.mjs`).
+- Honest assessment: many pieces exist as isolated features, while overall
+  usability, creative flow, Show-building speed, spatial/emitter depth, and
+  UI clarity still need substantial improvement.
 - Reference analysis: `docs/effectcraft-analysis.md` (read-only).
 - Server: `python3 -m hueme_studio --host 0.0.0.0 --port 8090`.
 
-## P0 — Phase 2 core — COMPLETE
+## 0. Stabilität, Performance & bekannte Bugs beheben
 
-### 2.1 Expressions
+- [x] Memory-Wachstum im Renderer/Server untersuchen und begrenzen
+      (Preview-Cache jetzt LRU mit 64 Einträgen; Regressionstest). Der
+      16-GB-Spike wurde lokal nicht reproduziert, der einzige unbegrenzte
+      Server-Cache ist damit gedeckelt.
+- [x] Doppelklick-Mehrfachauslösung bei Presets/Filtern in `studio.js` beheben.
+- [x] Timeline-Expression-Vorschau mit echten Audio-/Envelope-/Blueprint-Werten
+      speisen statt fester Dummy-Werte.
+- [x] Sync-Offset-State sauber synchronisieren (keine verwaisten
+      `localStorage`-Stände gegenüber dem Server-Zustand).
+- [x] 1800K-Amber-Extraktion in `hal.py` praxistauglich kalibrieren.
+- [x] Kleine Code-Bugs in `presets.py` (`shockwave_3d`, `strobe_blinder`),
+      `server.py` (sauberer Restart) und `mcp.py` beheben.
+- [x] `config/sendspin_pairings.json` und `config/sendspin_identity.json` aus
+      dem Repo nehmen (Runtime-Secrets; bereits in `.gitignore`). PSK nach dem
+      Historie-Leak rotieren/neu paaren.
 
-- [x] Extend `hueme_studio/expressions.py` with `smoothstep`, `lerp`, `step`,
-      `wrap`, `pulse`, `env(name, phase)`, `fbm(x, y, z, scale)`.
-- [x] Allow string literals only where a function needs a named curve; keep
-      attribute access and subscripts rejected.
-- [x] Extend `Compositor._expression_context` with `bass`, `mid`, `high`,
-      `harmonic`, `percussive`, `prominence`, `bar`, `barPhase`, `phrase`,
-      `phrasePhase`, `sectionProgress`, `beatsToDrop`, `inDrop`.
-- [x] Add `sectionProgress`, `beatsToDrop`, `inDrop` to both envelope providers
-      (`deterministic_envelope` and `BlueprintEnvelope`).
-- [x] Update `EXPRESSION_VARIABLES` and all validation/tests.
-- [x] Mirror the same functions in the UI preview (`evalUiExpression`).
-- [x] Upgrade the `ƒ` dialog: generator presets (Beat LFO, Stem Follower,
-      Phrase Riser, Emitter Wave, Wiggle), live value, error message, token
-      chips, readable expression output.
-- [x] Add server-side expression diagnostics endpoint or reuse ShowDoc
-      validation; show inline errors without blocking edits.
+## 1. UI/UX-Klarheit, Toolbar, Inspector & Viewport-Orientierung
 
-### 2.2 New presets
+- [ ] Topbar entrümpeln und responsiv gestalten: klare Menüs (`Datei`, `Bearbeiten`,
+      `Ebenen`, `Filter & Effekte`, `Ansicht`, `Hilfe`), keine abgeschnittenen Badges,
+      konsistente Sprache und Symbolik (MDI-Icons) statt Textwüste. Die Menüs und
+      Icons existieren bereits; offen sind responsive Dichte und Badge-Verhalten.
+- [ ] Inspector übersichtlicher strukturieren: lange Hilfetexte aus dem Arbeitsbereich
+      in Tooltips/Info-Popovers verlagern, Fokus auf Parameter, Keyframes (`◇`) und
+      Modulatoren (`ƒ`) legen.
+- [ ] Perspektiv-/Achsen-Selector im 3D-Viewport als interaktiven View-Cube
+      ausbauen (klickbare Ansichten/Achsen, klarer Status, `Persp`/`Ortho`-Umschalter).
+- [ ] Viewport-Hinweise entschlacken (kurzer Modus-Hinweis statt langem Textband unten,
+      Shortcuts übersichtlich in Hilfe/Dialog).
+- [ ] Visuelle Rückmeldung & Hierarchie im gesamten Studio schärfen (aktive Zustände,
+      klare Gruppierung, konsistente Dichte).
 
-- [x] `color_wash` / `quad_gradient` — four-corner room wash with separate
-      saturation/brightness and soft centre/edge falloff.
-- [x] `wave_interference` — 2–4 superposed 3D wave fronts (frequency, amplitude,
-      speed, angle, source count).
-- [x] `shutter_matrix` — musical gate with attack/decay, emitter phase spread
-      (`emitterNorm`), background floor.
-- [x] `emitter_swarm` — deterministic analytic particles: emitter position and
-      radii, birth rate, lifetime, velocity, gravity, resistance, turbulence,
-      size, fade tail, birth/death colour, seed. No persistent simulation state.
-- [x] Make numeric emitter/spawn params expression-addressable.
-- [x] Document that `emitterIdx`, `emitterCount`, `emitterNorm`, `nx`, `ny`,
-      `nz`, `distCenter` are per-emitter values available inside presets, not
-      clip-level scalar expressions.
+## 2. Timeline-Workflow, Ebenen-Hierarchie & schnelles Show-Bauen
 
-### 2.3 Filter keyframes
+- [ ] Struktur- & Marker-Band über der Timeline übersichtlich darstellen (Sections,
+      Drops, Cues gut lesbar ohne Überlappung im Ruler).
+- [x] Timeline-Ergonomie verbessern: magnetisches Snapping auf Grid, Marker,
+      Clip-Kanten und Playhead (8 px), mit `Alt` temporär lösbar; Verschieben/
+      Trimmen und Spurhöhen (`Alt+Wheel`) sind vorhanden.
+- [ ] Ebenen-Hierarchie & Maskierung intuitiv bedienbar machen (Global-Layer,
+      Lampen-Layer, Unterebenen, Clipping-Masken, Mute/Solo, Blend-Modes).
+- [ ] Farbliche & Gradient-Keyframes sauber unterstützen (Farbwechsel, Farbverläufe,
+      Low/High-Bereiche und Easing in Inspector und Timeline-Lanes sichtbar und
+      editierbar).
+- [ ] Show-Erstellung beschleunigen: Auto-Show-Grundgerüst / Section-Vorlagen aus
+      der Songanalyse generieren, die manuell oder hybrid verfeinert werden können.
 
-- [x] Add a stable filter instance id to `FilterSpec` (backward compatible).
-- [x] Define `filter:<uid>:<param>` keyframe paths; never use display names.
-- [x] Evaluate filter keyframes and expressions in the compositor without
-      mutating the stored `FilterSpec`.
-- [x] Add ◇ / ƒ buttons to each filter parameter row and active-key highlight.
-- [x] Show filter parameter lanes in the timeline.
-- [x] Tests for reorder, enable/disable, easing and colour interpolation.
+## 3. Echter Pop-up Effekt-Baukasten (Modularer FX- & Emitter-Editor)
 
-### 2.4 Blueprint FX + Effect Builder
+- [ ] Effekt-Baukasten als großzügiges, aufgeräumtes Pop-up-Fenster (`<dialog>`)
+      neu konzipieren (kein bloßer Clip-Inspector-Klon). Ein `<dialog>` mit
+      Live-Vorschau existiert; Umbau auf modulare Pipeline steht aus.
+- [ ] Modulare Effekt-Pipeline aufbauen: Emitter/Generatoren (Punkt, Linie/Strip,
+      Fläche, Partikel/Schwarm, Wellen, Noise, Szenen), Farbreaktion/Verläufe,
+      3D-Transformationen/Masken und Filter-Kette (Blur, Glow/Bloom, Pixelation,
+      Shutter/Gate, Grain, Inertia) flexibel kombinierbar und umsortierbar.
+- [ ] Direkte Modulator- (`ƒ`) und Keyframe- (`◇`) Anbindung an Emitter-, Farb-
+      und Filter-Parameter im Baukasten.
+- [ ] Live-Vorschau im Baukasten mit Playback/Scrubbing, passendem Auto-Namen und
+      1-Klick-Aktionen: *Als eigenen Effekt/Preset speichern*, *Auf Clip anwenden*,
+      *Als neuen Clip einfügen*.
+- [ ] Library um Favoriten, Zuletzt verwendet, Such-Highlighting und Sortieroptionen
+      erweitern.
 
-- [x] Pass `BlueprintEnvelope` and blueprint sections/drops into
-      `/api/preview/effect` and preset thumbnails when the active show has audio.
-- [x] Add `POST /api/user-presets` + `config/user-presets.json` for saved looks
-      (preset + params + mask + filter stack).
-- [x] Add “Effekt-Baukasten…” dialog: live preview, play/pause/scrub, recipe
-      stack (preset/mask/filters), add/reorder/enable/disable, parameter editing
-      with ◇/ƒ, save as user preset, apply to clip, insert as new clip.
-- [x] Keep it a non-blocking `<dialog>`; Esc closes; no alert/confirm.
+## 4. Audio-, Rhythmus- & Emitter-Expressions + Event-Trigger
 
-### 2.5 Timeline Analysis view (new)
+- [ ] Ausdrucksstarke Audio- & Rhythmus-Signale bereitstellen (Beats, Takte, Phrasen,
+      Abschnitte, Drop-Abstände, Frequenz-/Stem-Verläufe wie Bass/Kick/Snare/Hi-Hat/
+      Energie/Dynamik) — algorithmisch/DSP-basiert und mit optionalen leichten CPU-
+      Modellen für den 8700G.
+- [ ] Raum- & Emitter-Bezug in Expressions/Modulatoren ermöglichen (Emitter-Index/
+      Reihenfolge, Position, Abstand, Phasenversatz über Lampen/Strips).
+- [ ] Geführte Funktions-Presets & Modulatoren im `ƒ`-Dialog anbieten (Puls,
+      Ducking/Sidechain, Riser, Welle/Spread, Wiggle) mit Live-Vorschau und Fehlerfeedback.
+- [ ] Event-basierte Auslöser ermöglichen (z. B. Partikel-/Shockwave-Spawn oder
+      Impuls bei Beat, Onset, Snare, Kick oder Schwellwert statt nur starrem Timer).
+- [ ] Spektrumanalyzer / Audio-Basis-Ansicht verfeinern (klare Erklärungen der Werte,
+      optionale Einzel-Ausgabe/Isolierung eines Parameters, VU-Anzeigen sauber
+      ausgelagert/einklappbar).
 
-Goal: a waveform/scope view that shows **only audio** and lets every analysis
-basis be overlaid.
+## 5. Lichtziele, Gruppen-HW-Out, Start-Hub & Live-Modus (`/live`)
 
-- [x] Add a Timeline mode switch: **Layers / Analysis** (optional split later).
-- [x] In Analysis mode hide track rows; show a full-height waveform, beat grid,
-      section markers and drop windows.
-- [x] Overlay every available basis, each toggleable and colour-coded:
-      `pulse`, `kick`, `snare`, `hat`, `energy`, `harmonic`, `percussive`,
-      `prominence`, `bass`, `mid`, `high`, `sectionProgress`, `beatsToDrop`,
-      `inDrop`.
-- [x] Legend with checkboxes, “all/none”, and values at the playhead.
-- [x] Show a compact spectrum strip (bass/mid/high/energy bars) and a
-      “dominance” readout: which basis is strongest at the playhead or over the
-      selected range.
-- [x] Hover/scrub readout of every visible value; snap to beat grid.
-- [x] Use the same values as the expression scope; no duplicate envelope math.
-- [x] Persist the visible-curve selection in `localStorage`.
-- [x] Tests: deterministic curve sampling, toggle rendering, no audio = empty
-      state, blueprint min/max normalization.
+- [ ] Zielauswahl für Ebenen/Effekte vereinfachen (einzelne Lampen, Mehrfachauswahl,
+      Lampengruppen, Bereiche/Zonen, Global) inkl. Auto-Gruppen nach Typ/Bereich und
+      anpassbarer Gruppen-Darstellung ohne überladene Menüs.
+- [ ] Hardware-Ausgabe (`HW OUT`) nicht nur pro Fixture, sondern auch pro Gruppe/
+      Bereich steuerbar machen (inkl. klarer Statusanzeige).
+- [ ] Startseite / Projekt-Hub aufbauen („da weitermachen, wo du aufgehört hast“,
+      letzte Shows, neue Show anlegen, Vorlagen/Szenen).
+- [ ] `/live`-Modus neu ausrichten: erkannter Audio-Stream/Track, Umschaltung
+      zwischen **Auto-Show**, **Shows**, **Szenen** (auch statische/dynamische
+      Szenen ohne Audio) und **Direkt-Effekten** auf Global, Gruppen oder Lampen.
 
-## P0 follow-up — renderer memory
+## 6. Spätere Erweiterungen (Zukunft / Backburner)
 
-- [ ] Investigate the `hueme_studio` renderer process memory growth observed
-      after Phase 2 verification (16 GB+ before the temporary host bump).
-      Suspects: unbounded preview-cache keys (preset/filter/time/size), repeated
-      Effect Builder previews while playing, or per-frame allocations in the
-      preview socket. Add a bounded cache and a long-run leak check before the
-      next production session. Do not assume the host bump fixed it.
-
-## P1 — usability polish — COMPLETE
-
-- [x] Library: Favorites and Recently Used sections (persist locally), search
-      match highlighting, category/alphabetical toggle.
-- [x] Filter card drag reorder (keep up/down buttons for keyboard users).
-- [x] Double-click a parameter name to reveal its lane in the timeline.
-- [x] Effect header colour labels / reset / about popover.
-- [x] Keyboard: `U` / `Shift+U` reveal animated params, `Alt+click` expression.
-
-## P2 — later
-
-- [ ] Full graph editor for keyframes (value + speed).
-- [ ] Syntax-highlighted expression editor with line numbers and autocomplete.
-- [ ] User preset import/export (`.huemepreset`).
-- [ ] More blend modes only if a real look needs them.
-- [ ] FFT spectrum from the live audio element; blueprint curves are the
-      deterministic default.
+- [ ] Radar-gestützte Partikel- & Raum-Effekte (auf Basis der Hueme-Gateway-/
+      Stream-Radar-Logik, inkl. Radar-Einstellungen und Raum-Visualisierung im Studio).
+- [ ] Graph-Editor mit Kurven-/Geschwindigkeitsbearbeitung und Syntax-Highlighting /
+      Autocomplete im Expression-Editor.
+- [ ] Preset-Import/-Export (`.huemepreset`) und Live-Audio-FFT als Ergänzung zum
+      deterministischen Blueprint.
 
 ## Verification checklist
 
 - [x] `python3 -m pytest -q -W error`
 - [x] `python3 -m compileall -q hueme_studio`
 - [x] `node --check hueme_studio/static/*.js`
-- [x] Headless Chromium: no console/server errors; test the new UI path.
-- [x] Update `docs/PROGRESS.md` and add a checkpoint under `docs/checkpoints/`.
+- [x] `node --test tests/test_snap.mjs`
+- [x] Headless-Browser-Check auf `/studio` und `/live` ohne Konsolen-/Serverfehler.
+- [x] `docs/PROGRESS.md` und Checkpoint unter `docs/checkpoints/` aktualisieren.

@@ -10,7 +10,7 @@ from fastapi.testclient import TestClient
 
 from hueme_studio.palettes import PaletteStore
 from hueme_studio.presets import PresetUtils
-from hueme_studio.server import create_app
+from hueme_studio.server import MAX_PREVIEW_CACHE, create_app
 from hueme_studio.showdoc import Clip, ShowDoc, ShowStore, Track
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -137,6 +137,24 @@ def test_palette_api_roundtrip(client: TestClient):
 
     assert client.delete("/api/palettes/api_palette").status_code == 204
     assert client.delete("/api/palettes/synth").status_code == 400
+
+
+def test_preview_cache_stays_bounded(client: TestClient):
+    """Scrubbing previews use distinct cache keys; the cache must not grow."""
+    runtime = client.app.state.studio
+    for step in range(MAX_PREVIEW_CACHE + 20):
+        response = client.get(
+            f"/api/presets/solid/preview.png?t={step / 10:.1f}&width=16&height=9"
+        )
+        assert response.status_code == 200
+    assert len(runtime._preview_cache) == MAX_PREVIEW_CACHE
+
+    # A cache hit refreshes recency but does not add an entry.
+    hit = next(iter(runtime._preview_cache))
+    hit_t = hit.split(":")[2]
+    client.get(f"/api/presets/solid/preview.png?t={hit_t}&width=16&height=9")
+    assert len(runtime._preview_cache) == MAX_PREVIEW_CACHE
+    assert next(reversed(runtime._preview_cache)) == hit
 
 
 def test_effect_and_filter_preview_png(client: TestClient):

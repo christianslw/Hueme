@@ -4,7 +4,7 @@ This file is the durable handoff. A new session should read this first, then
 `docs/TODO.md`, then continue at the first unchecked item. Do **not** re-do
 completed work.
 
-Last updated: 2026-11-22 (P1 usability polish complete)
+Last updated: 2026-11-22 (P2 slice 1: preview-cache bound + magnetic timeline snap)
 
 ## Ground rules
 
@@ -322,6 +322,27 @@ systems) is intentionally separate.
   drag reorder, lane reveal, `U` / `Shift+U` and Alt+click expression removal
   with no console errors.
 
+### P2 slice 1 — memory bound + magnetic timeline snap — COMPLETE
+
+- [x] `StudioRuntime._preview_cache` is an LRU `OrderedDict` capped at
+  `MAX_PREVIEW_CACHE = 64`; hits refresh recency and old entries are evicted.
+  This bounds the only unbounded server cache; scrubbing with unique times can
+  no longer grow it. The reported 16 GB spike was not reproduced locally.
+- [x] Regression test requests 84 distinct preview times and asserts the cache
+  stays at the cap and a repeated time is a hit
+  (`tests/test_studio_palettes.py`).
+- [x] Timeline snapping now magnetises to markers, clip edges and the playhead
+  within 8 px, with the beat grid as the fallback. `Alt` still releases the
+  snap while moving or trimming clips; the dragged clip's own edges are
+  excluded (`snapTime(value, clip.id)`).
+- [x] Snap selection is a pure module, `hueme_studio/static/snap.js`, covered by
+  `tests/test_snap.mjs` (`node --test tests/test_snap.mjs`, 4 cases).
+- [x] `config/sendspin_pairings.json` and `config/sendspin_identity.json` are no
+  longer tracked. They contain live pairing PSKs and were already listed in
+  `.gitignore`; the PSKs appeared in earlier history, so re-pair/rotate them.
+- [x] Full suite: **177 passed, 6 subtests passed**. Headless Chromium verified
+  `/studio` seek snapping and `/live` with no console or server errors.
+
 ## Decisions already made
 
 - Coordinates metres, Z up. Room defaults to `[6.5, 8.0, 5.1]` only in the
@@ -388,6 +409,13 @@ systems) is intentionally separate.
   the same result. A manual track rename sets `name_auto=false`.
 - Filter automation addresses `filter:<uid>:<param>`. Legacy filters get a
   deterministic uid during validation; reorder never retargets automation.
+
+- Preview thumbnails are an LRU cache of 64 PNGs keyed by preset/filter +
+  time + size. Time is part of the key because thumbnails are editor aids, not
+  show data; the cap keeps scrubbing clients bounded.
+- Timeline snapping prefers the nearest magnet (marker, clip edge, playhead)
+  within 8 px of the pointer, otherwise it quantises to the beat grid. `Alt`
+  bypasses both while moving or trimming.
 - User looks are global runtime data in `config/user-presets.json`, not show
   data. They store preset + params + mask + filter stack, not timing.
 - Analysis mode is a scope over the same `envelopeAt()` values as expressions;
@@ -431,14 +459,20 @@ curl -s localhost:8090/mcp -H 'Content-Type: application/json' \
 
 ## Next session start point
 
-Phase 2 (slices 2.1–2.5) and P1 usability polish are complete. Read
-`docs/PROGRESS.md`, `docs/TODO.md`, `docs/effectcraft-analysis.md`,
+Phase 2 (slices 2.1–2.5), P1 usability polish and P2 slice 1 are complete.
+Read `docs/PROGRESS.md`, `docs/TODO.md`, `docs/effectcraft-analysis.md`,
 `docs/ui-system.md` and `docs/studio-server.md` first.
 
-The next board is **P2** in `docs/TODO.md`: full keyframe graph editor,
-syntax-highlighted expression editor, user preset import/export, additional
-blend modes only when a look needs them, and live FFT spectrum. The P0 renderer
-memory investigation still needs a long-run check.
+The next board in `docs/TODO.md` starts with section 1 (topbar density, inspector
+decluttering, view cube, viewport hints) and section 2 (marker band, layer
+hierarchy, colour/gradient keyframes, auto-show scaffold). The renderer memory
+spike still needs a long-run soak against the production host; the server's
+unbounded preview cache is now capped.
+
+Completed in P2 slice 1:
+
+- Bounded LRU preview thumbnail cache with regression test.
+- Magnetic timeline snapping to markers, clip edges and playhead, `Alt` bypass.
 
 Completed in Phase 2:
 
