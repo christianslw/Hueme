@@ -1033,6 +1033,167 @@ def silk_folds(ctx: PresetContext) -> np.ndarray:
     return np.clip(colour * level[:, None], 0.0, 255.0).astype(np.float32)
 
 
+def color_wash(ctx: PresetContext) -> np.ndarray:
+    """Four-corner room wash with soft centre glow and edge falloff."""
+    p = ctx.normalized.astype(np.float64)
+    master = _num(ctx, "brightness", 0.9)
+    saturation = max(0.0, _num(ctx, "saturation", 1.0))
+    falloff = np.clip(_num(ctx, "edge_falloff", 0.45), 0.0, 1.0)
+    softness = max(0.02, _num(ctx, "softness", 0.22))
+    drift = _num(ctx, "drift", 0.08)
+    speed = _num(ctx, "speed", 0.06)
+
+    tl = _color_param(ctx, "corner_tl", [255, 112, 28])
+    tr = _color_param(ctx, "corner_tr", [34, 92, 180])
+    bl = _color_param(ctx, "corner_bl", [120, 28, 96])
+    br = _color_param(ctx, "corner_br", [255, 226, 176])
+
+    wobble = drift * np.sin(ctx.t * speed * math.tau + p[:, 2] * 2.0)
+    x = np.clip(p[:, 0] + wobble, 0.0, 1.0)
+    z = np.clip(p[:, 2] + wobble * 0.5, 0.0, 1.0)
+    top = U.lerp(tl, tr, x)
+    bottom = U.lerp(bl, br, x)
+    colour = U.lerp(bottom, top, z)
+
+    luma = 0.2126 * colour[:, 0] + 0.7152 * colour[:, 1] + 0.0722 * colour[:, 2]
+    colour = luma[:, None] + (colour - luma[:, None]) * saturation
+    centre = np.linalg.norm((p - 0.5) * 2.0, axis=1)
+    glow = np.exp(-((centre / max(1e-6, softness * 3.0)) ** 2))
+    level = (1.0 - falloff) + falloff * (0.25 + 0.75 * glow)
+    return np.clip(colour * (level * master)[:, None], 0.0, 255.0).astype(np.float32)
+
+
+def wave_interference(ctx: PresetContext) -> np.ndarray:
+    """Two to four superposed 3D wave fronts with a shared drift angle."""
+    p = ctx.normalized.astype(np.float64)
+    sources = max(2, min(4, int(_num(ctx, "sources", 3))))
+    frequency = max(0.1, _num(ctx, "frequency", 2.4))
+    amplitude = np.clip(_num(ctx, "amplitude", 0.85), 0.0, 1.0)
+    speed = _num(ctx, "speed", 0.22)
+    angle = math.radians(_num(ctx, "angle", 28.0))
+    contrast = max(0.2, _num(ctx, "contrast", 1.4))
+    master = _num(ctx, "brightness", 1.0)
+    palette = str(ctx.params.get("palette", "ice"))
+
+    total = np.zeros(ctx.n, dtype=np.float64)
+    for index in range(sources):
+        theta = angle + index * math.pi / sources
+        dz = 0.22 * math.sin(index * 1.7 + 0.4)
+        direction = np.asarray([math.cos(theta), math.sin(theta), dz])
+        phase = (
+            p @ direction * frequency
+            - ctx.t * speed * (1.0 + index * 0.17)
+            + index * 1.31
+        )
+        total += np.sin(phase * math.tau)
+    raw = (total / sources + 1.0) * 0.5
+    crest = np.clip(raw, 0.0, 1.0) ** contrast
+    colour = U.gradient(palette, raw * 0.75 + p[:, 2] * 0.2 + ctx.t * 0.015)
+    level = (0.08 + 0.92 * crest) * amplitude * master
+    seam = np.exp(-((raw - 0.5) / 0.12) ** 2) * 0.2
+    return np.clip((colour + seam[:, None] * 90.0) * level[:, None], 0.0, 255.0).astype(
+        np.float32
+    )
+
+
+def shutter_matrix(ctx: PresetContext) -> np.ndarray:
+    """Beat-locked matrix shutter with per-emitter attack/decay phase spread."""
+    p = ctx.normalized.astype(np.float64)
+    division = str(ctx.params.get("division", "1/8"))
+    attack = np.clip(_num(ctx, "attack", 0.06), 0.005, 0.8)
+    decay = np.clip(_num(ctx, "decay", 0.24), 0.01, 1.0)
+    spread = np.clip(_num(ctx, "emitter_spread", 0.35), 0.0, 1.0)
+    floor = np.clip(_num(ctx, "background_floor", 0.03), 0.0, 1.0)
+    master = _num(ctx, "brightness", 1.0)
+    c_flash = _color_param(ctx, "color", [255, 248, 236])
+    c_bg = _color_param(ctx, "bg_color", [5, 7, 14])
+
+    grid = max(1e-3, float(ctx.beat.get("beat_grid_s", 0.5)))
+    beats = {"1/2": 2.0, "1/4": 1.0, "1/8": 0.5, "1/16": 0.25}
+    interval = max(1e-3, grid * beats.get(division, 0.5))
+    rank = np.where(ctx.target_rank >= 0, ctx.target_rank, 0)
+    emitter_norm = rank / max(1.0, float(ctx.target_size))
+    phase = _fract((ctx.t - float(ctx.beat.get("beat_offset_s", 0.0))) / interval)
+    phase = _fract(phase - emitter_norm * spread)
+    gate = np.where(
+        phase <= attack,
+        phase / max(1e-6, attack),
+        np.exp(-(phase - attack) / max(1e-6, decay)),
+    )
+    level = floor + (1.0 - floor) * np.clip(gate, 0.0, 1.0)
+    colour = U.lerp(c_bg, c_flash, np.clip(gate, 0.0, 1.0))
+    # Keep a little spatial texture so the matrix does not read as one lamp.
+    texture = 0.92 + 0.08 * np.sin(p[:, 0] * 12.0 + p[:, 2] * 7.0)
+    return np.clip(colour * (level * texture * master)[:, None], 0.0, 255.0).astype(
+        np.float32
+    )
+
+
+def emitter_swarm(ctx: PresetContext) -> np.ndarray:
+    """Deterministic analytic particles; no persistent simulation state."""
+    p = ctx.normalized.astype(np.float64)
+    origin = np.asarray(ctx.params.get("emitter_position", [0.5, 0.5, 0.25]), dtype=np.float64)
+    radius = np.asarray(ctx.params.get("emitter_radius", [0.16, 0.14, 0.08]), dtype=np.float64)
+    velocity = np.asarray(ctx.params.get("velocity", [0.08, 0.05, 0.18]), dtype=np.float64)
+    gravity = np.asarray(ctx.params.get("gravity", [0.0, 0.0, -0.12]), dtype=np.float64)
+    resistance = max(0.0, _num(ctx, "resistance", 0.45))
+    turbulence = max(0.0, _num(ctx, "turbulence", 0.08))
+    birth_rate = max(0.5, _num(ctx, "birth_rate", 9.0))
+    lifetime = max(0.25, _num(ctx, "lifetime", 2.6))
+    size = max(0.005, _num(ctx, "particle_size", 0.28))
+    fade_tail = np.clip(_num(ctx, "fade_tail", 0.55), 0.0, 1.0)
+    master = _num(ctx, "brightness", 1.0)
+    seed = _num(ctx, "seed", 1.0)
+    c_birth = _color_param(ctx, "birth_color", [255, 236, 196])
+    c_death = _color_param(ctx, "death_color", [255, 54, 12])
+    c_bg = _color_param(ctx, "bg_color", [3, 4, 9])
+    bg_level = np.clip(_num(ctx, "bg_level", 0.01), 0.0, 0.3)
+
+    count = max(1, min(64, int(round(birth_rate * lifetime))))
+    indices = np.arange(count, dtype=np.float64)
+    phase0 = _hash01(indices, np.zeros_like(indices), np.zeros_like(indices), seed)
+    offsets = np.stack(
+        (
+            (_hash01(indices, np.zeros_like(indices), np.zeros_like(indices), seed + 3.0) - 0.5) * 2.0,
+            (_hash01(indices, np.zeros_like(indices), np.zeros_like(indices), seed + 7.0) - 0.5) * 2.0,
+            (_hash01(indices, np.zeros_like(indices), np.zeros_like(indices), seed + 11.0) - 0.5) * 2.0,
+        ),
+        axis=1,
+    )
+    intensity = np.zeros(ctx.n, dtype=np.float64)
+    mix = np.zeros(ctx.n, dtype=np.float64)
+    for index in range(count):
+        cycle = _fract(ctx.t / lifetime + phase0[index])
+        age = cycle * lifetime
+        decayed = (1.0 - math.exp(-resistance * age)) / max(0.05, resistance)
+        pos = (
+            origin
+            + offsets[index] * radius
+            + velocity * decayed
+            + 0.5 * gravity * age * age
+        )
+        wobble = turbulence * np.asarray(
+            [
+                math.sin(age * 5.1 + index * 1.7 + seed),
+                math.cos(age * 4.3 + index * 2.3 + seed),
+                math.sin(age * 6.7 + index * 0.9 + seed),
+            ]
+        )
+        pos = pos + wobble
+        dist = np.linalg.norm(p - pos, axis=1)
+        life = 1.0 - cycle
+        glow = np.exp(-((dist / size) ** 2))
+        glow *= (0.25 + 0.75 * life) ** max(0.05, fade_tail)
+        take = glow > intensity
+        intensity = np.where(take, glow, intensity)
+        mix = np.where(take, cycle, mix)
+    colour = U.lerp(c_birth, c_death, mix)
+    level = bg_level + (1.0 - bg_level) * np.clip(intensity, 0.0, 1.0)
+    out = U.lerp(U.scale(c_bg, bg_level), colour, np.clip(intensity, 0.0, 1.0))
+    return np.clip(out * (level * master)[:, None], 0.0, 255.0).astype(np.float32)
+
+
+
 # ---------------------------------------------------------------------------
 # Registry
 # ---------------------------------------------------------------------------
@@ -1524,6 +1685,90 @@ PRESETS: dict[str, Preset] = {
         ),
         render=silk_folds,
     ),
+    "color_wash": Preset(
+        id="color_wash",
+        name="Color Wash",
+        description="Four-corner room wash with saturation, centre glow and edge falloff.",
+        category="Basic",
+        params=(
+            _color("corner_tl", "Corner TL", [255, 112, 28]),
+            _color("corner_tr", "Corner TR", [34, 92, 180]),
+            _color("corner_bl", "Corner BL", [120, 28, 96]),
+            _color("corner_br", "Corner BR", [255, 226, 176]),
+            _range("saturation", "Saturation", 1.0, 0.0, 2.0, 0.01),
+            _range("edge_falloff", "Edge Falloff", 0.45, 0.0, 1.0, 0.01),
+            _range("softness", "Centre Softness", 0.22, 0.02, 1.0, 0.01),
+            _range("drift", "Corner Drift", 0.08, 0.0, 0.5, 0.01),
+            _range("speed", "Drift Speed", 0.06, 0.0, 0.5, 0.01),
+            _range("brightness", "Brightness", 0.9, 0.0, 1.0, 0.01),
+        ),
+        render=color_wash,
+    ),
+    "wave_interference": Preset(
+        id="wave_interference",
+        name="Wave Interference",
+        description="Two to four superposed 3D wave fronts with rotating direction.",
+        category="Spatial FX",
+        params=(
+            _palette("palette", "Palette", "ice"),
+            _range("sources", "Wave Sources", 3.0, 2.0, 4.0, 1.0),
+            _range("frequency", "Frequency", 2.4, 0.1, 10.0, 0.1),
+            _range("amplitude", "Amplitude", 0.85, 0.0, 1.0, 0.01),
+            _range("speed", "Speed", 0.22, 0.0, 2.0, 0.01),
+            _range("angle", "Angle", 28.0, 0.0, 360.0, 1.0),
+            _range("contrast", "Crest Contrast", 1.4, 0.2, 4.0, 0.05),
+            _range("brightness", "Brightness", 1.0, 0.0, 1.0, 0.01),
+        ),
+        render=wave_interference,
+    ),
+    "shutter_matrix": Preset(
+        id="shutter_matrix",
+        name="Shutter Matrix",
+        description="Musical matrix shutter with attack, decay and per-emitter phase spread.",
+        category="Spatial FX",
+        params=(
+            ParamSpec(
+                "division",
+                "Grid",
+                "select",
+                "1/8",
+                options=(("1/2", "Half"), ("1/4", "Quarter"), ("1/8", "Eighth"), ("1/16", "Sixteenth")),
+            ),
+            _color("color", "Flash", [255, 248, 236]),
+            _color("bg_color", "Closed", [5, 7, 14]),
+            _range("attack", "Attack", 0.06, 0.005, 0.8, 0.005),
+            _range("decay", "Decay", 0.24, 0.01, 1.0, 0.01),
+            _range("emitter_spread", "Emitter Spread", 0.35, 0.0, 1.0, 0.01),
+            _range("background_floor", "Background Floor", 0.03, 0.0, 0.5, 0.01),
+            _range("brightness", "Brightness", 1.0, 0.0, 1.0, 0.01),
+        ),
+        render=shutter_matrix,
+    ),
+    "emitter_swarm": Preset(
+        id="emitter_swarm",
+        name="Emitter Swarm",
+        description="Analytic particles with birth/death colour, gravity, resistance and turbulence.",
+        category="Particles",
+        params=(
+            _vec3("emitter_position", "Emitter Position", [0.5, 0.5, 0.25]),
+            _vec3("emitter_radius", "Emitter Radii", [0.16, 0.14, 0.08]),
+            _vec3("velocity", "Velocity", [0.08, 0.05, 0.18]),
+            _vec3("gravity", "Gravity", [0.0, 0.0, -0.12]),
+            _range("birth_rate", "Birth Rate", 9.0, 0.5, 40.0, 0.5),
+            _range("lifetime", "Lifetime", 2.6, 0.25, 12.0, 0.05),
+            _range("resistance", "Resistance", 0.45, 0.0, 3.0, 0.01),
+            _range("turbulence", "Turbulence", 0.08, 0.0, 0.5, 0.01),
+            _range("particle_size", "Particle Size", 0.28, 0.005, 0.5, 0.005),
+            _range("fade_tail", "Fade Tail", 0.55, 0.0, 1.0, 0.01),
+            _color("birth_color", "Birth Colour", [255, 236, 196]),
+            _color("death_color", "Death Colour", [255, 54, 12]),
+            _color("bg_color", "Background", [3, 4, 9]),
+            _range("bg_level", "Background Level", 0.01, 0.0, 0.3, 0.005),
+            _range("seed", "Seed", 1.0, 0.0, 100.0, 1.0),
+            _range("brightness", "Brightness", 1.0, 0.0, 1.0, 0.01),
+        ),
+        render=emitter_swarm,
+    ),
 }
 
 
@@ -1584,6 +1829,7 @@ def preset_catalog() -> list[dict[str, Any]]:
 PRESET_ALIASES = {
     "turrell_skyspace": "turrell_horizon",
     "ma3_matrix_wing": "ma3_wings",
+    "quad_gradient": "color_wash",
 }
 
 

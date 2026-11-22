@@ -103,8 +103,12 @@ def test_all_presets_render_deterministically():
         "aurora_veil",
         "cell_bloom",
         "silk_folds",
+        "color_wash",
+        "wave_interference",
+        "shutter_matrix",
+        "emitter_swarm",
     }
-    assert len(PRESETS) == 27
+    assert len(PRESETS) == 31
     for preset_id in PRESETS:
         ctx = make_ctx(10.0)
         first = render_preset(preset_id, ctx)
@@ -265,9 +269,42 @@ def test_preset_param_defaults_are_available():
     assert default_params("solid")["color"] == [255, 110, 20]
     assert get_preset("turrell_skyspace").id == "turrell_horizon"
     assert get_preset("ma3_matrix_wing").id == "ma3_wings"
+    assert get_preset("quad_gradient").id == "color_wash"
     assert PRESET_ALIASES["ma3_matrix_wing"] == "ma3_wings"
+    assert PRESET_ALIASES["quad_gradient"] == "color_wash"
     with pytest.raises(KeyError):
         get_preset("missing")
     alias_out = render_preset("turrell_skyspace", make_ctx(10.0))
     canonical_out = render_preset("turrell_horizon", make_ctx(10.0))
     assert np.array_equal(alias_out, canonical_out)
+
+
+def test_phase2_presets_are_deterministic_and_expression_addressable():
+    from hueme_studio.showdoc import Clip
+
+    for preset_id in (
+        "color_wash",
+        "wave_interference",
+        "shutter_matrix",
+        "emitter_swarm",
+    ):
+        first = render_preset(preset_id, make_ctx(10.0))
+        second = render_preset(preset_id, make_ctx(10.0))
+        assert np.array_equal(first, second)
+        assert np.isfinite(first).all()
+
+    swarm = render_preset(
+        "emitter_swarm",
+        make_ctx(10.0, {"birth_rate": 4.0, "lifetime": 1.5, "turbulence": 0.0}),
+    )
+    assert swarm.max() > 0.0
+    clip = Clip(
+        id="swarm",
+        start_s=0.0,
+        end_s=4.0,
+        preset="emitter_swarm",
+        expressions={"birth_rate": "4 + 6 * kick", "particle_size": "0.04 + 0.02 * energy"},
+    )
+    params = clip.effective_params(0.0, {"kick": 0.5, "energy": 0.25})
+    assert params["birth_rate"] == pytest.approx(7.0)
+    assert params["particle_size"] == pytest.approx(0.045)

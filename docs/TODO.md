@@ -3,7 +3,7 @@
 > **Read this after `docs/PROGRESS.md`.** Update this file whenever a task starts,
 > lands or is deliberately deferred. One checkbox = one shippable change.
 
-Last updated: 2026-11-22 (Phase 2 slice 1: expressions complete)
+Last updated: 2026-11-22 (Phase 2 slice 2: presets complete)
 
 ## Current state
 
@@ -37,17 +37,17 @@ Last updated: 2026-11-22 (Phase 2 slice 1: expressions complete)
 
 ### 2.2 New presets
 
-- [ ] `color_wash` / `quad_gradient` — four-corner room wash with separate
+- [x] `color_wash` / `quad_gradient` — four-corner room wash with separate
       saturation/brightness and soft centre/edge falloff.
-- [ ] `wave_interference` — 2–4 superposed 3D wave fronts (frequency, amplitude,
+- [x] `wave_interference` — 2–4 superposed 3D wave fronts (frequency, amplitude,
       speed, angle, source count).
-- [ ] `shutter_matrix` — musical gate with attack/decay, emitter phase spread
+- [x] `shutter_matrix` — musical gate with attack/decay, emitter phase spread
       (`emitterNorm`), background floor.
-- [ ] `emitter_swarm` — deterministic analytic particles: emitter position and
+- [x] `emitter_swarm` — deterministic analytic particles: emitter position and
       radii, birth rate, lifetime, velocity, gravity, resistance, turbulence,
       size, fade tail, birth/death colour, seed. No persistent simulation state.
-- [ ] Make numeric emitter/spawn params expression-addressable.
-- [ ] Document that `emitterIdx`, `emitterCount`, `emitterNorm`, `nx`, `ny`,
+- [x] Make numeric emitter/spawn params expression-addressable.
+- [x] Document that `emitterIdx`, `emitterCount`, `emitterNorm`, `nx`, `ny`,
       `nz`, `distCenter` are per-emitter values available inside presets, not
       clip-level scalar expressions.
 

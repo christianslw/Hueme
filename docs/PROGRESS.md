@@ -4,7 +4,7 @@ This file is the durable handoff. A new session should read this first, then
 `docs/TODO.md`, then continue at the first unchecked item. Do **not** re-do
 completed work.
 
-Last updated: 2026-11-22 (Phase 2 slice 1: expressions)
+Last updated: 2026-11-22 (Phase 2 slice 2: new presets)
 
 ## Ground rules
 
@@ -214,6 +214,25 @@ systems) is intentionally separate.
   6 subtests passed**.
 - [x] Headless Chromium verified the generator dialog, live value, validation
   call and committed expression chip with no console errors.
+
+### Phase 2 slice 2 — New presets — COMPLETE
+
+- [x] `color_wash` (alias `quad_gradient`) — four-corner room wash with
+  saturation, centre softness, edge falloff and optional drift.
+- [x] `wave_interference` — two to four superposed 3D wave fronts with
+  frequency, amplitude, speed and angle controls.
+- [x] `shutter_matrix` — musical matrix shutter with attack, decay,
+  per-emitter phase spread and a background floor.
+- [x] `emitter_swarm` — analytic deterministic particles with emitter position
+  and radii, birth rate, lifetime, velocity, gravity, resistance, turbulence,
+  size, fade tail, birth/death colour, seed and background.
+- [x] Numeric emitter/spawn parameters accept clip expressions; per-emitter
+  and per-voxel values are documented as preset-local variables in
+  `docs/showdoc-v1.md`.
+- [x] Tests: preset determinism, animation and expression-addressable spawn
+  parameters; full suite **168 passed, 6 subtests passed**.
+- [x] Headless Chromium verified all four presets in the library and a lit
+  fixture-free FX render of Emitter Swarm with no console errors.
 
 ## Decisions already made
 

@@ -93,6 +93,24 @@ target-group coverage.
 - A keyframe's easing controls the segment starting at that keyframe. `hold`
   keeps the value until the next keyframe and is one of the ZCL snap triggers.
 
+## Expressions
+
+`clip.expressions` maps a parameter path to a safe scalar expression. Python
+evaluates it with a whitelisted AST; no `eval`, attribute access or subscripts
+are allowed. Available functions are `sin`, `cos`, `abs`, `exp`, `min`, `max`,
+`floor`, `round`, `noise`, `clamp`, `smoothstep`, `lerp`, `step`, `wrap`,
+`pulse`, `env(name, phase)` and `fbm(x, y, z, scale)`. String literals are only
+valid as the curve name in `env()`.
+
+Clip-level variables are `t`, `local_t`, `beat`, `beatPhase`, `bar`, `barPos`,
+`barPhase`, `phrase`, `phrasePhase`, `bpm`, `pulse`, `kick`, `snare`, `hat`,
+`energy`, `harmonic`, `percussive`, `prominence`, `bass`, `mid`, `high`,
+`sectionProgress`, `beatsToDrop`, `inDrop` and `val` (the keyframed value).
+
+`emitterIdx`, `emitterCount`, `emitterNorm`, `nx`, `ny`, `nz` and `distCenter`
+are per-emitter/per-voxel values available **inside preset renderers** only.
+They are deliberately not clip-level scalar expression variables.
+
 ## Spatial masks
 
 Coordinates are normalised room coordinates 0..1, independent of metres.
