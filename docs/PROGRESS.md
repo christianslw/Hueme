@@ -1,9 +1,10 @@
 # Hueme Studio — Build Progress & Session Checkpoints
 
 This file is the durable handoff. A new session should read this first, then
-continue at the first unchecked item. Do **not** re-do completed work.
+`docs/TODO.md`, then continue at the first unchecked item. Do **not** re-do
+completed work.
 
-Last updated: 2026-11-22 (Sprint 5, UI phase 1)
+Last updated: 2026-11-22 (Sprint 5 UI phase 1 + review fixes + EffectCraft analysis)
 
 ## Ground rules
 
@@ -172,6 +173,27 @@ systems) is intentionally separate.
   track auto-name following a preset change.
 - [x] Full suite: **161 passed, 6 subtests passed** with `-W error`.
 
+### Sprint 5 follow-up — code-review fixes, push, reference analysis
+
+- [x] Double-click in the preset/filter library can no longer create duplicate
+  commits; a 350 ms `libraryActionOnce` guard covers the native click pair.
+- [x] Expression lane preview now uses the real `envelopeAt()` values from the
+  attached blueprint (or the deterministic fallback), not `kick=0` / `energy=0.5`.
+- [x] Removed the unused `SYNC_OFFSET_KEY` localStorage writes from `/studio`
+  and `/live`; server sync status is the only source of truth.
+- [x] `extract_warm_channel()` now blends between a neutral and 1800 K
+  subtraction vector. Pure amber and neutral white both land on W with no RGB
+  residue/blue cast; warm whites keep a warm RGB residual.
+- [x] Removed the orphaned `base = U.color_mix(...)` line in `shockwave_3d`;
+  `strobe_blinder` now handles scalar or array `gate` without `float(array)`.
+- [x] `/api/system/restart` schedules the re-exec through `BackgroundTasks`
+  after the HTTP response is flushed.
+- [x] MCP `_blueprint_extract` comment now reflects `handle_async`'s worker
+  thread; `_create_show` uses `default_params("solid")`.
+- [x] Pushed `main` to GitHub at `0c0af10`, tag `phase1-ui-2026-11-22`.
+- [x] Added `AGENTS.md`, `docs/TODO.md` and `docs/effectcraft-analysis.md`.
+- [x] Full suite after fixes: **162 passed, 6 subtests passed**.
+
 ## Decisions already made
 
 - Coordinates metres, Z up. Room defaults to `[6.5, 8.0, 5.1]` only in the
@@ -270,19 +292,19 @@ curl -s localhost:8090/mcp -H 'Content-Type: application/json' \
 
 ## Next session start point
 
-Sprint 5 UI phase 1 is complete. Read `docs/PROGRESS.md`,
-`docs/checkpoints/2026-11-22-sprint5.md`, `docs/ui-system.md` and
+Sprint 5 UI phase 1 and the review fixes are complete. Read `docs/PROGRESS.md`,
+`docs/TODO.md`, `docs/effectcraft-analysis.md`, `docs/ui-system.md` and
 `docs/studio-server.md` first.
 
-Phase 2, not started:
+Phase 2 is the active task board in `docs/TODO.md`. It includes:
 
-- Richer expression vocabulary and audio variables (`bass`, `mid`, `high`,
-  `amp`, `rms`, `harmonic`, `pulse`, subdivision helpers, `smoothstep`, `mix`,
-  `map`, `pulse`, `saw`, `tri`, `decay`), expression templates and live preview.
-- New basic/particle presets with expression-addressable emitter position,
-  spawn rate, spread, gravity, turbulence and lifetime.
-- Filter parameter keyframes (only static values + presets are animatable now).
-- Optional blueprint-backed FX preview (currently synthetic envelope).
+- Richer expression vocabulary, audio/structure variables, generator presets,
+  live values and diagnostics.
+- New basic presets plus expression-addressable `emitter_swarm` particles.
+- Filter parameter keyframes and timeline lanes.
+- Blueprint-backed FX preview and the pop-up Effect Builder.
+- The new **Timeline Analysis view**: waveform only, every envelope basis
+  overlaid, spectrum strip and dominance readout.
 
 Remaining external verification, not code work:
 
