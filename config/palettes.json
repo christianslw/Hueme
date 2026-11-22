@@ -1,0 +1,27 @@
+{
+  "schema_version": 1,
+  "palettes": [
+    {
+      "id": "gta_6",
+      "name": "GTA 6",
+      "colors": [
+        [
+          255,
+          96,
+          24
+        ],
+        [
+          140,
+          30,
+          190
+        ],
+        [
+          0,
+          180,
+          255
+        ]
+      ],
+      "builtin": false
+    }
+  ]
+}

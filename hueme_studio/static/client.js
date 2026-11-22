@@ -44,6 +44,8 @@ export function el(tag, attrs = {}, ...children) {
 }
 
 export function toast(message, kind = "info", timeout = 4000) {
+  const closeIcon =
+    '<svg viewBox="0 0 12 12" width="10" height="10" fill="none" stroke="currentColor" stroke-width="1.5"><path d="m2.5 2.5 7 7m0-7-7 7"/></svg>';
   let host = document.getElementById("toasts");
   if (!host) {
     host = el("div", { id: "toasts", class: "toasts", "aria-live": "polite" });
@@ -58,7 +60,7 @@ export function toast(message, kind = "info", timeout = 4000) {
       class: "toast-close",
       type: "button",
       "aria-label": "Dismiss",
-      text: "x",
+      html: closeIcon,
       onclick: () => node.remove(),
     })
   );

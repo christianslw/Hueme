@@ -136,9 +136,10 @@ class Compositor:
         env_values = {k: _clip01(float(v)) for k, v in env_values.items()}
 
         master = np.zeros((self.rig.voxel_count, 3), dtype=np.float64)
-        active_tracks = doc.active_tracks()
+        active_tracks = doc.evaluation_order()
         active_clips: list[dict[str, Any]] = []
         track_levels: dict[str, float] = {}
+        below_alpha = np.zeros(self.rig.voxel_count, dtype=np.float64)
 
         for track in active_tracks:
             group_idx, group_rank, group_size = self._target_info(track.target_group)
@@ -147,11 +148,24 @@ class Compositor:
             )
             if clip_infos:
                 active_clips.extend(clip_infos)
+            if track.clipped_to_below:
+                # Photoshop clipping mask: only voxels where the layer below
+                # actually renders receive this layer.
+                track_alpha = track_alpha * below_alpha
             if track_alpha.size == 0 or float(track_alpha.max()) <= 1e-6:
                 track_levels[track.id] = 0.0
+                below_alpha = track_alpha
                 continue
             track_levels[track.id] = float(np.mean(track_alpha[group_idx]))
-            self._blend_track(master, track, group_idx, track_rgb, track_alpha)
+            self._blend_track(
+                master,
+                track,
+                group_idx,
+                track_rgb,
+                track_alpha,
+                limit_mask=below_alpha if track.clipped_to_below else None,
+            )
+            below_alpha = track_alpha
 
         snap = self._collect_snap_events(doc, active_tracks, t, beat)
         master = np.clip(master, 0.0, 255.0).astype(np.float32)
@@ -188,6 +202,27 @@ class Compositor:
         self._group_cache[group_id] = info
         return info
 
+    @staticmethod
+    def _expression_context(
+        doc: ShowDoc,
+        t: float,
+        beat: dict[str, float | int | bool],
+        env: dict[str, float],
+    ) -> dict[str, float]:
+        grid = max(1e-6, float(doc.timing.beat_grid_s))
+        beat_pos = (float(t) - doc.timing.beat_offset_s) / grid
+        return {
+            "t": float(t),
+            "beat": float(beat_pos),
+            "beatPhase": float(beat.get("beat_phase", 0.0)),
+            "barPos": float(beat.get("bar_pos", 0)),
+            "bpm": float(doc.timing.bpm),
+            "kick": float(env.get("kick", 0.0)),
+            "snare": float(env.get("snare", 0.0)),
+            "hat": float(env.get("hat", 0.0)),
+            "energy": float(env.get("energy", 0.0)),
+        }
+
     def _render_track(
         self,
         doc: ShowDoc,
@@ -203,17 +238,27 @@ class Compositor:
         track_rgb = np.zeros((n, 3), dtype=np.float64)
         track_alpha = np.zeros(n, dtype=np.float64)
         infos: list[dict[str, Any]] = []
+        expr_context = self._expression_context(doc, t, beat, env)
 
         clips = sorted(track.active_clips(t), key=lambda c: (c.start_s, c.id))
         for clip in clips:
             local_t = clip.local_time(t)
-            opacity = clip.effective_opacity(local_t)
+            opacity = clip.effective_opacity(local_t, expr_context)
             clip_alpha = clip.fade_alpha(local_t) * opacity
             if clip_alpha <= 1e-6:
                 continue
 
             rgb = self._render_clip(
-                doc, clip, local_t, t, beat, env, group_idx, group_rank, group_size
+                doc,
+                clip,
+                local_t,
+                t,
+                beat,
+                env,
+                group_idx,
+                group_rank,
+                group_size,
+                expr_context,
             )
             mask = evaluate_spatial_mask(
                 clip.spatial_mask,
@@ -261,10 +306,20 @@ class Compositor:
         group_idx: np.ndarray,
         group_rank: np.ndarray,
         group_size: int,
+        expr_context: dict[str, float] | None = None,
     ) -> np.ndarray:
         inertia_filters = [f for f in clip.filters if f.enabled and f.type == "inertia"]
         base = self._render_base(
-            doc, clip, local_t, t, beat, env, group_idx, group_rank, group_size
+            doc,
+            clip,
+            local_t,
+            t,
+            beat,
+            env,
+            group_idx,
+            group_rank,
+            group_size,
+            expr_context,
         )
         if not inertia_filters:
             inertia_reference = None
@@ -330,10 +385,14 @@ class Compositor:
         group_idx: np.ndarray,
         group_rank: np.ndarray,
         group_size: int,
+        expr_context: dict[str, float] | None = None,
     ) -> np.ndarray:
-        params = clip.effective_params(max(0.0, local_t))
         sample_beat = beat if beat is not None else doc.beat_context(sample_t)
         sample_env = env if env is not None else self.env_provider(doc, sample_t)
+        context = expr_context or self._expression_context(
+            doc, sample_t, sample_beat, {k: _clip01(float(v)) for k, v in sample_env.items()}
+        )
+        params = clip.effective_params(max(0.0, local_t), context)
         pctx = PresetContext(
             positions=self.rig.positions,
             normalized=self.rig.normalized_positions,
@@ -359,9 +418,15 @@ class Compositor:
         group_idx: np.ndarray,
         track_rgb: np.ndarray,
         track_alpha: np.ndarray,
+        *,
+        limit_mask: np.ndarray | None = None,
     ) -> None:
         if group_idx.size == 0:
             return
+        if limit_mask is not None:
+            group_idx = group_idx[limit_mask[group_idx] > 1e-6]
+            if group_idx.size == 0:
+                return
         src = track_rgb[group_idx]
         alpha = track_alpha[group_idx] * track.opacity
         if float(alpha.max()) <= 1e-6:

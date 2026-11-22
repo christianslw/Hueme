@@ -16,6 +16,7 @@ const dom = {
   timelineValue: $("#timeline-value"),
   master: $("#master"),
   masterValue: $("#master-value"),
+  trimValue: $("#trim-value"),
   blackout: $("#blackout"),
   auto: $("#auto"),
 };
@@ -70,9 +71,36 @@ function updateState() {
   dom.timelineValue.textContent = formatClock(state.playback.time_s || 0);
   dom.master.value = String(state.playback.gain ?? 1);
   dom.masterValue.textContent = `${Math.round((state.playback.gain ?? 1) * 100)}%`;
-  dom.auto.checked = Boolean(state.playback.loop);
+  dom.auto.checked = Boolean(state.sync?.enabled);
+  dom.auto.disabled = !state.sync?.configured;
   dom.play.textContent = state.playback.playing ? "PAUSE" : "PLAY";
+  updateTrim();
   updateTime();
+}
+
+function updateTrim() {
+  if (!dom.trimValue) return;
+  const ms = Math.round(Number(state?.sync?.offset_s || 0) * 1000);
+  dom.trimValue.textContent = `${ms > 0 ? "+" : ""}${ms} ms`;
+  dom.trimValue.title = "positiv = Licht später, negativ = früher";
+}
+
+async function trimSync(deltaMs) {
+  if (!state?.sync?.configured) {
+    toast("MA sync is not configured", "info");
+    return;
+  }
+  const ms = clamp(
+    Number(state.sync.offset_s || 0) * 1000 + deltaMs,
+    -20000,
+    20000
+  );
+  try {
+    state.sync = await client.post("/api/sync", { offset_s: ms / 1000 });
+    updateTrim();
+  } catch (error) {
+    toast(error.message, "danger");
+  }
 }
 
 function updateLink() {
@@ -84,7 +112,6 @@ function sendTransport(patch) {
   client.setTransport(patch).then((transport) => {
     if (state) state.playback = transport;
     dom.play.textContent = transport.playing ? "PAUSE" : "PLAY";
-    dom.auto.checked = Boolean(transport.loop);
   }).catch((error) => toast(error.message, "danger"));
 }
 
@@ -114,7 +141,20 @@ dom.master.addEventListener("input", () => {
   gainTimer = window.setTimeout(() => sendTransport({ gain }), 80);
 });
 
-dom.auto.addEventListener("change", () => sendTransport({ loop: dom.auto.checked }));
+dom.auto.addEventListener("change", () => {
+  if (!state?.sync?.configured) {
+    dom.auto.checked = false;
+    toast("Music Assistant sync is not configured", "info");
+    return;
+  }
+  client.post("/api/sync", { enabled: dom.auto.checked }).then((sync) => {
+    if (state) state.sync = sync;
+    dom.auto.checked = Boolean(sync.enabled);
+  }).catch((error) => {
+    dom.auto.checked = Boolean(state?.sync?.enabled);
+    toast(error.message, "danger");
+  });
+});
 
 function setBlackout(active) {
   dom.blackout.classList.toggle("active", active);
@@ -154,13 +194,21 @@ client.addEventListener("transport", (event) => {
   if (state) state.playback = event.detail;
   if (event.detail) {
     dom.play.textContent = event.detail.playing ? "PAUSE" : "PLAY";
-    dom.auto.checked = Boolean(event.detail.loop);
     dom.master.value = String(event.detail.gain ?? 1);
     dom.masterValue.textContent = `${Math.round((event.detail.gain ?? 1) * 100)}%`;
   }
   updateTime();
 });
 client.addEventListener("connection", updateLink);
+
+for (const [selector, delta] of [
+  ["#trim--1000", -1000],
+  ["#trim--100", -100],
+  ["#trim-100", 100],
+  ["#trim-1000", 1000],
+]) {
+  $(selector)?.addEventListener("click", () => trimSync(delta));
+}
 
 window.setInterval(updateTime, 1000);
 

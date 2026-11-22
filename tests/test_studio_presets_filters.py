@@ -11,6 +11,7 @@ from hueme_studio.filters import (
     apply_filter_stack,
     audio_mod,
     beat_gate,
+    bloom,
     dim2warm,
     inertia,
     mirror_symmetry,
@@ -83,26 +84,38 @@ def make_filter_ctx(rig=None, t: float = 0.0) -> FilterContext:
     )
 
 
-def test_all_six_presets_render_deterministically():
-    assert set(PRESETS) == {
+def test_all_presets_render_deterministically():
+    assert set(PRESETS) >= {
         "solid",
+        "gradient_3d",
+        "pulse_breathe",
+        "chase_scanner",
+        "pattern_bands",
+        "ma3_wings",
+        "particles_3d",
+        "sparkle_twinkle",
+        "shockwave_3d",
+        "strobe_blinder",
         "turrell_horizon",
         "caustic_abyss",
-        "celestial_orrery",
         "blackbody_forge",
-        "ma3_wings",
+        "noise_plasma",
+        "aurora_veil",
+        "cell_bloom",
+        "silk_folds",
     }
+    assert len(PRESETS) == 27
     for preset_id in PRESETS:
         ctx = make_ctx(10.0)
         first = render_preset(preset_id, ctx)
         second = render_preset(preset_id, ctx)
-        assert first.shape == (190, 3)
+        assert first.shape == (ctx.n, 3)
         assert first.dtype == np.float32
         assert np.isfinite(first).all()
         assert first.min() >= 0.0 and first.max() <= 255.0
         assert np.array_equal(first, second)
-        if preset_id != "solid":
-            later = render_preset(preset_id, make_ctx(12.0))
+        if preset_id not in {"solid", "strobe_blinder"}:
+            later = render_preset(preset_id, make_ctx(12.3))
             assert not np.array_equal(first, later), (
                 f"{preset_id} did not animate with time"
             )
@@ -141,12 +154,46 @@ def test_filters_are_non_destructive_and_catalogued():
     assert np.array_equal(rgb, original)
     assert out.shape == rgb.shape
     assert set(FILTERS) == {
+        "spatial_blur",
+        "bloom",
+        "grain_noise",
         "mirror_symmetry",
         "beat_gate",
         "dim2warm",
+        "color_grade",
+        "strobe_shutter",
+        "invert_color",
         "inertia",
         "audio_mod",
+        "hue_rotate",
+        "saturation",
+        "brightness_curve",
+        "scanline",
+        "posterize",
     }
+
+
+def test_filter_kind_accepts_every_registered_filter():
+    for filter_id in FILTERS:
+        assert FilterSpec(type=filter_id).type == filter_id
+
+
+def test_every_filter_runs_on_a_gradient_without_nan():
+    ctx = make_filter_ctx()
+    base = render_preset("gradient_3d", make_ctx(4.0, {"brightness": 1.0}))
+    assert set(FILTERS) >= {"hue_rotate", "saturation", "brightness_curve", "scanline", "posterize"}
+    for filter_id, info in FILTERS.items():
+        first = info.apply(base, ctx, info.default_params())
+        second = info.apply(base, ctx, info.default_params())
+        assert first.shape == base.shape
+        assert np.isfinite(first).all()
+        assert first.min() >= 0.0 and first.max() <= 255.0
+        assert np.array_equal(first, second)
+    # These filters must actually change the source buffer.
+    for filter_id in ("hue_rotate", "saturation", "brightness_curve", "posterize"):
+        info = FILTERS[filter_id]
+        out = info.apply(base, ctx, {**info.default_params(), "mix": 1.0})
+        assert not np.array_equal(out, base)
 
 
 def test_beat_gate_opens_on_the_grid_and_closes_after_duty():
@@ -179,6 +226,21 @@ def test_dim2warm_and_envelope_modulation():
     )
     dimmed = audio_mod(rgb, ctx, {"source": "kick", "depth": 0.5, "mode": "brightness"})
     assert float(dimmed.mean()) < float(rgb.mean())
+
+
+def test_bloom_spreads_light_from_bright_voxels():
+    rig = compile_rig(load_rig(RIG_PATH))
+    rgb = np.zeros((rig.voxel_count, 3), dtype=np.float32)
+    rgb[0] = [255.0, 255.0, 255.0]
+    original = rgb.copy()
+    out = bloom(
+        rgb,
+        make_filter_ctx(rig),
+        {"threshold": 100.0, "radius_m": 1.0, "gain": 1.0, "mix": 1.0},
+    )
+    assert out[0, 0] == pytest.approx(255.0)
+    assert out[1:].max() > 0.0
+    assert np.array_equal(rgb, original)
 
 
 def test_inertia_uses_reference_and_is_deterministic():

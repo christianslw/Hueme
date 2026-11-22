@@ -1,0 +1,2577 @@
+{
+  "schema_version": 1,
+  "id": "jane_smooth_sunrise",
+  "name": "JANE — Smooth Sunrise",
+  "duration_s": 287.1147,
+  "match": {
+    "artist": "Jane",
+    "title": "Jane",
+    "normalized_keys": [
+      "jane"
+    ],
+    "ma_item_ids": [],
+    "duration_s": 287.1147
+  },
+  "timing": {
+    "bpm": 112.4,
+    "beat_offset_s": 1.824,
+    "beat_grid_s": 0.533808,
+    "markers": [
+      {
+        "t_s": 0.0,
+        "name": "Intro",
+        "kind": "section",
+        "color": null
+      },
+      {
+        "t_s": 54.9152,
+        "name": "Verse",
+        "kind": "section",
+        "color": null
+      },
+      {
+        "t_s": 103.77,
+        "name": "Verse",
+        "kind": "section",
+        "color": null
+      },
+      {
+        "t_s": 142.0016,
+        "name": "Build",
+        "kind": "section",
+        "color": null
+      },
+      {
+        "t_s": 173.8594,
+        "name": "Drop",
+        "kind": "drop",
+        "color": null
+      },
+      {
+        "t_s": 207.8302,
+        "name": "Breakdown",
+        "kind": "section",
+        "color": null
+      },
+      {
+        "t_s": 233.3257,
+        "name": "Build",
+        "kind": "section",
+        "color": null
+      },
+      {
+        "t_s": 241.8242,
+        "name": "Drop",
+        "kind": "drop",
+        "color": null
+      },
+      {
+        "t_s": 284.2935,
+        "name": "Outro",
+        "kind": "section",
+        "color": null
+      }
+    ]
+  },
+  "tracks": [
+    {
+      "id": "room_field",
+      "name": "Room · Sunrise Field",
+      "target_group": "all",
+      "blend_mode": "normal",
+      "opacity": 0.85,
+      "muted": false,
+      "solo": false,
+      "kind": "layer",
+      "parent_id": null,
+      "clipped_to_below": false,
+      "height_px": 72,
+      "clips": [
+        {
+          "id": "room_field_all",
+          "start_s": 0.0,
+          "end_s": 159.3121,
+          "fade_in_s": 0.0,
+          "fade_out_s": 4.0,
+          "preset": "aurora_veil",
+          "opacity": 1.0,
+          "params": {
+            "palette": "sunset",
+            "speed": 0.05,
+            "veil_width": 0.6,
+            "shimmer": 0.1,
+            "brightness": 0.6
+          },
+          "expressions": {
+            "brightness": "val * (0.95 + 0.05 * sin(TAU * beat / 16))"
+          },
+          "keyframes": [
+            {
+              "t_s": 0.0,
+              "param": "brightness",
+              "value": 0.47500000000000003,
+              "easing": "ease_in_out"
+            },
+            {
+              "t_s": 16.96,
+              "param": "brightness",
+              "value": 0.52,
+              "easing": "ease_in_out"
+            },
+            {
+              "t_s": 33.5,
+              "param": "brightness",
+              "value": 0.595,
+              "easing": "ease_in_out"
+            },
+            {
+              "t_s": 43.5,
+              "param": "brightness",
+              "value": 0.49,
+              "easing": "ease_in_out"
+            },
+            {
+              "t_s": 50.5,
+              "param": "brightness",
+              "value": 0.6100000000000001,
+              "easing": "ease_in_out"
+            },
+            {
+              "t_s": 61.0,
+              "param": "brightness",
+              "value": 0.565,
+              "easing": "ease_in_out"
+            },
+            {
+              "t_s": 69.5,
+              "param": "brightness",
+              "value": 0.52,
+              "easing": "ease_in_out"
+            },
+            {
+              "t_s": 86.5,
+              "param": "brightness",
+              "value": 0.55,
+              "easing": "ease_in_out"
+            },
+            {
+              "t_s": 95.5,
+              "param": "brightness",
+              "value": 0.445,
+              "easing": "ease_in_out"
+            },
+            {
+              "t_s": 104.0,
+              "param": "brightness",
+              "value": 0.625,
+              "easing": "ease_in_out"
+            },
+            {
+              "t_s": 109.5,
+              "param": "brightness",
+              "value": 0.535,
+              "easing": "ease_in_out"
+            },
+            {
+              "t_s": 121.5,
+              "param": "brightness",
+              "value": 0.5800000000000001,
+              "easing": "ease_in_out"
+            },
+            {
+              "t_s": 124.5,
+              "param": "brightness",
+              "value": 0.64,
+              "easing": "ease_in_out"
+            },
+            {
+              "t_s": 139.5,
+              "param": "brightness",
+              "value": 0.505,
+              "easing": "ease_in_out"
+            },
+            {
+              "t_s": 157.0,
+              "param": "brightness",
+              "value": 0.388,
+              "easing": "ease_in_out"
+            }
+          ],
+          "spatial_mask": {
+            "kind": "none",
+            "axis": "x",
+            "position": 0.5,
+            "width": 0.25,
+            "center": [
+              0.5,
+              0.5,
+              0.5
+            ],
+            "radius": 0.3,
+            "box_min": [
+              0.0,
+              0.0,
+              0.0
+            ],
+            "box_max": [
+              1.0,
+              1.0,
+              1.0
+            ],
+            "modulo": 2,
+            "remainder": 0,
+            "softness": 0.08,
+            "invert": false
+          },
+          "filters": [
+            {
+              "type": "inertia",
+              "enabled": true,
+              "params": {
+                "mix": 0.72,
+                "tau_s": 0.65
+              }
+            },
+            {
+              "type": "audio_mod",
+              "enabled": true,
+              "params": {
+                "source": "energy",
+                "depth": 0.1,
+                "mode": "brightness"
+              }
+            }
+          ],
+          "snap_zcl": false,
+          "name": "Sunrise veil",
+          "color": "#ffc89a"
+        }
+      ]
+    },
+    {
+      "id": "gallery_main",
+      "name": "Gallery · Soft Horizon",
+      "target_group": "galerie_oben",
+      "blend_mode": "add",
+      "opacity": 0.9,
+      "muted": false,
+      "solo": false,
+      "kind": "layer",
+      "parent_id": null,
+      "clipped_to_below": false,
+      "height_px": 96,
+      "clips": [
+        {
+          "id": "gallery_all",
+          "start_s": 0.0,
+          "end_s": 159.3121,
+          "fade_in_s": 0.0,
+          "fade_out_s": 4.0,
+          "preset": "turrell_horizon",
+          "opacity": 1.0,
+          "params": {
+            "sky_color": [
+              64,
+              52,
+              96
+            ],
+            "seam_color": [
+              255,
+              196,
+              140
+            ],
+            "earth_color": [
+              255,
+              120,
+              120
+            ],
+            "brightness": 0.5,
+            "drift_speed": 0.045,
+            "angle": 90,
+            "seam_width": 0.38,
+            "contrast": 0.42,
+            "audio_mod": 0.08
+          },
+          "expressions": {},
+          "keyframes": [
+            {
+              "t_s": 0.0,
+              "param": "sky_color",
+              "value": [
+                64.0,
+                52.0,
+                96.0
+              ],
+              "easing": "ease_in_out"
+            },
+            {
+              "t_s": 16.96,
+              "param": "sky_color",
+              "value": [
+                70.0,
+                50.0,
+                90.0
+              ],
+              "easing": "ease_in_out"
+            },
+            {
+              "t_s": 33.5,
+              "param": "sky_color",
+              "value": [
+                90.0,
+                50.0,
+                70.0
+              ],
+              "easing": "ease_in_out"
+            },
+            {
+              "t_s": 43.5,
+              "param": "sky_color",
+              "value": [
+                60.0,
+                90.0,
+                130.0
+              ],
+              "easing": "ease_in_out"
+            },
+            {
+              "t_s": 50.5,
+              "param": "sky_color",
+              "value": [
+                100.0,
+                50.0,
+                70.0
+              ],
+              "easing": "ease_in_out"
+            },
+            {
+              "t_s": 61.0,
+              "param": "sky_color",
+              "value": [
+                80.0,
+                60.0,
+                90.0
+              ],
+              "easing": "ease_in_out"
+            },
+            {
+              "t_s": 69.5,
+              "param": "sky_color",
+              "value": [
+                40.0,
+                80.0,
+                100.0
+              ],
+              "easing": "ease_in_out"
+            },
+            {
+              "t_s": 86.5,
+              "param": "sky_color",
+              "value": [
+                90.0,
+                60.0,
+                80.0
+              ],
+              "easing": "ease_in_out"
+            },
+            {
+              "t_s": 95.5,
+              "param": "sky_color",
+              "value": [
+                55.0,
+                55.0,
+                95.0
+              ],
+              "easing": "ease_in_out"
+            },
+            {
+              "t_s": 104.0,
+              "param": "sky_color",
+              "value": [
+                95.0,
+                60.0,
+                75.0
+              ],
+              "easing": "ease_in_out"
+            },
+            {
+              "t_s": 109.5,
+              "param": "sky_color",
+              "value": [
+                70.0,
+                55.0,
+                110.0
+              ],
+              "easing": "ease_in_out"
+            },
+            {
+              "t_s": 121.5,
+              "param": "sky_color",
+              "value": [
+                85.0,
+                55.0,
+                95.0
+              ],
+              "easing": "ease_in_out"
+            },
+            {
+              "t_s": 124.5,
+              "param": "sky_color",
+              "value": [
+                100.0,
+                60.0,
+                80.0
+              ],
+              "easing": "ease_in_out"
+            },
+            {
+              "t_s": 139.5,
+              "param": "sky_color",
+              "value": [
+                60.0,
+                45.0,
+                85.0
+              ],
+              "easing": "ease_in_out"
+            },
+            {
+              "t_s": 157.0,
+              "param": "sky_color",
+              "value": [
+                35.0,
+                30.0,
+                60.0
+              ],
+              "easing": "ease_in_out"
+            },
+            {
+              "t_s": 0.0,
+              "param": "seam_color",
+              "value": [
+                255.0,
+                196.0,
+                140.0
+              ],
+              "easing": "ease_in_out"
+            },
+            {
+              "t_s": 16.96,
+              "param": "seam_color",
+              "value": [
+                255.0,
+                170.0,
+                140.0
+              ],
+              "easing": "ease_in_out"
+            },
+            {
+              "t_s": 33.5,
+              "param": "seam_color",
+              "value": [
+                255.0,
+                210.0,
+                150.0
+              ],
+              "easing": "ease_in_out"
+            },
+            {
+              "t_s": 43.5,
+              "param": "seam_color",
+              "value": [
+                200.0,
+                240.0,
+                255.0
+              ],
+              "easing": "ease_in_out"
+            },
+            {
+              "t_s": 50.5,
+              "param": "seam_color",
+              "value": [
+                255.0,
+                200.0,
+                140.0
+              ],
+              "easing": "ease_in_out"
+            },
+            {
+              "t_s": 61.0,
+              "param": "seam_color",
+              "value": [
+                255.0,
+                210.0,
+                160.0
+              ],
+              "easing": "ease_in_out"
+            },
+            {
+              "t_s": 69.5,
+              "param": "seam_color",
+              "value": [
+                170.0,
+                245.0,
+                225.0
+              ],
+              "easing": "ease_in_out"
+            },
+            {
+              "t_s": 86.5,
+              "param": "seam_color",
+              "value": [
+                255.0,
+                220.0,
+                170.0
+              ],
+              "easing": "ease_in_out"
+            },
+            {
+              "t_s": 95.5,
+              "param": "seam_color",
+              "value": [
+                240.0,
+                220.0,
+                230.0
+              ],
+              "easing": "ease_in_out"
+            },
+            {
+              "t_s": 104.0,
+              "param": "seam_color",
+              "value": [
+                255.0,
+                235.0,
+                190.0
+              ],
+              "easing": "ease_in_out"
+            },
+            {
+              "t_s": 109.5,
+              "param": "seam_color",
+              "value": [
+                235.0,
+                210.0,
+                255.0
+              ],
+              "easing": "ease_in_out"
+            },
+            {
+              "t_s": 121.5,
+              "param": "seam_color",
+              "value": [
+                255.0,
+                210.0,
+                220.0
+              ],
+              "easing": "ease_in_out"
+            },
+            {
+              "t_s": 124.5,
+              "param": "seam_color",
+              "value": [
+                255.0,
+                240.0,
+                200.0
+              ],
+              "easing": "ease_in_out"
+            },
+            {
+              "t_s": 139.5,
+              "param": "seam_color",
+              "value": [
+                255.0,
+                190.0,
+                150.0
+              ],
+              "easing": "ease_in_out"
+            },
+            {
+              "t_s": 157.0,
+              "param": "seam_color",
+              "value": [
+                240.0,
+                200.0,
+                180.0
+              ],
+              "easing": "ease_in_out"
+            },
+            {
+              "t_s": 0.0,
+              "param": "earth_color",
+              "value": [
+                255.0,
+                120.0,
+                120.0
+              ],
+              "easing": "ease_in_out"
+            },
+            {
+              "t_s": 16.96,
+              "param": "earth_color",
+              "value": [
+                255.0,
+                120.0,
+                110.0
+              ],
+              "easing": "ease_in_out"
+            },
+            {
+              "t_s": 33.5,
+              "param": "earth_color",
+              "value": [
+                255.0,
+                140.0,
+                90.0
+              ],
+              "easing": "ease_in_out"
+            },
+            {
+              "t_s": 43.5,
+              "param": "earth_color",
+              "value": [
+                120.0,
+                170.0,
+                220.0
+              ],
+              "easing": "ease_in_out"
+            },
+            {
+              "t_s": 50.5,
+              "param": "earth_color",
+              "value": [
+                255.0,
+                120.0,
+                100.0
+              ],
+              "easing": "ease_in_out"
+            },
+            {
+              "t_s": 61.0,
+              "param": "earth_color",
+              "value": [
+                200.0,
+                230.0,
+                200.0
+              ],
+              "easing": "ease_in_out"
+            },
+            {
+              "t_s": 69.5,
+              "param": "earth_color",
+              "value": [
+                90.0,
+                180.0,
+                190.0
+              ],
+              "easing": "ease_in_out"
+            },
+            {
+              "t_s": 86.5,
+              "param": "earth_color",
+              "value": [
+                255.0,
+                160.0,
+                110.0
+              ],
+              "easing": "ease_in_out"
+            },
+            {
+              "t_s": 95.5,
+              "param": "earth_color",
+              "value": [
+                160.0,
+                150.0,
+                200.0
+              ],
+              "easing": "ease_in_out"
+            },
+            {
+              "t_s": 104.0,
+              "param": "earth_color",
+              "value": [
+                255.0,
+                170.0,
+                120.0
+              ],
+              "easing": "ease_in_out"
+            },
+            {
+              "t_s": 109.5,
+              "param": "earth_color",
+              "value": [
+                180.0,
+                160.0,
+                230.0
+              ],
+              "easing": "ease_in_out"
+            },
+            {
+              "t_s": 121.5,
+              "param": "earth_color",
+              "value": [
+                230.0,
+                170.0,
+                190.0
+              ],
+              "easing": "ease_in_out"
+            },
+            {
+              "t_s": 124.5,
+              "param": "earth_color",
+              "value": [
+                255.0,
+                150.0,
+                160.0
+              ],
+              "easing": "ease_in_out"
+            },
+            {
+              "t_s": 139.5,
+              "param": "earth_color",
+              "value": [
+                190.0,
+                150.0,
+                210.0
+              ],
+              "easing": "ease_in_out"
+            },
+            {
+              "t_s": 157.0,
+              "param": "earth_color",
+              "value": [
+                120.0,
+                110.0,
+                170.0
+              ],
+              "easing": "ease_in_out"
+            },
+            {
+              "t_s": 0.0,
+              "param": "brightness",
+              "value": 0.4625,
+              "easing": "ease_in_out"
+            },
+            {
+              "t_s": 16.96,
+              "param": "brightness",
+              "value": 0.53,
+              "easing": "ease_in_out"
+            },
+            {
+              "t_s": 33.5,
+              "param": "brightness",
+              "value": 0.6425000000000001,
+              "easing": "ease_in_out"
+            },
+            {
+              "t_s": 43.5,
+              "param": "brightness",
+              "value": 0.485,
+              "easing": "ease_in_out"
+            },
+            {
+              "t_s": 50.5,
+              "param": "brightness",
+              "value": 0.665,
+              "easing": "ease_in_out"
+            },
+            {
+              "t_s": 61.0,
+              "param": "brightness",
+              "value": 0.5975,
+              "easing": "ease_in_out"
+            },
+            {
+              "t_s": 69.5,
+              "param": "brightness",
+              "value": 0.53,
+              "easing": "ease_in_out"
+            },
+            {
+              "t_s": 86.5,
+              "param": "brightness",
+              "value": 0.575,
+              "easing": "ease_in_out"
+            },
+            {
+              "t_s": 95.5,
+              "param": "brightness",
+              "value": 0.4175,
+              "easing": "ease_in_out"
+            },
+            {
+              "t_s": 104.0,
+              "param": "brightness",
+              "value": 0.6875,
+              "easing": "ease_in_out"
+            },
+            {
+              "t_s": 109.5,
+              "param": "brightness",
+              "value": 0.5525,
+              "easing": "ease_in_out"
+            },
+            {
+              "t_s": 121.5,
+              "param": "brightness",
+              "value": 0.6200000000000001,
+              "easing": "ease_in_out"
+            },
+            {
+              "t_s": 124.5,
+              "param": "brightness",
+              "value": 0.71,
+              "easing": "ease_in_out"
+            },
+            {
+              "t_s": 139.5,
+              "param": "brightness",
+              "value": 0.5075000000000001,
+              "easing": "ease_in_out"
+            },
+            {
+              "t_s": 157.0,
+              "param": "brightness",
+              "value": 0.332,
+              "easing": "ease_in_out"
+            }
+          ],
+          "spatial_mask": {
+            "kind": "none",
+            "axis": "x",
+            "position": 0.5,
+            "width": 0.25,
+            "center": [
+              0.5,
+              0.5,
+              0.5
+            ],
+            "radius": 0.3,
+            "box_min": [
+              0.0,
+              0.0,
+              0.0
+            ],
+            "box_max": [
+              1.0,
+              1.0,
+              1.0
+            ],
+            "modulo": 2,
+            "remainder": 0,
+            "softness": 0.08,
+            "invert": false
+          },
+          "filters": [
+            {
+              "type": "inertia",
+              "enabled": true,
+              "params": {
+                "mix": 0.65,
+                "tau_s": 0.55
+              }
+            },
+            {
+              "type": "spatial_blur",
+              "enabled": true,
+              "params": {
+                "radius_m": 0.4,
+                "mix": 0.35
+              }
+            }
+          ],
+          "snap_zcl": false,
+          "name": "Soft horizon",
+          "color": "#ffc89a"
+        }
+      ]
+    },
+    {
+      "id": "lower_accents",
+      "name": "Lower · Breathing Wash",
+      "target_group": "decke_unten",
+      "blend_mode": "max",
+      "opacity": 0.9,
+      "muted": false,
+      "solo": false,
+      "kind": "layer",
+      "parent_id": null,
+      "clipped_to_below": false,
+      "height_px": 54,
+      "clips": [
+        {
+          "id": "lower_all",
+          "start_s": 0.0,
+          "end_s": 159.3121,
+          "fade_in_s": 0.0,
+          "fade_out_s": 4.0,
+          "preset": "pulse_breathe",
+          "opacity": 1.0,
+          "params": {
+            "color": [
+              255,
+              196,
+              150
+            ],
+            "accent_color": [
+              255,
+              240,
+              214
+            ],
+            "axis": "z",
+            "rate_hz": 0.13,
+            "depth": 0.42,
+            "spatial_offset": 0.5,
+            "brightness": 0.5
+          },
+          "expressions": {},
+          "keyframes": [
+            {
+              "t_s": 0.0,
+              "param": "color",
+              "value": [
+                255.0,
+                196.0,
+                150.0
+              ],
+              "easing": "ease_in_out"
+            },
+            {
+              "t_s": 16.96,
+              "param": "color",
+              "value": [
+                255.0,
+                150.0,
+                120.0
+              ],
+              "easing": "ease_in_out"
+            },
+            {
+              "t_s": 33.5,
+              "param": "color",
+              "value": [
+                255.0,
+                180.0,
+                90.0
+              ],
+              "easing": "ease_in_out"
+            },
+            {
+              "t_s": 43.5,
+              "param": "color",
+              "value": [
+                150.0,
+                220.0,
+                255.0
+              ],
+              "easing": "ease_in_out"
+            },
+            {
+              "t_s": 50.5,
+              "param": "color",
+              "value": [
+                255.0,
+                160.0,
+                90.0
+              ],
+              "easing": "ease_in_out"
+            },
+            {
+              "t_s": 61.0,
+              "param": "color",
+              "value": [
+                255.0,
+                190.0,
+                120.0
+              ],
+              "easing": "ease_in_out"
+            },
+            {
+              "t_s": 69.5,
+              "param": "color",
+              "value": [
+                120.0,
+                230.0,
+                200.0
+              ],
+              "easing": "ease_in_out"
+            },
+            {
+              "t_s": 86.5,
+              "param": "color",
+              "value": [
+                255.0,
+                200.0,
+                120.0
+              ],
+              "easing": "ease_in_out"
+            },
+            {
+              "t_s": 95.5,
+              "param": "color",
+              "value": [
+                255.0,
+                220.0,
+                200.0
+              ],
+              "easing": "ease_in_out"
+            },
+            {
+              "t_s": 104.0,
+              "param": "color",
+              "value": [
+                255.0,
+                220.0,
+                140.0
+              ],
+              "easing": "ease_in_out"
+            },
+            {
+              "t_s": 109.5,
+              "param": "color",
+              "value": [
+                200.0,
+                180.0,
+                255.0
+              ],
+              "easing": "ease_in_out"
+            },
+            {
+              "t_s": 121.5,
+              "param": "color",
+              "value": [
+                255.0,
+                160.0,
+                190.0
+              ],
+              "easing": "ease_in_out"
+            },
+            {
+              "t_s": 124.5,
+              "param": "color",
+              "value": [
+                255.0,
+                230.0,
+                160.0
+              ],
+              "easing": "ease_in_out"
+            },
+            {
+              "t_s": 139.5,
+              "param": "color",
+              "value": [
+                255.0,
+                170.0,
+                120.0
+              ],
+              "easing": "ease_in_out"
+            },
+            {
+              "t_s": 157.0,
+              "param": "color",
+              "value": [
+                255.0,
+                205.0,
+                170.0
+              ],
+              "easing": "ease_in_out"
+            },
+            {
+              "t_s": 0.0,
+              "param": "accent_color",
+              "value": [
+                255.0,
+                240.0,
+                214.0
+              ],
+              "easing": "ease_in_out"
+            },
+            {
+              "t_s": 16.96,
+              "param": "accent_color",
+              "value": [
+                255.0,
+                246.0,
+                226.0
+              ],
+              "easing": "ease_in_out"
+            },
+            {
+              "t_s": 33.5,
+              "param": "accent_color",
+              "value": [
+                255.0,
+                250.0,
+                225.0
+              ],
+              "easing": "ease_in_out"
+            },
+            {
+              "t_s": 43.5,
+              "param": "accent_color",
+              "value": [
+                255.0,
+                255.0,
+                255.0
+              ],
+              "easing": "ease_in_out"
+            },
+            {
+              "t_s": 50.5,
+              "param": "accent_color",
+              "value": [
+                255.0,
+                248.0,
+                220.0
+              ],
+              "easing": "ease_in_out"
+            },
+            {
+              "t_s": 61.0,
+              "param": "accent_color",
+              "value": [
+                255.0,
+                255.0,
+                235.0
+              ],
+              "easing": "ease_in_out"
+            },
+            {
+              "t_s": 69.5,
+              "param": "accent_color",
+              "value": [
+                245.0,
+                255.0,
+                245.0
+              ],
+              "easing": "ease_in_out"
+            },
+            {
+              "t_s": 86.5,
+              "param": "accent_color",
+              "value": [
+                255.0,
+                250.0,
+                230.0
+              ],
+              "easing": "ease_in_out"
+            },
+            {
+              "t_s": 95.5,
+              "param": "accent_color",
+              "value": [
+                255.0,
+                250.0,
+                240.0
+              ],
+              "easing": "ease_in_out"
+            },
+            {
+              "t_s": 104.0,
+              "param": "accent_color",
+              "value": [
+                255.0,
+                255.0,
+                240.0
+              ],
+              "easing": "ease_in_out"
+            },
+            {
+              "t_s": 109.5,
+              "param": "accent_color",
+              "value": [
+                255.0,
+                250.0,
+                255.0
+              ],
+              "easing": "ease_in_out"
+            },
+            {
+              "t_s": 121.5,
+              "param": "accent_color",
+              "value": [
+                255.0,
+                255.0,
+                250.0
+              ],
+              "easing": "ease_in_out"
+            },
+            {
+              "t_s": 124.5,
+              "param": "accent_color",
+              "value": [
+                255.0,
+                255.0,
+                255.0
+              ],
+              "easing": "ease_in_out"
+            },
+            {
+              "t_s": 139.5,
+              "param": "accent_color",
+              "value": [
+                255.0,
+                240.0,
+                220.0
+              ],
+              "easing": "ease_in_out"
+            },
+            {
+              "t_s": 157.0,
+              "param": "accent_color",
+              "value": [
+                255.0,
+                245.0,
+                235.0
+              ],
+              "easing": "ease_in_out"
+            },
+            {
+              "t_s": 0.0,
+              "param": "brightness",
+              "value": 0.429,
+              "easing": "ease_in_out"
+            },
+            {
+              "t_s": 16.96,
+              "param": "brightness",
+              "value": 0.492,
+              "easing": "ease_in_out"
+            },
+            {
+              "t_s": 33.5,
+              "param": "brightness",
+              "value": 0.597,
+              "easing": "ease_in_out"
+            },
+            {
+              "t_s": 43.5,
+              "param": "brightness",
+              "value": 0.44999999999999996,
+              "easing": "ease_in_out"
+            },
+            {
+              "t_s": 50.5,
+              "param": "brightness",
+              "value": 0.618,
+              "easing": "ease_in_out"
+            },
+            {
+              "t_s": 61.0,
+              "param": "brightness",
+              "value": 0.5549999999999999,
+              "easing": "ease_in_out"
+            },
+            {
+              "t_s": 69.5,
+              "param": "brightness",
+              "value": 0.492,
+              "easing": "ease_in_out"
+            },
+            {
+              "t_s": 86.5,
+              "param": "brightness",
+              "value": 0.534,
+              "easing": "ease_in_out"
+            },
+            {
+              "t_s": 95.5,
+              "param": "brightness",
+              "value": 0.387,
+              "easing": "ease_in_out"
+            },
+            {
+              "t_s": 104.0,
+              "param": "brightness",
+              "value": 0.639,
+              "easing": "ease_in_out"
+            },
+            {
+              "t_s": 109.5,
+              "param": "brightness",
+              "value": 0.513,
+              "easing": "ease_in_out"
+            },
+            {
+              "t_s": 121.5,
+              "param": "brightness",
+              "value": 0.5760000000000001,
+              "easing": "ease_in_out"
+            },
+            {
+              "t_s": 124.5,
+              "param": "brightness",
+              "value": 0.6599999999999999,
+              "easing": "ease_in_out"
+            },
+            {
+              "t_s": 139.5,
+              "param": "brightness",
+              "value": 0.471,
+              "easing": "ease_in_out"
+            },
+            {
+              "t_s": 157.0,
+              "param": "brightness",
+              "value": 0.3072,
+              "easing": "ease_in_out"
+            }
+          ],
+          "spatial_mask": {
+            "kind": "none",
+            "axis": "x",
+            "position": 0.5,
+            "width": 0.25,
+            "center": [
+              0.5,
+              0.5,
+              0.5
+            ],
+            "radius": 0.3,
+            "box_min": [
+              0.0,
+              0.0,
+              0.0
+            ],
+            "box_max": [
+              1.0,
+              1.0,
+              1.0
+            ],
+            "modulo": 2,
+            "remainder": 0,
+            "softness": 0.08,
+            "invert": false
+          },
+          "filters": [
+            {
+              "type": "inertia",
+              "enabled": true,
+              "params": {
+                "mix": 0.72,
+                "tau_s": 0.6
+              }
+            },
+            {
+              "type": "audio_mod",
+              "enabled": true,
+              "params": {
+                "source": "kick",
+                "depth": 0.1,
+                "mode": "brightness"
+              }
+            }
+          ],
+          "snap_zcl": false,
+          "name": "Breathing wash",
+          "color": "#ffc89a"
+        }
+      ]
+    },
+    {
+      "id": "steel_strip",
+      "name": "Steel · Gold Ripple",
+      "target_group": "stahltraeger",
+      "blend_mode": "add",
+      "opacity": 0.85,
+      "muted": false,
+      "solo": false,
+      "kind": "layer",
+      "parent_id": null,
+      "clipped_to_below": false,
+      "height_px": 42,
+      "clips": [
+        {
+          "id": "steel_all",
+          "start_s": 0.0,
+          "end_s": 159.3121,
+          "fade_in_s": 0.0,
+          "fade_out_s": 4.0,
+          "preset": "gradient_3d",
+          "opacity": 1.0,
+          "params": {
+            "mode": "linear",
+            "color_a": [
+              255,
+              196,
+              150
+            ],
+            "color_b": [
+              255,
+              120,
+              110
+            ],
+            "color_c": [
+              255,
+              240,
+              214
+            ],
+            "angle": 0,
+            "drift": 0.7,
+            "speed": 0.035,
+            "brightness": 0.5
+          },
+          "expressions": {},
+          "keyframes": [
+            {
+              "t_s": 0.0,
+              "param": "color_a",
+              "value": [
+                255.0,
+                196.0,
+                150.0
+              ],
+              "easing": "ease_in_out"
+            },
+            {
+              "t_s": 16.96,
+              "param": "color_a",
+              "value": [
+                255.0,
+                150.0,
+                120.0
+              ],
+              "easing": "ease_in_out"
+            },
+            {
+              "t_s": 33.5,
+              "param": "color_a",
+              "value": [
+                255.0,
+                180.0,
+                90.0
+              ],
+              "easing": "ease_in_out"
+            },
+            {
+              "t_s": 43.5,
+              "param": "color_a",
+              "value": [
+                150.0,
+                220.0,
+                255.0
+              ],
+              "easing": "ease_in_out"
+            },
+            {
+              "t_s": 50.5,
+              "param": "color_a",
+              "value": [
+                255.0,
+                160.0,
+                90.0
+              ],
+              "easing": "ease_in_out"
+            },
+            {
+              "t_s": 61.0,
+              "param": "color_a",
+              "value": [
+                255.0,
+                190.0,
+                120.0
+              ],
+              "easing": "ease_in_out"
+            },
+            {
+              "t_s": 69.5,
+              "param": "color_a",
+              "value": [
+                120.0,
+                230.0,
+                200.0
+              ],
+              "easing": "ease_in_out"
+            },
+            {
+              "t_s": 86.5,
+              "param": "color_a",
+              "value": [
+                255.0,
+                200.0,
+                120.0
+              ],
+              "easing": "ease_in_out"
+            },
+            {
+              "t_s": 95.5,
+              "param": "color_a",
+              "value": [
+                255.0,
+                220.0,
+                200.0
+              ],
+              "easing": "ease_in_out"
+            },
+            {
+              "t_s": 104.0,
+              "param": "color_a",
+              "value": [
+                255.0,
+                220.0,
+                140.0
+              ],
+              "easing": "ease_in_out"
+            },
+            {
+              "t_s": 109.5,
+              "param": "color_a",
+              "value": [
+                200.0,
+                180.0,
+                255.0
+              ],
+              "easing": "ease_in_out"
+            },
+            {
+              "t_s": 121.5,
+              "param": "color_a",
+              "value": [
+                255.0,
+                160.0,
+                190.0
+              ],
+              "easing": "ease_in_out"
+            },
+            {
+              "t_s": 124.5,
+              "param": "color_a",
+              "value": [
+                255.0,
+                230.0,
+                160.0
+              ],
+              "easing": "ease_in_out"
+            },
+            {
+              "t_s": 139.5,
+              "param": "color_a",
+              "value": [
+                255.0,
+                170.0,
+                120.0
+              ],
+              "easing": "ease_in_out"
+            },
+            {
+              "t_s": 157.0,
+              "param": "color_a",
+              "value": [
+                255.0,
+                205.0,
+                170.0
+              ],
+              "easing": "ease_in_out"
+            },
+            {
+              "t_s": 0.0,
+              "param": "color_b",
+              "value": [
+                255.0,
+                120.0,
+                110.0
+              ],
+              "easing": "ease_in_out"
+            },
+            {
+              "t_s": 16.96,
+              "param": "color_b",
+              "value": [
+                120.0,
+                226.0,
+                190.0
+              ],
+              "easing": "ease_in_out"
+            },
+            {
+              "t_s": 33.5,
+              "param": "color_b",
+              "value": [
+                255.0,
+                110.0,
+                80.0
+              ],
+              "easing": "ease_in_out"
+            },
+            {
+              "t_s": 43.5,
+              "param": "color_b",
+              "value": [
+                255.0,
+                232.0,
+                200.0
+              ],
+              "easing": "ease_in_out"
+            },
+            {
+              "t_s": 50.5,
+              "param": "color_b",
+              "value": [
+                255.0,
+                90.0,
+                120.0
+              ],
+              "easing": "ease_in_out"
+            },
+            {
+              "t_s": 61.0,
+              "param": "color_b",
+              "value": [
+                140.0,
+                235.0,
+                200.0
+              ],
+              "easing": "ease_in_out"
+            },
+            {
+              "t_s": 69.5,
+              "param": "color_b",
+              "value": [
+                90.0,
+                190.0,
+                255.0
+              ],
+              "easing": "ease_in_out"
+            },
+            {
+              "t_s": 86.5,
+              "param": "color_b",
+              "value": [
+                255.0,
+                150.0,
+                90.0
+              ],
+              "easing": "ease_in_out"
+            },
+            {
+              "t_s": 95.5,
+              "param": "color_b",
+              "value": [
+                190.0,
+                180.0,
+                255.0
+              ],
+              "easing": "ease_in_out"
+            },
+            {
+              "t_s": 104.0,
+              "param": "color_b",
+              "value": [
+                255.0,
+                140.0,
+                100.0
+              ],
+              "easing": "ease_in_out"
+            },
+            {
+              "t_s": 109.5,
+              "param": "color_b",
+              "value": [
+                255.0,
+                180.0,
+                200.0
+              ],
+              "easing": "ease_in_out"
+            },
+            {
+              "t_s": 121.5,
+              "param": "color_b",
+              "value": [
+                255.0,
+                220.0,
+                170.0
+              ],
+              "easing": "ease_in_out"
+            },
+            {
+              "t_s": 124.5,
+              "param": "color_b",
+              "value": [
+                255.0,
+                120.0,
+                150.0
+              ],
+              "easing": "ease_in_out"
+            },
+            {
+              "t_s": 139.5,
+              "param": "color_b",
+              "value": [
+                200.0,
+                140.0,
+                255.0
+              ],
+              "easing": "ease_in_out"
+            },
+            {
+              "t_s": 157.0,
+              "param": "color_b",
+              "value": [
+                150.0,
+                150.0,
+                220.0
+              ],
+              "easing": "ease_in_out"
+            },
+            {
+              "t_s": 0.0,
+              "param": "color_c",
+              "value": [
+                255.0,
+                240.0,
+                214.0
+              ],
+              "easing": "ease_in_out"
+            },
+            {
+              "t_s": 16.96,
+              "param": "color_c",
+              "value": [
+                255.0,
+                246.0,
+                226.0
+              ],
+              "easing": "ease_in_out"
+            },
+            {
+              "t_s": 33.5,
+              "param": "color_c",
+              "value": [
+                255.0,
+                250.0,
+                225.0
+              ],
+              "easing": "ease_in_out"
+            },
+            {
+              "t_s": 43.5,
+              "param": "color_c",
+              "value": [
+                255.0,
+                255.0,
+                255.0
+              ],
+              "easing": "ease_in_out"
+            },
+            {
+              "t_s": 50.5,
+              "param": "color_c",
+              "value": [
+                255.0,
+                248.0,
+                220.0
+              ],
+              "easing": "ease_in_out"
+            },
+            {
+              "t_s": 61.0,
+              "param": "color_c",
+              "value": [
+                255.0,
+                255.0,
+                235.0
+              ],
+              "easing": "ease_in_out"
+            },
+            {
+              "t_s": 69.5,
+              "param": "color_c",
+              "value": [
+                245.0,
+                255.0,
+                245.0
+              ],
+              "easing": "ease_in_out"
+            },
+            {
+              "t_s": 86.5,
+              "param": "color_c",
+              "value": [
+                255.0,
+                250.0,
+                230.0
+              ],
+              "easing": "ease_in_out"
+            },
+            {
+              "t_s": 95.5,
+              "param": "color_c",
+              "value": [
+                255.0,
+                250.0,
+                240.0
+              ],
+              "easing": "ease_in_out"
+            },
+            {
+              "t_s": 104.0,
+              "param": "color_c",
+              "value": [
+                255.0,
+                255.0,
+                240.0
+              ],
+              "easing": "ease_in_out"
+            },
+            {
+              "t_s": 109.5,
+              "param": "color_c",
+              "value": [
+                255.0,
+                250.0,
+                255.0
+              ],
+              "easing": "ease_in_out"
+            },
+            {
+              "t_s": 121.5,
+              "param": "color_c",
+              "value": [
+                255.0,
+                255.0,
+                250.0
+              ],
+              "easing": "ease_in_out"
+            },
+            {
+              "t_s": 124.5,
+              "param": "color_c",
+              "value": [
+                255.0,
+                255.0,
+                255.0
+              ],
+              "easing": "ease_in_out"
+            },
+            {
+              "t_s": 139.5,
+              "param": "color_c",
+              "value": [
+                255.0,
+                240.0,
+                220.0
+              ],
+              "easing": "ease_in_out"
+            },
+            {
+              "t_s": 157.0,
+              "param": "color_c",
+              "value": [
+                255.0,
+                245.0,
+                235.0
+              ],
+              "easing": "ease_in_out"
+            },
+            {
+              "t_s": 0.0,
+              "param": "brightness",
+              "value": 0.5075000000000001,
+              "easing": "ease_in_out"
+            },
+            {
+              "t_s": 16.96,
+              "param": "brightness",
+              "value": 0.5900000000000001,
+              "easing": "ease_in_out"
+            },
+            {
+              "t_s": 33.5,
+              "param": "brightness",
+              "value": 0.7275,
+              "easing": "ease_in_out"
+            },
+            {
+              "t_s": 43.5,
+              "param": "brightness",
+              "value": 0.535,
+              "easing": "ease_in_out"
+            },
+            {
+              "t_s": 50.5,
+              "param": "brightness",
+              "value": 0.7550000000000001,
+              "easing": "ease_in_out"
+            },
+            {
+              "t_s": 61.0,
+              "param": "brightness",
+              "value": 0.6725000000000001,
+              "easing": "ease_in_out"
+            },
+            {
+              "t_s": 69.5,
+              "param": "brightness",
+              "value": 0.5900000000000001,
+              "easing": "ease_in_out"
+            },
+            {
+              "t_s": 86.5,
+              "param": "brightness",
+              "value": 0.645,
+              "easing": "ease_in_out"
+            },
+            {
+              "t_s": 95.5,
+              "param": "brightness",
+              "value": 0.4525,
+              "easing": "ease_in_out"
+            },
+            {
+              "t_s": 104.0,
+              "param": "brightness",
+              "value": 0.7825,
+              "easing": "ease_in_out"
+            },
+            {
+              "t_s": 109.5,
+              "param": "brightness",
+              "value": 0.6175,
+              "easing": "ease_in_out"
+            },
+            {
+              "t_s": 121.5,
+              "param": "brightness",
+              "value": 0.7000000000000001,
+              "easing": "ease_in_out"
+            },
+            {
+              "t_s": 124.5,
+              "param": "brightness",
+              "value": 0.81,
+              "easing": "ease_in_out"
+            },
+            {
+              "t_s": 139.5,
+              "param": "brightness",
+              "value": 0.5625,
+              "easing": "ease_in_out"
+            },
+            {
+              "t_s": 157.0,
+              "param": "brightness",
+              "value": 0.34800000000000003,
+              "easing": "ease_in_out"
+            },
+            {
+              "t_s": 0.0,
+              "param": "angle",
+              "value": 0.0,
+              "easing": "ease_in_out"
+            },
+            {
+              "t_s": 16.96,
+              "param": "angle",
+              "value": 0.0,
+              "easing": "ease_in_out"
+            },
+            {
+              "t_s": 33.5,
+              "param": "angle",
+              "value": 0.0,
+              "easing": "ease_in_out"
+            },
+            {
+              "t_s": 43.5,
+              "param": "angle",
+              "value": 0.0,
+              "easing": "ease_in_out"
+            },
+            {
+              "t_s": 50.5,
+              "param": "angle",
+              "value": 0.0,
+              "easing": "ease_in_out"
+            },
+            {
+              "t_s": 61.0,
+              "param": "angle",
+              "value": 0.0,
+              "easing": "ease_in_out"
+            },
+            {
+              "t_s": 69.5,
+              "param": "angle",
+              "value": 0.0,
+              "easing": "ease_in_out"
+            },
+            {
+              "t_s": 86.5,
+              "param": "angle",
+              "value": 0.0,
+              "easing": "ease_in_out"
+            },
+            {
+              "t_s": 95.5,
+              "param": "angle",
+              "value": 0.0,
+              "easing": "ease_in_out"
+            },
+            {
+              "t_s": 104.0,
+              "param": "angle",
+              "value": 0.0,
+              "easing": "ease_in_out"
+            },
+            {
+              "t_s": 109.5,
+              "param": "angle",
+              "value": 0.0,
+              "easing": "ease_in_out"
+            },
+            {
+              "t_s": 121.5,
+              "param": "angle",
+              "value": 0.0,
+              "easing": "ease_in_out"
+            },
+            {
+              "t_s": 124.5,
+              "param": "angle",
+              "value": 0.0,
+              "easing": "ease_in_out"
+            },
+            {
+              "t_s": 139.5,
+              "param": "angle",
+              "value": 0.0,
+              "easing": "ease_in_out"
+            },
+            {
+              "t_s": 157.0,
+              "param": "angle",
+              "value": 0.0,
+              "easing": "ease_in_out"
+            }
+          ],
+          "spatial_mask": {
+            "kind": "none",
+            "axis": "x",
+            "position": 0.5,
+            "width": 0.25,
+            "center": [
+              0.5,
+              0.5,
+              0.5
+            ],
+            "radius": 0.3,
+            "box_min": [
+              0.0,
+              0.0,
+              0.0
+            ],
+            "box_max": [
+              1.0,
+              1.0,
+              1.0
+            ],
+            "modulo": 2,
+            "remainder": 0,
+            "softness": 0.08,
+            "invert": false
+          },
+          "filters": [
+            {
+              "type": "inertia",
+              "enabled": true,
+              "params": {
+                "mix": 0.74,
+                "tau_s": 0.6
+              }
+            },
+            {
+              "type": "dim2warm",
+              "enabled": true,
+              "params": {
+                "amount": 0.3,
+                "curve": 1.2,
+                "warm_color": [
+                  255,
+                  150,
+                  60
+                ]
+              }
+            }
+          ],
+          "snap_zcl": false,
+          "name": "Gold ripple",
+          "color": "#ffc89a"
+        }
+      ]
+    },
+    {
+      "id": "floor_roots",
+      "name": "Floor · Warm Uplight",
+      "target_group": "bodenstrahler",
+      "blend_mode": "add",
+      "opacity": 0.85,
+      "muted": false,
+      "solo": false,
+      "kind": "layer",
+      "parent_id": null,
+      "clipped_to_below": false,
+      "height_px": 42,
+      "clips": [
+        {
+          "id": "floor_all",
+          "start_s": 0.0,
+          "end_s": 159.3121,
+          "fade_in_s": 0.0,
+          "fade_out_s": 4.0,
+          "preset": "pulse_breathe",
+          "opacity": 1.0,
+          "params": {
+            "color": [
+              255,
+              196,
+              150
+            ],
+            "accent_color": [
+              255,
+              120,
+              110
+            ],
+            "axis": "z",
+            "rate_hz": 0.1,
+            "depth": 0.35,
+            "spatial_offset": 0.45,
+            "brightness": 0.45
+          },
+          "expressions": {},
+          "keyframes": [
+            {
+              "t_s": 0.0,
+              "param": "color",
+              "value": [
+                255.0,
+                196.0,
+                150.0
+              ],
+              "easing": "ease_in_out"
+            },
+            {
+              "t_s": 16.96,
+              "param": "color",
+              "value": [
+                255.0,
+                150.0,
+                120.0
+              ],
+              "easing": "ease_in_out"
+            },
+            {
+              "t_s": 33.5,
+              "param": "color",
+              "value": [
+                255.0,
+                180.0,
+                90.0
+              ],
+              "easing": "ease_in_out"
+            },
+            {
+              "t_s": 43.5,
+              "param": "color",
+              "value": [
+                150.0,
+                220.0,
+                255.0
+              ],
+              "easing": "ease_in_out"
+            },
+            {
+              "t_s": 50.5,
+              "param": "color",
+              "value": [
+                255.0,
+                160.0,
+                90.0
+              ],
+              "easing": "ease_in_out"
+            },
+            {
+              "t_s": 61.0,
+              "param": "color",
+              "value": [
+                255.0,
+                190.0,
+                120.0
+              ],
+              "easing": "ease_in_out"
+            },
+            {
+              "t_s": 69.5,
+              "param": "color",
+              "value": [
+                120.0,
+                230.0,
+                200.0
+              ],
+              "easing": "ease_in_out"
+            },
+            {
+              "t_s": 86.5,
+              "param": "color",
+              "value": [
+                255.0,
+                200.0,
+                120.0
+              ],
+              "easing": "ease_in_out"
+            },
+            {
+              "t_s": 95.5,
+              "param": "color",
+              "value": [
+                255.0,
+                220.0,
+                200.0
+              ],
+              "easing": "ease_in_out"
+            },
+            {
+              "t_s": 104.0,
+              "param": "color",
+              "value": [
+                255.0,
+                220.0,
+                140.0
+              ],
+              "easing": "ease_in_out"
+            },
+            {
+              "t_s": 109.5,
+              "param": "color",
+              "value": [
+                200.0,
+                180.0,
+                255.0
+              ],
+              "easing": "ease_in_out"
+            },
+            {
+              "t_s": 121.5,
+              "param": "color",
+              "value": [
+                255.0,
+                160.0,
+                190.0
+              ],
+              "easing": "ease_in_out"
+            },
+            {
+              "t_s": 124.5,
+              "param": "color",
+              "value": [
+                255.0,
+                230.0,
+                160.0
+              ],
+              "easing": "ease_in_out"
+            },
+            {
+              "t_s": 139.5,
+              "param": "color",
+              "value": [
+                255.0,
+                170.0,
+                120.0
+              ],
+              "easing": "ease_in_out"
+            },
+            {
+              "t_s": 157.0,
+              "param": "color",
+              "value": [
+                255.0,
+                205.0,
+                170.0
+              ],
+              "easing": "ease_in_out"
+            },
+            {
+              "t_s": 0.0,
+              "param": "accent_color",
+              "value": [
+                255.0,
+                120.0,
+                110.0
+              ],
+              "easing": "ease_in_out"
+            },
+            {
+              "t_s": 16.96,
+              "param": "accent_color",
+              "value": [
+                120.0,
+                226.0,
+                190.0
+              ],
+              "easing": "ease_in_out"
+            },
+            {
+              "t_s": 33.5,
+              "param": "accent_color",
+              "value": [
+                255.0,
+                110.0,
+                80.0
+              ],
+              "easing": "ease_in_out"
+            },
+            {
+              "t_s": 43.5,
+              "param": "accent_color",
+              "value": [
+                255.0,
+                232.0,
+                200.0
+              ],
+              "easing": "ease_in_out"
+            },
+            {
+              "t_s": 50.5,
+              "param": "accent_color",
+              "value": [
+                255.0,
+                90.0,
+                120.0
+              ],
+              "easing": "ease_in_out"
+            },
+            {
+              "t_s": 61.0,
+              "param": "accent_color",
+              "value": [
+                140.0,
+                235.0,
+                200.0
+              ],
+              "easing": "ease_in_out"
+            },
+            {
+              "t_s": 69.5,
+              "param": "accent_color",
+              "value": [
+                90.0,
+                190.0,
+                255.0
+              ],
+              "easing": "ease_in_out"
+            },
+            {
+              "t_s": 86.5,
+              "param": "accent_color",
+              "value": [
+                255.0,
+                150.0,
+                90.0
+              ],
+              "easing": "ease_in_out"
+            },
+            {
+              "t_s": 95.5,
+              "param": "accent_color",
+              "value": [
+                190.0,
+                180.0,
+                255.0
+              ],
+              "easing": "ease_in_out"
+            },
+            {
+              "t_s": 104.0,
+              "param": "accent_color",
+              "value": [
+                255.0,
+                140.0,
+                100.0
+              ],
+              "easing": "ease_in_out"
+            },
+            {
+              "t_s": 109.5,
+              "param": "accent_color",
+              "value": [
+                255.0,
+                180.0,
+                200.0
+              ],
+              "easing": "ease_in_out"
+            },
+            {
+              "t_s": 121.5,
+              "param": "accent_color",
+              "value": [
+                255.0,
+                220.0,
+                170.0
+              ],
+              "easing": "ease_in_out"
+            },
+            {
+              "t_s": 124.5,
+              "param": "accent_color",
+              "value": [
+                255.0,
+                120.0,
+                150.0
+              ],
+              "easing": "ease_in_out"
+            },
+            {
+              "t_s": 139.5,
+              "param": "accent_color",
+              "value": [
+                200.0,
+                140.0,
+                255.0
+              ],
+              "easing": "ease_in_out"
+            },
+            {
+              "t_s": 157.0,
+              "param": "accent_color",
+              "value": [
+                150.0,
+                150.0,
+                220.0
+              ],
+              "easing": "ease_in_out"
+            },
+            {
+              "t_s": 0.0,
+              "param": "brightness",
+              "value": 0.389,
+              "easing": "ease_in_out"
+            },
+            {
+              "t_s": 16.96,
+              "param": "brightness",
+              "value": 0.452,
+              "easing": "ease_in_out"
+            },
+            {
+              "t_s": 33.5,
+              "param": "brightness",
+              "value": 0.5569999999999999,
+              "easing": "ease_in_out"
+            },
+            {
+              "t_s": 43.5,
+              "param": "brightness",
+              "value": 0.41000000000000003,
+              "easing": "ease_in_out"
+            },
+            {
+              "t_s": 50.5,
+              "param": "brightness",
+              "value": 0.5780000000000001,
+              "easing": "ease_in_out"
+            },
+            {
+              "t_s": 61.0,
+              "param": "brightness",
+              "value": 0.515,
+              "easing": "ease_in_out"
+            },
+            {
+              "t_s": 69.5,
+              "param": "brightness",
+              "value": 0.452,
+              "easing": "ease_in_out"
+            },
+            {
+              "t_s": 86.5,
+              "param": "brightness",
+              "value": 0.494,
+              "easing": "ease_in_out"
+            },
+            {
+              "t_s": 95.5,
+              "param": "brightness",
+              "value": 0.347,
+              "easing": "ease_in_out"
+            },
+            {
+              "t_s": 104.0,
+              "param": "brightness",
+              "value": 0.599,
+              "easing": "ease_in_out"
+            },
+            {
+              "t_s": 109.5,
+              "param": "brightness",
+              "value": 0.47300000000000003,
+              "easing": "ease_in_out"
+            },
+            {
+              "t_s": 121.5,
+              "param": "brightness",
+              "value": 0.536,
+              "easing": "ease_in_out"
+            },
+            {
+              "t_s": 124.5,
+              "param": "brightness",
+              "value": 0.62,
+              "easing": "ease_in_out"
+            },
+            {
+              "t_s": 139.5,
+              "param": "brightness",
+              "value": 0.43100000000000005,
+              "easing": "ease_in_out"
+            },
+            {
+              "t_s": 157.0,
+              "param": "brightness",
+              "value": 0.2672,
+              "easing": "ease_in_out"
+            }
+          ],
+          "spatial_mask": {
+            "kind": "none",
+            "axis": "x",
+            "position": 0.5,
+            "width": 0.25,
+            "center": [
+              0.5,
+              0.5,
+              0.5
+            ],
+            "radius": 0.3,
+            "box_min": [
+              0.0,
+              0.0,
+              0.0
+            ],
+            "box_max": [
+              1.0,
+              1.0,
+              1.0
+            ],
+            "modulo": 2,
+            "remainder": 0,
+            "softness": 0.08,
+            "invert": false
+          },
+          "filters": [
+            {
+              "type": "inertia",
+              "enabled": true,
+              "params": {
+                "mix": 0.74,
+                "tau_s": 0.65
+              }
+            }
+          ],
+          "snap_zcl": false,
+          "name": "Warm uplight",
+          "color": "#ffc89a"
+        }
+      ]
+    }
+  ],
+  "notes": "Smooth cheerful take on JANE: pastel sunrise palette, one continuous clip per track, Oklab colour keyframes, no strobes or blackouts.",
+  "created_at": null
+}

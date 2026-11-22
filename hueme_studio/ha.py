@@ -73,6 +73,7 @@ class HomeAssistantBridge:
         self.last_error: str | None = None
         self._commands: deque[dict[str, Any]] = deque()
         self._published: dict[str, str] = {}
+        self._state_topics: set[str] = set()
         self._lock = threading.Lock()
         self._last_state: dict[str, Any] = {}
         self._shows_signature: tuple[str, ...] = ()
@@ -198,7 +199,7 @@ class HomeAssistantBridge:
         log.info(
             "HA MQTT connected to %s:%s", self.settings.host, self.settings.port
         )
-        for suffix in ("playback/set", "show/set", "gain/set"):
+        for suffix in ("playback/set", "show/set", "gain/set", "auto_show/set"):
             if hasattr(client, "subscribe"):
                 client.subscribe(self.topic(suffix), qos=0)
         self._publish(self.topic("availability"), "online", retain=True)
@@ -233,6 +234,10 @@ class HomeAssistantBridge:
             except ValueError:
                 return
             command = {"entity": "gain", "value": value / 100.0}
+        elif topic == self.topic("auto_show/set"):
+            value = payload.upper()
+            if value in {"ON", "OFF"}:
+                command = {"entity": "auto_show", "value": value == "ON"}
         if command is not None:
             with self._lock:
                 self._commands.append(command)
@@ -247,8 +252,12 @@ class HomeAssistantBridge:
     def _publish(self, topic: str, payload: str, *, retain: bool = True) -> None:
         if self._client is None:
             return
+        text = str(payload)
+        if self._published.get(topic) == text:
+            return
         try:
-            self._client.publish(topic, payload=payload, qos=0, retain=retain)
+            self._client.publish(topic, payload=text, qos=0, retain=retain)
+            self._published[topic] = text
         except Exception as exc:
             self.last_error = f"publish {topic}: {type(exc).__name__}: {exc}"
 
@@ -256,7 +265,6 @@ class HomeAssistantBridge:
         text = json.dumps(payload, separators=(",", ":"), ensure_ascii=False)
         if self._published.get(topic) == text:
             return
-        self._published[topic] = text
         self._publish(topic, text, retain=True)
 
     def _device(self) -> dict[str, Any]:
@@ -334,6 +342,32 @@ class HomeAssistantBridge:
             self.config_topic("sensor", f"{self.settings.node_id}_status"),
             sensor,
         )
+        auto = {
+            **self._common("Auto Show", "auto_show"),
+            "state_topic": self.topic("auto_show"),
+            "command_topic": self.topic("auto_show/set"),
+            "payload_on": "ON",
+            "payload_off": "OFF",
+            "icon": "mdi:auto-fix",
+        }
+        self._publish_config(
+            self.config_topic("switch", f"{self.settings.node_id}_auto_show"),
+            auto,
+        )
+        available = {
+            **self._common("Show Available", "show_available"),
+            "state_topic": self.topic("show_available"),
+            "payload_on": "ON",
+            "payload_off": "OFF",
+            "device_class": "running",
+            "icon": "mdi:music-note-check",
+        }
+        self._publish_config(
+            self.config_topic(
+                "binary_sensor", f"{self.settings.node_id}_show_available"
+            ),
+            available,
+        )
 
     def publish_state(
         self,
@@ -367,16 +401,23 @@ class HomeAssistantBridge:
         show_id = str(transport.get("show_id") or "")
         gain = int(round(max(0.0, min(1.0, float(transport.get("gain", 1.0)))) * 100.0))
         status = "blackout" if blackout else ("playing" if playing else "idle")
+        sync = state.get("sync") or {}
+        auto_show = "ON" if bool(sync.get("enabled")) else "OFF"
+        show_available = "ON" if bool(sync.get("matched_show_id")) else "OFF"
         attributes = {
             "show_id": show_id,
             "time_s": round(float(transport.get("time_s") or 0.0), 3),
             "duration_s": round(float(transport.get("duration_s") or 0.0), 3),
             "blackout": blackout,
-            "sync": state.get("sync") or {},
+            "auto_show": auto_show == "ON",
+            "show_available": show_available == "ON",
+            "sync": sync,
         }
         self._publish(self.topic("playback"), playback)
         self._publish(self.topic("show"), show_id)
         self._publish(self.topic("gain"), str(gain))
+        self._publish(self.topic("auto_show"), auto_show)
+        self._publish(self.topic("show_available"), show_available)
         self._publish(self.topic("status"), status)
         self._publish(
             self.topic("status/attributes"),
@@ -396,7 +437,14 @@ class HomeAssistantBridge:
             "node_id": self.settings.node_id,
             "entities": [
                 f"{self.settings.node_id}_{object_id}"
-                for object_id in ("playback", "show", "gain", "status")
+                for object_id in (
+                    "playback",
+                    "show",
+                    "gain",
+                    "status",
+                    "auto_show",
+                    "show_available",
+                )
             ],
             "last_error": self.last_error,
         }

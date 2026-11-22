@@ -95,7 +95,10 @@ class TestHueConsolidation(unittest.TestCase):
         drv.send_consolidated(recs, fps=30.0, snap=False)
         frame = [p for _, p in fake.published if p.get("zclcommand", {}).get("command") == CMD_FRAME][0]
         data = frame["zclcommand"]["payload"]["data"]
-        self.assertEqual(int.from_bytes(bytes(data[4:6]), "little"), smoothing_for_fps(30.0))
+        self.assertEqual(
+            int.from_bytes(bytes(data[4:6]), "little"),
+            smoothing_for_fps(30.0, 1.5),
+        )
 
     def test_single_proxy_over_10_deterministically_interleaves_and_stops_on_idle(self):
         fake = FakeMqttClient()

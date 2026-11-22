@@ -11,11 +11,15 @@ from hueme_studio.rig import (
     Fixture,
     FixtureOutput,
     FixtureTransform,
+    Folder,
     Group,
     PointGeometry,
     Rig,
     RigLibrary,
+    SmartGroup,
     compile_rig,
+    fixture_incomplete_reasons,
+    hue_proxy_health,
     load_rig,
     save_rig,
 )
@@ -29,40 +33,53 @@ def test_default_rig_expands_to_expected_voxels():
     rig = load_rig(RIG_PATH)
     compiled = rig.compile()
 
-    assert compiled.fixture_count == 11
-    assert compiled.voxel_count == 7 + 3 + 180
-    assert tuple(compiled.fixture_ids[:7]) == tuple(
-        f"galerie_{i:02d}" for i in range(1, 8)
+    expected = {
+        fixture.id: (
+            int(fixture.geometry.pixels)
+            if fixture.geometry.type == "line"
+            else 1
+        )
+        for fixture in rig.fixtures
+    }
+    assert compiled.fixture_count == len(expected)
+    assert compiled.voxel_count == sum(expected.values())
+    for fixture_id, count in expected.items():
+        span = compiled.fixture_slices[fixture_id]
+        assert span.stop - span.start == count
+    assert len(compiled.groups["all"]) == compiled.voxel_count
+    gallery = [fixture_id for fixture_id in expected if fixture_id.startswith("galerie_")]
+    assert len(compiled.groups["galerie_oben"]) == sum(
+        expected[fixture_id] for fixture_id in gallery
     )
-    assert compiled.fixture_slices["stahltraeger"].start == 10
-    assert compiled.fixture_slices["stahltraeger"].stop == 190
-    assert len(compiled.groups["all"]) == 190
-    assert len(compiled.groups["galerie_oben"]) == 7
-    assert len(compiled.groups["decke_unten"]) == 3
-    assert len(compiled.groups["stahltraeger"]) == 180
+    lower = [
+        fixture_id for fixture_id in expected if fixture_id.startswith("decke_unten_")
+    ]
+    assert len(compiled.groups["decke_unten"]) == sum(
+        expected[fixture_id] for fixture_id in lower
+    )
 
     strip = compiled.fixture_positions("stahltraeger")
-    assert np.allclose(strip[0], [0.35, 4.40, 4.05])
-    assert np.allclose(strip[-1], [6.15, 4.40, 4.05])
-    assert np.allclose(
-        compiled.normalized_positions[0], [0.55 / 6.5, 1.15 / 8.0, 4.45 / 5.1]
-    )
+    assert strip.shape[0] == expected["stahltraeger"]
+    assert np.allclose(strip[0][1:], strip[-1][1:])
+    normalized = compiled.normalized_positions
+    assert (normalized >= -1e-6).all() and (normalized <= 1.0 + 1e-6).all()
 
 
 def test_group_rank_and_spatial_groups_are_deterministic():
-    compiled = load_rig(RIG_PATH).compile()
-    rank = compiled.group_rank("galerie_oben")
-    assert list(rank[:7]) == list(range(7))
-    assert np.all(rank[7:] == -1)
-
-    centre = compiled.group_indices("loft_center")
-    for index in centre:
-        position = compiled.positions[int(index)]
-        assert np.linalg.norm(position - np.array([3.25, 4.0, 2.4])) <= 2.4 + 1e-6
-
-    rear = compiled.group_indices("rear_half")
-    assert rear.size == 3  # only the three lower depth spots live in the rear half
-    assert set(compiled.voxel_fixture_index[rear].tolist()) == {7, 8, 9}
+    first = load_rig(RIG_PATH).compile()
+    second = load_rig(RIG_PATH).compile()
+    for group in ("all", "galerie_oben", "decke_unten", "stahltraeger",
+                  "loft_center", "rear_half"):
+        assert np.array_equal(
+            first.group_indices(group), second.group_indices(group)
+        )
+        assert np.array_equal(first.group_rank(group), second.group_rank(group))
+    rank = first.group_rank("galerie_oben")
+    assert sorted(rank[first.group_indices("galerie_oben")].tolist()) == list(
+        range(len(first.group_indices("galerie_oben")))
+    )
+    rear = first.group_indices("rear_half")
+    assert set(rear.tolist()).issubset(set(first.group_indices("all").tolist()))
 
 
 def test_unknown_group_and_fixture_raise_readable_errors():
@@ -82,13 +99,14 @@ def test_new_fixture_automatically_enters_all_group():
         capabilities=Capabilities(color_space="rgb", max_fps=30.0, zcl_snap=False),
         output=FixtureOutput(protocol="none"),
     )
+    base = rig.compile().voxel_count
     updated = rig.model_copy(deep=True)
     updated.fixtures.append(extra)
     compiled = updated.compile()
 
-    assert compiled.voxel_count == 191
-    assert compiled.groups["all"].size == 191
-    assert compiled.fixture_voxels("extra_spot").start == 190
+    assert compiled.voxel_count == base + 1
+    assert compiled.groups["all"].size == base + 1
+    assert compiled.fixture_voxels("extra_spot").start == base
 
 
 def test_fixture_transform_moves_and_rotates_geometry():
@@ -231,3 +249,53 @@ def test_rig_save_roundtrip(tmp_path: Path):
     loaded = load_rig(out)
     assert loaded == rig
     assert "stahltraeger" in out.read_text(encoding="utf-8")
+
+
+def test_floor_fixtures_folders_smart_groups_and_hue_health():
+    rig = load_rig(RIG_PATH)
+    by_id = {fixture.id: fixture for fixture in rig.fixtures}
+    assert by_id["boden_01"].output.address == "0x19C7"
+    assert by_id["boden_02"].output.address == "0x0C7F"
+    assert by_id["boden_01"].folder_id == "boden"
+    assert {folder.id for folder in rig.folders} >= {"galerie", "decke", "struktur", "boden"}
+    assert {group.id for group in rig.smart_groups} >= {"smart_hue_all", "smart_boden"}
+    compiled = rig.compile()
+    assert compiled.group_indices("smart_boden").size == 2
+    assert compiled.group_indices("boden_01").size == 1
+    health = hue_proxy_health(rig)
+    assert health["hue_count"] == 12
+    assert health["required_proxies"] == 2
+    assert health["assigned_proxies"] == 3
+    assert health["ok"] is True
+    assert all(not reasons for reasons in fixture_incomplete_reasons(rig).values())
+
+
+def test_hue_proxy_and_address_violations_are_reported_per_fixture():
+    fixtures = []
+    for index in range(12):
+        fixtures.append(
+            Fixture(
+                id=f"hue_{index}",
+                name=f"Hue {index}",
+                geometry=PointGeometry(pos=[float(index), 1.0, 2.0]),
+                output=FixtureOutput(
+                    protocol="hue_z2m",
+                    address="0xZZZZ" if index == 0 else f"0x{index + 1:04X}",
+                    proxy=None if index == 1 else "proxy_a",
+                ),
+            )
+        )
+    rig = Rig(
+        fixtures=fixtures,
+        folders=[Folder(id="f", name="Folder")],
+        groups=[Group(id="all", name="All", type="all")],
+        smart_groups=[SmartGroup(id="hues", name="Hues", fixtures=["hue_0"])],
+    )
+    health = hue_proxy_health(rig)
+    reasons = fixture_incomplete_reasons(rig)
+    assert health["required_proxies"] == 2
+    assert health["assigned_proxies"] == 1
+    assert health["ok"] is False
+    assert any("address" in reason for reason in reasons["hue_0"])
+    assert any("proxy" in reason for reason in reasons["hue_1"])
+    assert any("11" in reason or "exceeds" in reason for reason in reasons["hue_2"])

@@ -68,6 +68,8 @@ def test_timing_grid_and_beat_context():
     assert beat["bar_pos"] == 2
     with pytest.raises(ValueError):
         timing.grid_interval("1/7")
+    repaired = Timing(bpm=112.4, beat_grid_s=112.4)
+    assert repaired.beat_grid_s == pytest.approx(60.0 / 112.4)
 
 
 def test_keyframe_easing_and_hold_semantics():
@@ -167,41 +169,26 @@ def test_showdoc_validation_rejects_bad_geometry_and_ids():
         )
 
 
-def test_default_show_loads_with_expected_structure():
+def test_default_show_loads_with_valid_structure():
+    # The show file is user data: assert its invariants, not a demo snapshot.
     show = ShowDoc.from_json(SHOW_PATH.read_text(encoding="utf-8"))
     assert show.id == "dance_loft_v1"
-    assert show.duration_s == pytest.approx(236.25)
-    assert show.timing.bpm == pytest.approx(128.0)
-    assert len(show.tracks) >= 5
-    assert len(show.all_clips()) >= 22
-    assert {
-        "base_field",
-        "gallery_beams",
-        "steel_beam",
-        "lower_accents",
-        "blackout_cuts",
-    } <= {track.id for track in show.tracks}
-    assert {t.blend_mode for t in show.tracks} == {"normal", "add", "max", "override"}
-    assert {c.preset for _, c in show.all_clips()} == {
-        "solid",
-        "turrell_horizon",
-        "caustic_abyss",
-        "celestial_orrery",
-        "blackbody_forge",
-        "ma3_wings",
+    assert show.duration_s > 0
+    assert show.timing.bpm > 0
+    assert show.tracks
+    assert show.all_clips()
+    assert {t.blend_mode for t in show.tracks} <= {
+        "normal",
+        "add",
+        "max",
+        "multiply",
+        "override",
     }
-    filters = {f.type for _, c in show.all_clips() for f in c.filters}
-    assert filters == {
-        "mirror_symmetry",
-        "beat_gate",
-        "dim2warm",
-        "inertia",
-        "audio_mod",
-    }
-    masks = {c.spatial_mask.kind for _, c in show.all_clips()}
-    assert masks == {"none", "plane_sweep", "sphere_narrow", "box", "parity"}
-    assert any(c.keyframes for _, c in show.all_clips())
-    assert any(c.snap_zcl for _, c in show.all_clips())
+    assert all(
+        c.spatial_mask.kind
+        in {"none", "plane_sweep", "sphere_narrow", "box", "parity"}
+        for _, c in show.all_clips()
+    )
     for track in show.tracks:
         for clip in track.clips:
             assert clip.start_s < clip.end_s

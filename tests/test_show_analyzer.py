@@ -43,13 +43,22 @@ class TestShowAnalyzer(unittest.TestCase):
             self.assertTrue(track.drop_windows)
             self.assertTrue(track.pre_drops)
             bar_seconds = 4.0 * 60.0 / track.tempo
-            min_section_s = 16.0 * bar_seconds
-            if track.duration >= min_section_s:
-                for sec in track.sections:
-                    self.assertGreaterEqual(sec["end"] - sec["start"] + 1e-6, min_section_s)
-            else:
-                # Short test clip: everything collapses into one stable macro section.
-                self.assertEqual(len(track.sections), 1)
+            min_section_s = 8.0 * bar_seconds
+            labels = [sec["label"] for sec in track.sections]
+            self.assertIn("drop", labels, "the clear impact must stay a drop section")
+            self.assertIn("pre_drop", labels)
+            for sec in track.sections:
+                self.assertGreater(sec["end"], sec["start"])
+                if sec["label"] in ("verse", "chorus"):
+                    self.assertGreaterEqual(
+                        sec["end"] - sec["start"] + 1e-6, min_section_s
+                    )
+            self.assertEqual(track.sections[0]["start"], 0.0)
+            self.assertAlmostEqual(track.sections[-1]["end"], track.duration, places=3)
+            self.assertEqual(len(track.beat_energy), len(track.beats))
+            self.assertEqual(len(track.beat_bass), len(track.beats))
+            drop_energy = track.sections[labels.index("drop")]["energy"]
+            self.assertGreater(drop_energy, track.sections[0]["energy"])
 
             cache_path = analyzer.cache_path("test/drop-track")
             self.assertTrue(os.path.exists(cache_path))

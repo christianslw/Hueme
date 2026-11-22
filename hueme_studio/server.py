@@ -5,8 +5,8 @@ the playhead and the preview subscribers.  REST edits mutate the session and
 are pushed to every connected client; the binary ``/ws/preview`` socket carries
 RGB voxel frames plus JSON invalidations.
 
-Preview never requires hardware.  ``Hal`` stays opt-in and is intentionally not
-wired to the transport in Sprint 2.
+Preview never requires hardware.  ``Hal`` stays opt-in and runs on its own
+monotonic output clock so fixture cadence does not follow the preview ticker.
 """
 
 from __future__ import annotations
@@ -15,8 +15,11 @@ import asyncio
 import json
 import logging
 import math
+import os
 import secrets
 import struct
+import sys
+import threading
 import time
 from collections import deque
 from collections.abc import AsyncIterator
@@ -26,6 +29,7 @@ from typing import Any
 
 import numpy as np
 from fastapi import (
+    BackgroundTasks,
     Body,
     FastAPI,
     HTTPException,
@@ -42,12 +46,24 @@ from pydantic import BaseModel, ConfigDict, Field, ValidationError
 
 from hueme_studio import __version__
 from hueme_studio.blueprint import BlueprintStore
-from hueme_studio.compositor import Compositor, deterministic_envelope
-from hueme_studio.filters import filter_catalog
+from hueme_studio.compositor import Compositor, FrameResult, deterministic_envelope
+from hueme_studio.filters import (
+    FILTERS,
+    FilterContext,
+    filter_catalog,
+)
+from hueme_studio.fxpreview import preview_png, render_clip_rgb, render_preset_rgb
 from hueme_studio.ha import HomeAssistantBridge
+from hueme_studio.hal import Hal, HalSettings
 from hueme_studio.lint import lint_show as lint_show_doc
 from hueme_studio.mcp import McpBridge
-from hueme_studio.presets import preset_catalog
+from hueme_studio.palettes import PaletteStore
+from hueme_studio.presets import (
+    PRESETS,
+    PresetContext,
+    get_preset,
+    preset_catalog,
+)
 from hueme_studio.rig import (
     CompiledRig,
     Fixture,
@@ -56,12 +72,19 @@ from hueme_studio.rig import (
     RigLibrary,
     RigPresetEntry,
     Room,
+    fixture_incomplete_reasons,
+    hue_proxy_health,
 )
 from hueme_studio.showdoc import (
+    Clip,
+    FilterSpec,
+    Keyframe,
+    Marker,
     ShowDoc,
     ShowNotFound,
     ShowStore,
     ShowStoreError,
+    Timing,
 )
 from hueme_studio.sync import MaSync
 
@@ -135,7 +158,39 @@ class SyncPatch(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     enabled: bool | None = None
-    offset_s: float | None = Field(default=None, ge=-2.0, le=2.0)
+    offset_s: float | None = Field(default=None, ge=-20.0, le=20.0)
+
+
+class HardwarePatch(BaseModel):
+    """Toggle physical output; the HAL stays opt-in."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    enabled: bool
+
+
+class FixtureSelectionTransform(BaseModel):
+    """Blender-style transform for the active fixture selection."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    fixture_ids: list[str] = Field(min_length=1)
+    translate: list[float] = Field(default_factory=lambda: [0.0, 0.0, 0.0], min_length=3, max_length=3)
+    rotate_axis: str = "z"
+    rotate_deg: float = 0.0
+    scale: list[float] = Field(default_factory=lambda: [1.0, 1.0, 1.0], min_length=3, max_length=3)
+    pivot: list[float] | None = Field(default=None, min_length=3, max_length=3)
+
+
+class AutoKeyframesPatch(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    clip_id: str | None = None
+    source: str = "kick"
+    param: str = "opacity"
+    division: str = "1/4"
+    depth: float = Field(default=0.65, ge=0.0, le=1.0)
+    threshold: float = Field(default=0.18, ge=0.0, le=1.0)
 
 
 def _deep_merge(base: dict[str, Any], patch: dict[str, Any]) -> dict[str, Any]:
@@ -169,13 +224,20 @@ class StudioRuntime:
         persist_shows: bool = True,
         sync: MaSync | None = None,
         ha_bridge: HomeAssistantBridge | None = None,
+        hal_settings: HalSettings | None = None,
+        analyzer_url: str | None = None,
     ) -> None:
         self.rigs = RigLibrary(rigs_dir)
         self.shows = ShowStore(
             shows_dir, persist=persist_shows, on_change=self._show_changed
         )
         self.blueprints = BlueprintStore(
-            blueprints_dir or Path(shows_dir).parent / "blueprints"
+            blueprints_dir or Path(shows_dir).parent / "blueprints",
+            analyzer_url=analyzer_url,
+        )
+        self.palettes = PaletteStore(
+            Path(shows_dir).parent / "palettes.json",
+            persist=persist_shows,
         )
         self.blueprint: dict[str, Any] | None = None
         self.fps = self._clamp(float(fps), 1.0, 120.0)
@@ -193,6 +255,8 @@ class StudioRuntime:
         self.started_at = time.monotonic()
         self.sync = sync
         self.ha_bridge = ha_bridge
+        self.hal_settings = hal_settings
+        self.hal: Hal | None = None
         self._clients: set[WebSocket] = set()
         self._events: deque[dict[str, Any]] = deque(maxlen=MAX_EVENT_BACKLOG)
         self._needs_frame = False
@@ -200,6 +264,8 @@ class StudioRuntime:
         self._sync_shows: list[dict[str, Any]] = []
         self._sync_shows_at = 0.0
         self._ha_publish_at = 0.0
+        self._preview_lock = threading.Lock()
+        self._preview_cache: dict[str, bytes] = {}
         self._load_initial()
         self._publish_ha(force=True)
 
@@ -219,6 +285,287 @@ class StudioRuntime:
         self.compiled = self.rig.compile()
         self.compositor = Compositor(self.compiled, self.show, fps=self.fps)
         self.attach_blueprint(self.show_id)
+        if self.hal is not None:
+            self.hal.set_rig(self.compiled)
+        elif self.hal_settings is not None and self.hal_settings.enabled:
+            self.hal = Hal(self.compiled, self.hal_settings)
+
+    # -- hardware ---------------------------------------------------------
+    def hardware_status(self) -> dict[str, Any]:
+        if self.hal is None:
+            return {
+                "enabled": bool(
+                    self.hal_settings.enabled if self.hal_settings is not None else False
+                ),
+                "started": False,
+                "tx_operations": 0,
+                "last_error": None,
+            }
+        stats = self.hal.snapshot_stats()
+        return {
+            "enabled": bool(stats.get("enabled")),
+            "started": bool(stats.get("started")),
+            "tx_operations": int(stats.get("tx_operations", 0)),
+            "last_error": stats.get("last_error"),
+        }
+
+    def set_hardware(self, enabled: bool) -> dict[str, Any]:
+        if self.hal_settings is None:
+            # The UI toggle is also used when the server was started without
+            # ``--hardware``. In that case the legacy gateway config still owns
+            # the broker/proxy credentials, so load it instead of silently
+            # talking to localhost with an empty Hue/MQTT config.
+            gateway: dict[str, Any] = {}
+            candidate = PROJECT_ROOT / "config" / "gateway.json"
+            try:
+                if candidate.is_file():
+                    payload = json.loads(candidate.read_text(encoding="utf-8"))
+                    if isinstance(payload, dict):
+                        gateway = payload
+            except (OSError, ValueError) as exc:
+                log.warning("could not read gateway config for hardware output: %s", exc)
+            self.hal_settings = HalSettings.from_gateway_config(gateway)
+        if self.hal is None:
+            self.hal = Hal(self.compiled, self.hal_settings)
+        self.hal_settings.enabled = bool(enabled)
+        self.hal.set_enabled(bool(enabled))
+        self._queue_event("hardware", enabled=bool(enabled))
+        return self.hardware_status()
+
+    @staticmethod
+    def _preview_projection(
+        rig: Any, max_points: int = 140
+    ) -> tuple[np.ndarray, np.ndarray]:
+        """Return sampled voxel indices and fitted isometric 2D positions."""
+        n = rig.voxel_count
+        max_points = max(8, min(260, int(max_points)))
+        indices = np.linspace(0, max(0, n - 1), min(n, max_points)).astype(np.int64)
+        norm = rig.normalized_positions[indices].astype(np.float64)
+        sx = (norm[:, 0] - norm[:, 1]) * 0.866
+        sy = (norm[:, 0] + norm[:, 1]) * 0.34 - norm[:, 2] * 0.72
+        for values in (sx, sy):
+            lo = float(values.min())
+            hi = float(values.max())
+            span = max(1e-6, hi - lo)
+            values[:] = 0.06 + (values - lo) / span * 0.88
+        return indices, np.stack((sx, sy), axis=1)
+
+    def _preview_frame(self, rgb: np.ndarray, points: np.ndarray) -> list[list[Any]]:
+        out: list[list[Any]] = []
+        for (x, y), (r, g, b) in zip(points, rgb):
+            peak = int(max(r, g, b))
+            if peak <= 8:
+                continue
+            out.append(
+                [
+                    round(float(x), 4),
+                    round(float(y), 4),
+                    f"#{int(r):02x}{int(g):02x}{int(b):02x}",
+                ]
+            )
+        return out
+
+    def filter_previews(
+        self, *, frames: int = 6, samples: int = 140, span_s: float = 2.0
+    ) -> dict[str, Any]:
+        """Render before/after filter strips on top of a common gradient base."""
+        doc = self.show
+        rig = self.compiled
+        n = rig.voxel_count
+        if doc is None or n == 0:
+            return {}
+        frames = max(2, min(12, int(frames)))
+        samples = max(8, min(260, int(samples)))
+        indices, points = self._preview_projection(rig, samples)
+        group_idx = rig.groups.get("all", np.arange(n, dtype=np.int64))
+        rank = rig.group_rank("all") if "all" in rig.groups else np.arange(n, dtype=np.int64)
+        size = max(1, len(group_idx))
+        base_preset = get_preset("gradient_3d")
+        out: dict[str, list[list[list[Any]]]] = {}
+        for filter_id, info in FILTERS.items():
+            sequence: list[list[list[Any]]] = []
+            for frame in range(frames):
+                t = (frame / max(1, frames - 1)) * span_s
+                beat = doc.beat_context(t)
+                env = {
+                    key: max(0.0, min(1.0, float(value)))
+                    for key, value in deterministic_envelope(doc, t).items()
+                }
+                pctx = PresetContext(
+                    positions=rig.positions,
+                    normalized=rig.normalized_positions,
+                    scene_min=np.asarray(rig.room.min, dtype=np.float32),
+                    scene_max=np.asarray(rig.room.max, dtype=np.float32),
+                    room_size=rig.room.size.astype(np.float32),
+                    t=float(t),
+                    local_t=float(t),
+                    beat=beat,
+                    env=env,
+                    params=base_preset.default_params(),
+                    target_indices=group_idx,
+                    target_rank=rank,
+                    target_size=size,
+                )
+                base = base_preset.render(pctx)
+                fctx = FilterContext(
+                    positions=rig.positions,
+                    normalized=rig.normalized_positions,
+                    scene_min=np.asarray(rig.room.min, dtype=np.float32),
+                    scene_max=np.asarray(rig.room.max, dtype=np.float32),
+                    room_size=rig.room.size.astype(np.float32),
+                    t=float(t),
+                    local_t=float(t),
+                    timing=doc.timing,
+                    beat=beat,
+                    env=env,
+                    target_indices=group_idx,
+                    target_rank=rank,
+                    fps=float(self.fps),
+                    inertia_reference=np.clip(base * 0.35, 0.0, 255.0),
+                    mirror_sources={},
+                )
+                filtered = info.apply(base, fctx, info.default_params())
+                rgb = np.clip(filtered, 0.0, 255.0).astype(np.uint8)
+                sequence.append(
+                    [f"#{int(r):02x}{int(g):02x}{int(b):02x}" for r, g, b in rgb[indices]]
+                )
+            out[filter_id] = sequence
+        return out
+
+    def preset_previews(
+        self, *, frames: int = 6, samples: int = 140, span_s: float = 2.0
+    ) -> dict[str, list[list[list[Any]]]]:
+        """Render real isometric point-cloud previews for every preset."""
+        doc = self.show
+        rig = self.compiled
+        n = rig.voxel_count
+        if doc is None or n == 0:
+            return {}
+        frames = max(2, min(12, int(frames)))
+        samples = max(8, min(260, int(samples)))
+        indices, points = self._preview_projection(rig, samples)
+        group_idx = rig.groups.get("all", np.arange(n, dtype=np.int64))
+        rank = rig.group_rank("all") if "all" in rig.groups else np.arange(n, dtype=np.int64)
+        size = max(1, len(group_idx))
+        out: dict[str, list[list[list[Any]]]] = {}
+        for preset_id, preset in PRESETS.items():
+            rendered: list[np.ndarray] = []
+            scores: list[int] = []
+            for frame in range(frames):
+                t = (frame / max(1, frames - 1)) * span_s
+                beat = doc.beat_context(t)
+                env = deterministic_envelope(doc, t)
+                ctx = PresetContext(
+                    positions=rig.positions,
+                    normalized=rig.normalized_positions,
+                    scene_min=np.asarray(rig.room.min, dtype=np.float32),
+                    scene_max=np.asarray(rig.room.max, dtype=np.float32),
+                    room_size=rig.room.size.astype(np.float32),
+                    t=float(t),
+                    local_t=float(t),
+                    beat=beat,
+                    env={key: max(0.0, min(1.0, float(value))) for key, value in env.items()},
+                    params=preset.default_params(),
+                    target_indices=group_idx,
+                    target_rank=rank,
+                    target_size=size,
+                )
+                rendered.append(
+                    np.clip(preset.render(ctx), 0.0, 255.0).astype(np.uint8)
+                )
+            if not rendered:
+                out[preset_id] = []
+                continue
+            sequence = [self._preview_frame(frame[indices], points) for frame in rendered]
+            scores = [int(np.sum(frame[indices].astype(np.int64))) for frame in rendered]
+            pivot = max(range(len(scores)), key=lambda index: scores[index])
+            out[preset_id] = sequence[pivot:] + sequence[:pivot]
+        return out
+
+    def invalidate_preview_cache(self) -> None:
+        with self._preview_lock:
+            self._preview_cache.clear()
+
+    def effect_preview_png(
+        self,
+        clip: Clip,
+        t: float,
+        *,
+        width: int = 128,
+        height: int = 72,
+        timing: Timing | None = None,
+    ) -> bytes:
+        # One preview render at a time: the spatial filters are O(n^2) and a
+        # burst of library thumbnails must not balloon memory.
+        with self._preview_lock:
+            image = render_clip_rgb(
+                clip,
+                float(t),
+                timing=timing or (self.show.timing if self.show else Timing()),
+                width=width,
+                height=height,
+                room_size=self.rig.room.size,
+            )
+            return preview_png(image)
+
+    def preset_preview_png(
+        self,
+        preset_id: str,
+        *,
+        t: float = 0.65,
+        width: int = 128,
+        height: int = 72,
+    ) -> bytes:
+        key = f"preset:{preset_id}:{t}:{width}:{height}"
+        with self._preview_lock:
+            cached = self._preview_cache.get(key)
+            if cached is not None:
+                return cached
+            timing = self.show.timing if self.show else Timing()
+            # Library thumbnails should show the effect at a representative
+            # moment.  Pick the brightest of three nearby frames instead of
+            # freezing whichever phase happens to be dark.
+            candidates = [
+                render_preset_rgb(
+                    preset_id,
+                    t=t + offset,
+                    timing=timing,
+                    width=width,
+                    height=height,
+                    room_size=self.rig.room.size,
+                )
+                for offset in (0.0, 0.55, 1.1)
+            ]
+            image = max(candidates, key=lambda frame: int(frame.sum()))
+            data = preview_png(image)
+            self._preview_cache[key] = data
+            return data
+
+    def filter_preview_png(
+        self,
+        filter_id: str,
+        *,
+        t: float = 0.65,
+        width: int = 48,
+        height: int = 27,
+    ) -> bytes:
+        key = f"filter:{filter_id}:{t}:{width}:{height}"
+        with self._preview_lock:
+            cached = self._preview_cache.get(key)
+            if cached is not None:
+                return cached
+            image = render_preset_rgb(
+                "gradient_3d",
+                t=t,
+                timing=self.show.timing if self.show else Timing(),
+                width=width,
+                height=height,
+                room_size=self.rig.room.size,
+                filters=[FilterSpec(type=filter_id)],
+            )
+            data = preview_png(image)
+            self._preview_cache[key] = data
+            return data
 
     def _set_show_doc(self, doc: ShowDoc | None, show_id: str | None) -> None:
         self.show = doc
@@ -258,6 +605,13 @@ class StudioRuntime:
 
     def snapshot(self) -> dict[str, Any]:
         compiled = self.compiled
+        proxy_health = hue_proxy_health(self.rig)
+        fixture_health = fixture_incomplete_reasons(self.rig)
+        rig_document = self.rig.model_dump(mode="json")
+        for fixture in rig_document.get("fixtures", []):
+            fixture["incomplete_reasons"] = fixture_health.get(
+                str(fixture.get("id")), []
+            )
         return {
             "schema_version": 1,
             "version": __version__,
@@ -265,7 +619,8 @@ class StudioRuntime:
                 "active": self.rigs.active_id,
                 "dirty": self.rig_dirty,
                 "presets": self.rigs.list_presets(),
-                "document": self.rig.model_dump(mode="json"),
+                "document": rig_document,
+                "proxy_health": proxy_health,
                 "compiled": {
                     "voxel_count": compiled.voxel_count,
                     "fixture_ids": list(compiled.fixture_ids),
@@ -280,6 +635,7 @@ class StudioRuntime:
                     "positions": [
                         round(float(c), 4) for c in compiled.positions.ravel()
                     ],
+                    "voxel_fixture_index": compiled.voxel_fixture_index.tolist(),
                     "groups": {
                         gid: indices.tolist()
                         for gid, indices in compiled.groups.items()
@@ -303,8 +659,11 @@ class StudioRuntime:
             "playback": self.transport(),
             "sync": self.sync_status(),
             "home_assistant": self.ha_status(),
+            "hardware": self.hardware_status(),
+            "proxy_health": proxy_health,
             "presets": preset_catalog(),
             "filters": filter_catalog(),
+            "palettes": self.palettes.list(),
         }
 
     def health(self) -> dict[str, Any]:
@@ -321,6 +680,8 @@ class StudioRuntime:
             "ha_connected": bool(
                 self.ha_bridge.connected if self.ha_bridge is not None else False
             ),
+            "hardware": self.hardware_status(),
+            "proxy_health": hue_proxy_health(self.rig),
         }
 
     # -- events -----------------------------------------------------------
@@ -372,6 +733,186 @@ class StudioRuntime:
                 self._dirty()
         return blueprint
 
+    def sync_show_from_blueprint(
+        self, show_id: str, blueprint: dict[str, Any] | None = None
+    ) -> ShowDoc:
+        """Align duration, tempo and markers with an audio blueprint.
+
+        Runs as one regular ShowStore transaction, so Ctrl+Z restores the
+        arrangement exactly.
+        """
+        if not self.shows.has(show_id):
+            raise ShowNotFound(f"show '{show_id}' not found")
+        bp = blueprint if blueprint is not None else self.blueprints.get(show_id)
+        if bp is None:
+            raise ShowNotFound("no AudioBlueprint attached")
+        duration = float(bp.get("duration_s") or 0.0)
+        if not math.isfinite(duration) or duration <= 0.0:
+            raise ValueError("blueprint has no usable duration")
+        bpm = float(bp.get("bpm") or 0.0)
+        if not math.isfinite(bpm) or bpm <= 0.0:
+            bpm = 120.0
+
+        def mutate(current: ShowDoc) -> ShowDoc:
+            current.duration_s = round(duration, 4)
+            current.timing.bpm = max(1.0, min(400.0, bpm))
+            grid = float(bp.get("beat_grid_s") or 0.0)
+            if not math.isfinite(grid) or grid <= 0.0:
+                grid = 60.0 / max(1e-6, current.timing.bpm)
+            current.timing.beat_grid_s = round(grid, 6)
+            current.match.duration_s = round(duration, 4)
+            markers: list[Marker] = []
+            seen: set[tuple[float, str]] = set()
+
+            def add_marker(t_s: float, name: str, kind: str) -> None:
+                t = round(max(0.0, min(duration, float(t_s))), 4)
+                key = (t, name)
+                if key in seen:
+                    return
+                seen.add(key)
+                markers.append(Marker(t_s=t, name=name, kind=kind))
+
+            for section in bp.get("sections") or []:
+                if not isinstance(section, dict):
+                    continue
+                label = str(section.get("label") or "section")
+                kind = "drop" if label == "drop" else "section"
+                add_marker(
+                    float(section.get("start") or 0.0),
+                    label.replace("_", " ").title(),
+                    kind,
+                )
+            for drop in bp.get("drops") or []:
+                try:
+                    add_marker(float(drop), "Drop", "drop")
+                except (TypeError, ValueError):
+                    continue
+            current.timing.markers = sorted(markers, key=lambda marker: marker.t_s)
+            for track in current.tracks:
+                kept = []
+                for clip in track.clips:
+                    if clip.start_s >= duration - 1e-4:
+                        continue
+                    end = min(clip.end_s, duration)
+                    if end <= clip.start_s + 1e-4:
+                        continue
+                    clip.end_s = round(end, 4)
+                    length = max(0.0, clip.end_s - clip.start_s)
+                    fade_sum = clip.fade_in_s + clip.fade_out_s
+                    if fade_sum > length + 1e-9:
+                        scale_fade = length / fade_sum if fade_sum > 0 else 0.0
+                        clip.fade_in_s *= scale_fade
+                        clip.fade_out_s *= scale_fade
+                    clip.fade_in_s = min(clip.fade_in_s, length)
+                    clip.fade_out_s = min(clip.fade_out_s, length)
+                    clip.keyframes = [
+                        keyframe
+                        for keyframe in clip.keyframes
+                        if keyframe.t_s <= clip.end_s - clip.start_s + 1e-9
+                    ]
+                    kept.append(clip)
+                track.clips = kept
+            return current
+
+        updated = self.shows.apply(show_id, "sync from blueprint", mutate)
+        if self.show_id == show_id:
+            self.show = updated
+        return updated
+
+    def auto_keyframes(
+        self,
+        show_id: str,
+        *,
+        clip_id: str | None = None,
+        source: str = "kick",
+        param: str = "opacity",
+        division: str = "1/4",
+        depth: float = 0.65,
+        threshold: float = 0.18,
+    ) -> dict[str, Any]:
+        """Stamp deterministic musical keyframes from the ML/deterministic envelope."""
+        doc = self.shows.get(show_id)
+        blueprint = self.blueprints.get(show_id)
+        envelope = (
+            BlueprintStore.envelope(blueprint)
+            if blueprint is not None
+            else deterministic_envelope
+        )
+        source = str(source or "kick")
+        param = str(param or "opacity")
+        depth = max(0.0, min(1.0, float(depth)))
+        step = doc.timing.grid_interval(division)
+        times: list[float] = []
+        t = max(0.0, float(doc.timing.beat_offset_s))
+        while t <= doc.duration_s + 1e-6:
+            times.append(round(t, 4))
+            t += step
+            if len(times) > 20000:
+                break
+
+        added = 0
+
+        def mutate(current: ShowDoc) -> ShowDoc:
+            nonlocal added
+            for track in current.tracks:
+                for clip in track.clips:
+                    if clip_id and clip.id != clip_id:
+                        continue
+                    length = clip.end_s - clip.start_s
+                    keyframes = [
+                        keyframe
+                        for keyframe in clip.keyframes
+                        if not (
+                            keyframe.param == param
+                            and any(
+                                abs(keyframe.t_s - (time - clip.start_s)) <= 1e-4
+                                for time in times
+                            )
+                        )
+                    ]
+                    base = 1.0
+                    raw = clip.params.get(param, clip.opacity)
+                    try:
+                        base = float(raw)
+                    except (TypeError, ValueError):
+                        base = 1.0
+                    for time in times:
+                        local = time - clip.start_s
+                        if local < -1e-6 or local > length + 1e-6:
+                            continue
+                        env = envelope(current, time)
+                        value = max(0.0, min(1.0, float(env.get(source, 0.0))))
+                        if source in {"snare", "hat"} and value < threshold:
+                            continue
+                        level = max(
+                            0.0,
+                            min(1.0, base * (0.18 + depth * value)),
+                        )
+                        keyframes.append(
+                            Keyframe(
+                                t_s=round(max(0.0, min(length, local)), 4),
+                                param=param,
+                                value=round(level, 4),
+                                easing="ease_out",
+                            )
+                        )
+                        added += 1
+                    keyframes.sort(key=lambda keyframe: keyframe.t_s)
+                    clip.keyframes = keyframes
+            return current
+
+        updated = self.shows.apply(
+            show_id, f"auto keyframes ({source} / {param})", mutate
+        )
+        return {
+            "document": updated.model_dump(mode="json"),
+            "added": added,
+            "source": source,
+            "param": param,
+            "division": division,
+            "analyzer": blueprint.get("analyzer") if blueprint else "deterministic",
+        }
+
     def lint_show(self, show_id: str | None = None) -> dict[str, Any]:
         target = show_id or self.show_id
         if not target:
@@ -387,7 +928,7 @@ class StudioRuntime:
 
     # -- MCP telemetry ----------------------------------------------------
     def note_mcp(self, entry: dict[str, Any]) -> None:
-        self._queue_event("mcp", **entry)
+        self._events.append({"type": "mcp", **entry})
 
     # -- transport --------------------------------------------------------
     def apply_transport(self, patch: TransportPatch | dict[str, Any]) -> dict[str, Any]:
@@ -434,6 +975,9 @@ class StudioRuntime:
                 "matched_show_id": None,
                 "track": None,
                 "locked": False,
+                "pairing_token": None,
+                "client_id": None,
+                "paired": False,
             }
         return {"configured": True, **self.sync.status()}
 
@@ -452,6 +996,19 @@ class StudioRuntime:
             self.sync.set_offset_s(float(data["offset_s"]))
         self._queue_event("sync", state=self.sync.status()["state"])
         self._queue_transport()
+        return self.sync_status()
+
+    def restart_sync(self) -> dict[str, Any]:
+        if self.sync is None:
+            raise ValueError("MA sync is not configured")
+        source = self.sync.source
+        restart = getattr(source, "restart", None)
+        if callable(restart):
+            restart()
+        self.sync.reset_link()
+        self._sync_shows_at = 0.0
+        self._queue_event("sync", state=self.sync.status()["state"])
+        self._dirty()
         return self.sync_status()
 
     # -- Home Assistant bridge --------------------------------------------
@@ -475,6 +1032,9 @@ class StudioRuntime:
                         self.apply_transport({"show_id": target})
                 elif entity == "gain":
                     self.apply_transport({"gain": float(value)})
+                elif entity == "auto_show":
+                    if self.sync is not None:
+                        self.set_sync({"enabled": bool(value)})
             except Exception as exc:
                 log.warning("HA command %s failed: %s", command, exc)
 
@@ -552,43 +1112,108 @@ class StudioRuntime:
                 self._queue_transport()
         self._dirty()
 
-    def evaluate(self) -> bytes:
+    def evaluate_frame(self) -> FrameResult:
         count = self.compiled.voxel_count
-        rgb = np.zeros((count, 3), dtype=np.float64)
         if self.show is not None and self.compositor is not None:
-            rgb = self.compositor.evaluate(self.playhead).rgb.astype(np.float64)
+            frame = self.compositor.evaluate(self.playhead)
+        else:
+            frame = FrameResult(
+                time_s=self.playhead,
+                rgb=np.zeros((count, 3), dtype=np.float32),
+                snap_zcl=np.zeros(self.compiled.fixture_count, dtype=bool),
+            )
+        rgb = frame.rgb.astype(np.float64, copy=True)
         if self.blackout:
             rgb[:] = 0.0
         elif self.gain != 1.0:
             rgb *= self.gain
-        rgb_u8 = np.clip(np.rint(rgb), 0, 255).astype(np.uint8)
+        frame.rgb = np.clip(rgb, 0.0, 255.0).astype(np.float32)
+        return frame
+
+    @staticmethod
+    def encode_frame(frame: FrameResult, *, playing: bool, blackout: bool, loop: bool) -> bytes:
+        rgb_u8 = frame.rgb_u8
+        count = int(rgb_u8.shape[0])
         flags = 0
-        if self.playing:
+        if playing:
             flags |= FRAME_FLAG_PLAYING
-        if self.blackout:
+        if blackout:
             flags |= FRAME_FLAG_BLACKOUT
-        if self.loop:
+        if loop:
             flags |= FRAME_FLAG_LOOP
         header = FRAME_HEADER.pack(
-            FRAME_MAGIC, count, float(self.playhead), flags
+            FRAME_MAGIC, count, float(frame.time_s), flags
         )
         return header + rgb_u8.tobytes()
 
-    async def run(self) -> None:
+    def evaluate(self) -> bytes:
+        return self.encode_frame(
+            self.evaluate_frame(),
+            playing=self.playing,
+            blackout=self.blackout,
+            loop=self.loop,
+        )
+
+    async def _hardware_loop(self) -> None:
+        """Send each fixture on its own monotonic deadline, independent of preview.
+
+        The preview ticker used to throttle fixtures with ``elapsed >= 1/fps``.
+        At 30 fps preview and 25 fps lamps that produced 67 ms gaps with a
+        33 ms ZCL ramp, i.e. a visible hold on every other frame.  Sleeping
+        until the exact next deadline keeps the lamp cadence regular even when
+        the preview rate, client count or render cost changes.
+        """
         while True:
-            await asyncio.sleep(1.0 / max(1.0, self.fps))
-            self._apply_ha_commands()
-            self._advance()
-            self._publish_ha()
-            events = self._drain_events()
-            if events and self._clients:
-                await self._broadcast_text(events)
-            if not self._clients:
-                self._needs_frame = False
+            hal = self.hal
+            if hal is None or not hal.enabled:
+                await asyncio.sleep(0.25)
                 continue
-            if self.playing or self._needs_frame:
-                self._needs_frame = False
-                await self._broadcast_bytes(self.evaluate())
+            wait = hal.seconds_until_due()
+            if wait > 0.0:
+                await asyncio.sleep(min(wait, 0.25))
+                continue
+            frame = self.evaluate_frame()
+            try:
+                # Blocking MQTT/UDP stays off the ASGI event loop.
+                await hal.output_frame_async(frame)
+            except Exception as exc:  # keep the clock alive after driver errors
+                log.warning("hardware frame failed: %s", exc)
+
+    async def run(self) -> None:
+        hardware = asyncio.create_task(self._hardware_loop())
+        try:
+            deadline = time.monotonic()
+            while True:
+                # Deadline-based sleep: render cost must not stretch the tick.
+                period = 1.0 / max(1.0, self.fps)
+                deadline += period
+                delay = deadline - time.monotonic()
+                if delay > 0.0:
+                    await asyncio.sleep(delay)
+                else:
+                    deadline = time.monotonic()
+                self._apply_ha_commands()
+                self._advance()
+                self._publish_ha()
+                events = self._drain_events()
+                if events and self._clients:
+                    await self._broadcast_text(events)
+                if self._clients and (self.playing or self._needs_frame):
+                    self._needs_frame = False
+                    await self._broadcast_bytes(
+                        self.encode_frame(
+                            self.evaluate_frame(),
+                            playing=self.playing,
+                            blackout=self.blackout,
+                            loop=self.loop,
+                        )
+                    )
+        finally:
+            hardware.cancel()
+            try:
+                await hardware
+            except asyncio.CancelledError:
+                pass
 
     # -- websocket --------------------------------------------------------
     async def connect(self, ws: WebSocket) -> None:
@@ -722,6 +1347,79 @@ class StudioRuntime:
         ]
         return self._commit_rig(Rig.model_validate(payload))
 
+    def transform_fixtures(
+        self,
+        fixture_ids: list[str],
+        *,
+        translate: list[float],
+        rotate_axis: str,
+        rotate_deg: float,
+        scale: list[float],
+        pivot: list[float] | None,
+    ) -> Rig:
+        """Bake a Blender-style group transform into fixture geometry.
+
+        The selection is transformed in world space. Geometry is written back
+        and per-fixture transforms are reset, so Position becomes the single
+        source of truth after a G/R/S operation.
+        """
+        axis = {"x": 0, "y": 1, "z": 2}.get(str(rotate_axis).lower())
+        if axis is None:
+            raise ValueError("rotate_axis must be x, y or z")
+        if len(scale) != 3 or any(
+            not math.isfinite(float(value)) or float(value) <= 0.0 for value in scale
+        ):
+            raise ValueError("scale must contain three positive finite numbers")
+        scale_vec = np.asarray([float(value) for value in scale], dtype=np.float64)
+        if any(not math.isfinite(float(value)) for value in translate):
+            raise ValueError("translate must contain finite numbers")
+        angle = math.radians(float(rotate_deg))
+        cos_a, sin_a = math.cos(angle), math.sin(angle)
+        if axis == 0:
+            rotation = np.asarray(
+                [[1.0, 0.0, 0.0], [0.0, cos_a, -sin_a], [0.0, sin_a, cos_a]]
+            )
+        elif axis == 1:
+            rotation = np.asarray(
+                [[cos_a, 0.0, sin_a], [0.0, 1.0, 0.0], [-sin_a, 0.0, cos_a]]
+            )
+        else:
+            rotation = np.asarray(
+                [[cos_a, -sin_a, 0.0], [sin_a, cos_a, 0.0], [0.0, 0.0, 1.0]]
+            )
+        payload = self.rig.model_dump(mode="json")
+        known = {fixture["id"]: fixture for fixture in payload["fixtures"]}
+        missing = [fixture_id for fixture_id in fixture_ids if fixture_id not in known]
+        if missing:
+            raise KeyError(f"fixtures not found: {missing}")
+        offset = np.asarray([float(value) for value in translate], dtype=np.float64)
+        for fixture_id in fixture_ids:
+            fixture = known[fixture_id]
+            try:
+                voxels = self.compiled.fixture_voxels(fixture_id)
+            except KeyError as exc:
+                raise KeyError(str(exc)) from exc
+            pts = self.compiled.positions[voxels].astype(np.float64)
+            centre = np.asarray(pivot, dtype=np.float64) if pivot is not None else pts.mean(axis=0)
+            transformed = ((pts - centre) * scale_vec) @ rotation.T + centre + offset
+            geometry = fixture["geometry"]
+            if geometry["type"] == "point":
+                geometry["pos"] = [round(float(value), 4) for value in transformed[0]]
+            else:
+                geometry["start"] = [round(float(value), 4) for value in transformed[0]]
+                geometry["end"] = [round(float(value), 4) for value in transformed[-1]]
+            aim = self.compiled.fixture_aims.get(fixture_id)
+            if aim is not None:
+                rotated_aim = rotation @ np.asarray(aim, dtype=np.float64)
+                geometry["aim"] = [round(float(value), 4) for value in rotated_aim]
+            fixture["transform"] = {
+                "translate": [0.0, 0.0, 0.0],
+                "rotate_deg": [0.0, 0.0, 0.0],
+                "pivot": [0.0, 0.0, 0.0],
+                "scale": [1.0, 1.0, 1.0],
+            }
+        return self.replace_rig(Rig.model_validate(payload))
+
     def delete_fixture(self, fixture_id: str) -> Rig:
         return self._commit_rig(self.rig.without_fixture(fixture_id))
 
@@ -843,6 +1541,8 @@ def create_app(
     sync_enabled: bool = True,
     sync_offset_s: float = 0.0,
     ha_bridge: HomeAssistantBridge | None = None,
+    hal_settings: HalSettings | None = None,
+    analyzer_url: str | None = None,
 ) -> FastAPI:
     sync = (
         MaSync(
@@ -861,6 +1561,8 @@ def create_app(
         persist_shows=persist_shows,
         sync=sync,
         ha_bridge=ha_bridge,
+        hal_settings=hal_settings,
+        analyzer_url=analyzer_url,
     )
     mcp = McpBridge(runtime)
 
@@ -878,6 +1580,11 @@ def create_app(
                 await asyncio.to_thread(runtime.ha_bridge.start)
             except Exception as exc:
                 log.warning("HA bridge start failed: %s", exc)
+        if runtime.hal is not None and runtime.hal.enabled:
+            try:
+                await asyncio.to_thread(runtime.hal.start)
+            except Exception as exc:
+                log.warning("HAL start failed: %s", exc)
         task = asyncio.create_task(runtime.run())
         try:
             yield
@@ -890,6 +1597,11 @@ def create_app(
             if runtime.ha_bridge is not None:
                 try:
                     await asyncio.to_thread(runtime.ha_bridge.stop)
+                except Exception:
+                    pass
+            if runtime.hal is not None:
+                try:
+                    await asyncio.to_thread(runtime.hal.stop)
                 except Exception:
                     pass
             if runtime.sync is not None:
@@ -953,9 +1665,94 @@ def create_app(
     async def presets() -> dict[str, Any]:
         return {"presets": preset_catalog()}
 
+    @app.get("/api/presets/previews")
+    def preset_previews() -> dict[str, Any]:
+        return {"frames": runtime.preset_previews()}
+
     @app.get("/api/filters")
     async def filters() -> dict[str, Any]:
         return {"filters": filter_catalog()}
+
+    @app.get("/api/filters/previews")
+    def filter_previews() -> dict[str, Any]:
+        return {"frames": runtime.filter_previews()}
+
+    @app.get("/api/presets/{preset_id}/preview.png")
+    def preset_preview_png(
+        preset_id: str,
+        t: float = Query(default=0.65, ge=0.0, le=3600.0),
+        width: int = Query(default=128, ge=16, le=192),
+        height: int = Query(default=72, ge=9, le=108),
+    ) -> Response:
+        if preset_id not in PRESETS:
+            raise HTTPException(status_code=404, detail="preset not found")
+        return Response(
+            runtime.preset_preview_png(
+                preset_id, t=t, width=width, height=height
+            ),
+            media_type="image/png",
+            headers={"Cache-Control": "no-cache"},
+        )
+
+    @app.get("/api/filters/{filter_id}/preview.png")
+    def filter_preview_png(
+        filter_id: str,
+        t: float = Query(default=0.65, ge=0.0, le=3600.0),
+        width: int = Query(default=48, ge=16, le=192),
+        height: int = Query(default=27, ge=9, le=108),
+    ) -> Response:
+        if filter_id not in FILTERS:
+            raise HTTPException(status_code=404, detail="filter not found")
+        return Response(
+            runtime.filter_preview_png(
+                filter_id, t=t, width=width, height=height
+            ),
+            media_type="image/png",
+            headers={"Cache-Control": "no-cache"},
+        )
+
+    @app.post("/api/preview/effect")
+    def effect_preview(payload: dict[str, Any] = Body(...)) -> Response:
+        clip_payload = payload.get("clip")
+        if not isinstance(clip_payload, dict):
+            raise HTTPException(status_code=400, detail="clip is required")
+        clip = Clip.model_validate(clip_payload)
+        timing_payload = payload.get("timing")
+        timing = (
+            Timing.model_validate(timing_payload)
+            if isinstance(timing_payload, dict)
+            else None
+        )
+        return Response(
+            runtime.effect_preview_png(
+                clip,
+                float(payload.get("t") or 0.0),
+                width=int(payload.get("width") or 128),
+                height=int(payload.get("height") or 72),
+                timing=timing,
+            ),
+            media_type="image/png",
+            headers={"Cache-Control": "no-store"},
+        )
+
+    # -- palette library --------------------------------------------------
+    @app.get("/api/palettes")
+    async def palettes() -> dict[str, Any]:
+        return {"palettes": runtime.palettes.list()}
+
+    @app.post("/api/palettes", status_code=201)
+    async def save_palette(payload: dict[str, Any] = Body(...)) -> dict[str, Any]:
+        palette = await asyncio.to_thread(runtime.palettes.upsert, payload)
+        runtime.invalidate_preview_cache()
+        runtime._queue_event("palettes")
+        return palette
+
+    @app.delete("/api/palettes/{palette_id}", status_code=204)
+    async def delete_palette(palette_id: str) -> Response:
+        await asyncio.to_thread(runtime.palettes.delete, palette_id)
+        runtime.invalidate_preview_cache()
+        runtime._queue_event("palettes")
+        return Response(status_code=204)
 
     # -- rig preset library ----------------------------------------------
     @app.get("/api/rigs")
@@ -1020,6 +1817,19 @@ def create_app(
     @app.post("/api/rig/fixtures", status_code=201)
     async def add_fixture(fixture: Fixture) -> Rig:
         return runtime.add_fixture(fixture)
+
+    @app.post("/api/rig/fixtures/transform")
+    async def transform_fixtures(body: FixtureSelectionTransform) -> dict[str, Any]:
+        rig = await asyncio.to_thread(
+            runtime.transform_fixtures,
+            body.fixture_ids,
+            translate=body.translate,
+            rotate_axis=body.rotate_axis,
+            rotate_deg=body.rotate_deg,
+            scale=body.scale,
+            pivot=body.pivot,
+        )
+        return {"rig": rig.model_dump(mode="json"), "dirty": runtime.rig_dirty}
 
     @app.patch("/api/rig/fixtures/{fixture_id}")
     async def patch_fixture(
@@ -1126,21 +1936,51 @@ def create_app(
         show_id: str,
         request: Request,
         source: str = Query(default="upload"),
+        sync_show: bool = Query(default=True),
     ) -> dict[str, Any]:
         if not runtime.shows.has(show_id):
             raise ShowNotFound(f"show '{show_id}' not found")
         payload = await request.body()
-        # Analysis is CPU-heavy; keep the preview ticker responsive.
+        # Analysis is CPU-heavy and may call an external ML container; keep the
+        # preview ticker responsive.
         blueprint = await asyncio.to_thread(
             runtime.blueprints.extract, show_id, payload, source=source
         )
         runtime.attach_blueprint(show_id)
-        return (
-            BlueprintStore.summary(
-                blueprint,
-                audio_available=runtime.blueprints.audio_path(show_id) is not None,
-            )
-            or {}
+        if sync_show:
+            await asyncio.to_thread(runtime.sync_show_from_blueprint, show_id, blueprint)
+        summary = BlueprintStore.summary(
+            blueprint,
+            audio_available=runtime.blueprints.audio_path(show_id) is not None,
+        ) or {}
+        summary["synced"] = bool(sync_show)
+        return summary
+
+    @app.post("/api/shows/{show_id}/sync-from-blueprint")
+    async def sync_from_blueprint(show_id: str) -> dict[str, Any]:
+        if not runtime.shows.has(show_id):
+            raise ShowNotFound(f"show '{show_id}' not found")
+        doc = await asyncio.to_thread(runtime.sync_show_from_blueprint, show_id)
+        return {
+            "document": doc.model_dump(mode="json"),
+            "history": runtime.shows.history(show_id),
+        }
+
+    @app.post("/api/shows/{show_id}/auto-keyframes")
+    async def auto_keyframes(
+        show_id: str, body: AutoKeyframesPatch
+    ) -> dict[str, Any]:
+        if not runtime.shows.has(show_id):
+            raise ShowNotFound(f"show '{show_id}' not found")
+        return await asyncio.to_thread(
+            runtime.auto_keyframes,
+            show_id,
+            clip_id=body.clip_id,
+            source=body.source,
+            param=body.param,
+            division=body.division,
+            depth=body.depth,
+            threshold=body.threshold,
         )
 
     @app.get("/api/shows/{show_id}/audio")
@@ -1172,7 +2012,7 @@ def create_app(
                 },
                 status_code=400,
             )
-        result = mcp.handle(payload)
+        result = await mcp.handle_async(payload)
         headers: dict[str, str] = {}
         if (
             isinstance(payload, dict)
@@ -1216,9 +2056,49 @@ def create_app(
     async def set_sync(patch: SyncPatch) -> dict[str, Any]:
         return runtime.set_sync(patch)
 
+    @app.post("/api/sync/restart")
+    async def restart_sync() -> dict[str, Any]:
+        return await asyncio.to_thread(runtime.restart_sync)
+
+    @app.post("/api/system/restart")
+    async def restart_system(background: BackgroundTasks) -> dict[str, Any]:
+        """Re-exec the Studio process after the HTTP response is flushed."""
+        def _exec() -> None:
+            try:
+                args = list(sys.argv[1:])
+                if (
+                    runtime.hal is not None
+                    and runtime.hal.enabled
+                    and "--hardware" not in args
+                ):
+                    args.append("--hardware")
+                os.execv(
+                    sys.executable,
+                    [sys.executable, "-m", "hueme_studio", *args],
+                )
+            except Exception:
+                log.exception("Studio restart failed")
+
+        async def _restart() -> None:
+            # BackgroundTasks run after the response has been sent.  The short
+            # grace period lets the client read the JSON body before execv.
+            await asyncio.sleep(0.75)
+            _exec()
+
+        background.add_task(_restart)
+        return {"ok": True, "restarting": True}
+
     @app.get("/api/ha")
     async def get_ha() -> dict[str, Any]:
         return runtime.ha_status()
+
+    @app.post("/api/hardware")
+    async def set_hardware(patch: HardwarePatch) -> dict[str, Any]:
+        return await asyncio.to_thread(runtime.set_hardware, patch.enabled)
+
+    @app.get("/api/hardware")
+    async def get_hardware() -> dict[str, Any]:
+        return runtime.hardware_status()
 
     # -- preview socket ---------------------------------------------------
     @app.websocket("/ws/preview")

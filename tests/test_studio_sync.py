@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 import shutil
 from pathlib import Path
 
@@ -78,6 +79,32 @@ def test_matcher_exact_key_item_id_and_title_only():
     assert matcher.match([SHOW], item_id="ma-item-1") == "dance_loft_v1"
     assert matcher.match([SHOW], title="Dance Loft 128") == "dance_loft_v1"
     assert matcher.match([SHOW], artist="Someone Else", title="Dance Loft 128") is None
+    # MA often appends live/remix tags to the title. Same artist + title prefix
+    # is still the same song; a different artist never matches.
+    assert (
+        matcher.match(
+            [SHOW], artist="Demo Artist", title="Dance Loft 128 (Live)"
+        )
+        == "dance_loft_v1"
+    )
+    assert (
+        matcher.match(
+            [SHOW], artist="Demo Artist", title="Dance Loft 128 VIP Mix"
+        )
+        == "dance_loft_v1"
+    )
+    assert (
+        matcher.match(
+            [SHOW], artist="Demo Artist, Guest Vocalist", title="Dance Loft 128"
+        )
+        == "dance_loft_v1"
+    )
+    assert (
+        matcher.match(
+            [SHOW], artist="Someone Else", title="Dance Loft 128 (Live)"
+        )
+        is None
+    )
     assert matcher.match([SHOW], title="Dance Loft 128", duration_s=999.0) is None
 
 
@@ -94,6 +121,12 @@ def test_matcher_refuses_ambiguous_title_match():
         },
     }
     assert ShowMatcher().match([SHOW, other], title="Dance Loft 128") is None
+    assert (
+        ShowMatcher().match(
+            [SHOW, other], title="Dance Loft 128", prefer_show_id="other"
+        )
+        == "other"
+    )
 
 
 def test_pll_snaps_large_jumps_and_trims_small_error():
@@ -225,6 +258,18 @@ def test_runtime_switches_show_and_locks_playhead_to_sendspin(tmp_path):
     shutil.copytree(RIGS_DIR, rigs)
     shutil.copytree(SHOWS_DIR, shows)
     source = FakeSource()
+    # The show is user data: bind the fake source to whatever this show's
+    # match block currently says instead of assuming the demo track.
+    show_payload = json.loads((shows / "dance_loft_v1.json").read_text())
+    match = show_payload.get("match") or {}
+    source.track_artist = match.get("artist") or ""
+    source.track_title = match.get("title") or ""
+    source.track_key = normalize_match_key(
+        f"{source.track_artist}|{source.track_title}"
+    )
+    source.track_duration_s = float(
+        match.get("duration_s") or show_payload.get("duration_s") or 0
+    )
     app = create_app(
         rigs_dir=rigs,
         shows_dir=shows,

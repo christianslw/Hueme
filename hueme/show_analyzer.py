@@ -18,7 +18,18 @@ import wave
 
 import numpy as np
 
-CACHE_VERSION = 2
+CACHE_VERSION = 3
+
+_SECTION_MOOD = {
+    "intro": "calm",
+    "outro": "calm",
+    "build": "rising",
+    "drop": "peak",
+    "chorus": "euphoric",
+    "breakdown": "ambient",
+    "pre_drop": "tension",
+    "verse": "groove",
+}
 
 
 # ---------------------------------------------------------------------------
@@ -316,37 +327,51 @@ def _pick_peaks(values, min_dist, threshold):
     return np.asarray(sorted(accepted), dtype=np.int64)
 
 
-def _merge_short_sections(sections, bar_seconds, min_bars=16):
-    """Merge macro sections until every one spans at least 16 bars.
+def _merge_short_sections(sections, bar_seconds, min_bars=8, protected=()):
+    """Merge short neighbouring sections without touching structural anchors.
 
-    Short drop/pre-drop *events* are preserved separately as cue windows; the
-    macro section list stays stable instead of flapping every few seconds.
+    Drops, builds and intros/outros are what the operator navigates by; merging
+    a clear 4-bar drop into the following verse is what made the old analyzer
+    call every important moment "verse".  Protected sections are never merged,
+    and other sections merge only with other unprotected neighbours.
     """
     out = [dict(s) for s in sections]
+    protected = set(protected)
     if bar_seconds <= 0:
         return out
     while len(out) > 1:
         lengths = [max(0.0, s["end"] - s["start"]) / bar_seconds for s in out]
-        i = min(range(len(out)), key=lambda k: lengths[k])
+        mergeable = [
+            k
+            for k, sec in enumerate(out)
+            if sec.get("label") not in protected
+            and (
+                (k > 0 and out[k - 1].get("label") not in protected)
+                or (k + 1 < len(out) and out[k + 1].get("label") not in protected)
+            )
+        ]
+        if not mergeable:
+            break
+        i = min(mergeable, key=lambda k: lengths[k])
         if lengths[i] >= min_bars:
             break
-        if i == 0:
-            j = 1
-        elif i == len(out) - 1:
-            j = i - 1
-        else:
-            j = i - 1 if lengths[i - 1] <= lengths[i + 1] else i + 1
+        neighbours = [
+            k
+            for k in (i - 1, i + 1)
+            if 0 <= k < len(out) and out[k].get("label") not in protected
+        ]
+        if not neighbours:
+            break
+        j = min(neighbours, key=lambda k: lengths[k])
         a, b = sorted((i, j))
         sa, sb = out[a], out[b]
-        la, lb = sa.get("label"), sb.get("label")
         merged = dict(sa)
         merged["end"] = sb["end"]
-        if la in ("drop", "pre_drop") and lb not in ("drop", "pre_drop"):
-            merged["label"] = lb
-        elif lb in ("drop", "pre_drop") and la not in ("drop", "pre_drop"):
-            merged["label"] = la
-        else:
-            merged["label"] = la if lengths[a] >= lengths[b] else lb
+        merged["label"] = (
+            sa.get("label")
+            if lengths[a] >= lengths[b]
+            else sb.get("label")
+        )
         total = lengths[a] + lengths[b]
         for key in ("energy", "onset", "bass"):
             merged[key] = (
@@ -414,6 +439,8 @@ class TrackMap:
     beat_harmonic: list[float] = field(default_factory=list)
     beat_percussive: list[float] = field(default_factory=list)
     beat_prominence: list[float] = field(default_factory=list)
+    beat_energy: list[float] = field(default_factory=list)
+    beat_bass: list[float] = field(default_factory=list)
     sample_rate: int = 48000
     version: int = CACHE_VERSION
 
@@ -656,21 +683,33 @@ class ShowAnalyzer:
         threshold = float(np.mean(novelty) + 0.6 * np.std(novelty))
         boundaries = list(_pick_peaks(novelty, max(3, len(bar_features) // 12), threshold))
 
-        # Production drops are also visible as a sharp energy/transient jump
-        # even when the harmony (and therefore the SSM) barely changes.
+        # Production drops and section entries are visible as a sharp
+        # energy/transient/sub jump even when the harmony barely changes.
+        # Compare against both the previous bar and a 2-bar mean: a one-bar
+        # pre-drop hit must not hide the impact that follows it.
         energy_arr = np.asarray(bar_energy, dtype=np.float64)
         onset_arr = np.asarray(bar_onset, dtype=np.float64)
         bass_arr = np.asarray(bar_bass, dtype=np.float64)
-        for b in range(2, max(2, len(bar_energy) - 1)):
-            prev_e = float(np.mean(energy_arr[max(0, b - 2):b]))
-            prev_o = float(np.mean(onset_arr[max(0, b - 2):b]))
-            prev_b = float(np.mean(bass_arr[max(0, b - 2):b]))
-            if (
-                energy_arr[b] > prev_e * 1.25
-                and onset_arr[b] > prev_o * 1.15
-                and bass_arr[b] > prev_b * 1.05
-            ):
+        impact_bars: set[int] = set()
+        for b in range(1, max(1, len(bar_energy) - 1)):
+            before_e = float(np.mean(energy_arr[max(0, b - 2):b]))
+            before_o = float(np.mean(onset_arr[max(0, b - 2):b]))
+            before_b = float(np.mean(bass_arr[max(0, b - 2):b]))
+            last_e, last_o, last_b = (
+                energy_arr[b - 1],
+                onset_arr[b - 1],
+                bass_arr[b - 1],
+            )
+            e_jump = (
+                energy_arr[b] > last_e * 1.18 and energy_arr[b] > before_e * 1.05
+            ) or energy_arr[b] > before_e * 1.12
+            o_jump = onset_arr[b] > last_o * 1.10 and onset_arr[b] > before_o * 1.02
+            b_jump = (
+                bass_arr[b] > last_b * 1.12 and bass_arr[b] > before_b * 1.03
+            ) or bass_arr[b] > before_b * 1.10
+            if e_jump and o_jump and b_jump:
                 boundaries.append(b)
+                impact_bars.add(b)
 
         boundaries = [b for b in boundaries if 0 < b < len(bar_features)]
         boundaries = [0] + boundaries + [len(bar_features)]
@@ -681,6 +720,7 @@ class ShowAnalyzer:
         bar_bass = np.asarray(bar_bass, dtype=np.float64)
         median_energy = max(float(np.median(bar_energy)), 1e-9)
         median_onset = max(float(np.median(bar_onset)), 1e-9)
+        median_bass = max(float(np.median(bar_bass)), 1e-9)
         p75_energy = float(np.percentile(bar_energy, 75)) if len(bar_energy) else median_energy
 
         raw = []
@@ -693,22 +733,52 @@ class ShowAnalyzer:
             raw.append({
                 "start": start_t,
                 "end": end_t,
+                "start_bar": a,
                 "energy": float(np.mean(bar_energy[a:z])),
                 "onset": float(np.mean(bar_onset[a:z])),
                 "bass": float(np.mean(bar_bass[a:z])),
                 "label": "verse",
             })
         if not raw:
-            raw = [{"start": 0.0, "end": duration, "energy": float(np.mean(bar_energy)),
-                    "onset": float(np.mean(bar_onset)), "bass": float(np.mean(bar_bass)), "label": "verse"}]
+            raw = [{"start": 0.0, "end": duration, "start_bar": 0,
+                    "energy": float(np.mean(bar_energy)),
+                    "onset": float(np.mean(bar_onset)),
+                    "bass": float(np.mean(bar_bass)), "label": "verse"}]
+
+        beat_period = 60.0 / max(tempo, 1.0)
+        bar_seconds = 4.0 * beat_period
+
+        # Novelty sometimes fires a one-bar fragment; absorb those before
+        # labelling so the fragment cannot steal a drop's true start.
+        for index, section in enumerate(raw):
+            section["label"] = (
+                "intro" if index == 0 else "outro" if index == len(raw) - 1 else "verse"
+            )
+        raw = _merge_short_sections(
+            raw, bar_seconds, min_bars=2, protected={"intro", "outro"}
+        )
 
         drop_indices = set()
         for i, sec in enumerate(raw):
-            loud = sec["energy"] >= max(p75_energy, median_energy * 1.15)
-            busy = sec["onset"] >= median_onset * 0.80
-            # A drop can run all the way to the end; the first section stays
-            # intro even when the track slams in immediately.
-            if i > 0 and loud and busy:
+            if i == 0:
+                continue
+            if sec["end"] - sec["start"] < 1.5 * bar_seconds:
+                continue
+            prev = raw[i - 1]
+            started_on_impact = int(sec.get("start_bar", -1)) in impact_bars
+            high = sec["energy"] >= (
+                max(p75_energy * 0.88, median_energy * 1.05)
+                if started_on_impact
+                else max(p75_energy * 0.92, median_energy * 1.08)
+            )
+            ratio = sec["energy"] / max(prev["energy"], 1e-9)
+            impact = ratio >= 1.20 and sec["onset"] >= median_onset * 0.85
+            quiet_before = prev["energy"] < median_energy * 0.88
+            if high and (
+                impact
+                or started_on_impact
+                or (quiet_before and sec["bass"] >= median_bass * 1.02)
+            ):
                 drop_indices.add(i)
         if not drop_indices and len(raw) >= 3:
             interior = [i for i in range(1, len(raw) - 1)]
@@ -724,14 +794,66 @@ class ShowAnalyzer:
                 sec["label"] = "intro"
             elif i == len(raw) - 1:
                 sec["label"] = "outro"
-            elif raw[i]["energy"] < median_energy * 0.72:
+            elif sec["energy"] < median_energy * 0.72:
                 sec["label"] = "breakdown"
-        for i in drop_indices:
+            elif sec["energy"] >= p75_energy * 0.98 and sec["onset"] >= median_onset * 0.90:
+                sec["label"] = "chorus"
+            else:
+                sec["label"] = "verse"
+        for i in sorted(drop_indices):
             if i - 1 >= 0 and raw[i - 1]["label"] not in ("intro", "drop"):
                 raw[i - 1]["label"] = "build"
 
+        # Adjacent drop sections are one peak region, not two cues.
+        joined: list[dict] = []
+        for sec in raw:
+            if joined and sec["label"] == "drop" and joined[-1]["label"] == "drop":
+                head = joined[-1]
+                length_head = head["end"] - head["start"]
+                length_tail = sec["end"] - sec["start"]
+                total = max(length_head + length_tail, 1e-9)
+                for key in ("energy", "onset", "bass"):
+                    head[key] = (
+                        float(head.get(key, 0.0)) * length_head
+                        + float(sec.get(key, 0.0)) * length_tail
+                    ) / total
+                head["end"] = sec["end"]
+                continue
+            joined.append(sec)
+        raw = joined
+
+        # Macro sections stay stable, but never at the cost of dropping a
+        # structural anchor.  8 bars preserves real 8/16-bar phrases.
+        raw = _merge_short_sections(
+            raw,
+            bar_seconds,
+            min_bars=8,
+            protected={"intro", "outro", "drop", "pre_drop", "build", "breakdown"},
+        )
+        # A one-bar start transient should not produce a one-bar "Intro" marker
+        # in front of a long ambient breakdown; absorb it into that section and
+        # keep the intro label.
+        if (
+            len(raw) > 1
+            and raw[0]["label"] == "intro"
+            and raw[0]["end"] - raw[0]["start"] < 2.0 * bar_seconds
+            and raw[1]["label"] == "breakdown"
+        ):
+            head, tail = raw[0], raw[1]
+            length_head = head["end"] - head["start"]
+            length_tail = tail["end"] - tail["start"]
+            total = max(length_head + length_tail, 1e-9)
+            for key in ("energy", "onset", "bass"):
+                tail[key] = (
+                    float(head.get(key, 0.0)) * length_head
+                    + float(tail.get(key, 0.0)) * length_tail
+                ) / total
+            tail["start"] = head["start"]
+            tail["label"] = "intro"
+            del raw[0]
+
+        drop_indices = {i for i, sec in enumerate(raw) if sec["label"] == "drop"}
         drops = [float(raw[i]["start"]) for i in sorted(drop_indices)]
-        # Event windows survive the macro-section merge below.
         drop_windows = [
             {"start": round(float(raw[i]["start"]), 4), "end": round(float(raw[i]["end"]), 4)}
             for i in sorted(drop_indices)
@@ -739,7 +861,6 @@ class ShowAnalyzer:
 
         # Pre-drop vacuum: split the last 0.5-2 beats off the section before a drop.
         pre_drops = []
-        beat_period = 60.0 / max(tempo, 1.0)
         for drop_time in drops:
             vac = _detect_vacuum(drop_time, beat_period, onset, bass_env, fps)
             if not vac:
@@ -753,12 +874,20 @@ class ShowAnalyzer:
                     break
         raw.sort(key=lambda s: s["start"])
 
-        # Macro sections: no flapping every few seconds. Drop/pre-drop remain
-        # exact cue events via drop_windows/pre_drops above.
-        raw = _merge_short_sections(raw, 4.0 * beat_period, min_bars=16)
-
         # Beat-indexed cue features.
         beat_idx = np.clip(beat_frames, 0, mag.shape[1] - 1)
+        energy_win = max(3, int(round(fps)))
+        energy_smooth = np.convolve(
+            frame_energy, np.ones(energy_win) / energy_win, mode="same"
+        )
+        bass_win = max(3, int(round(fps * 0.5)))
+        bass_smooth = np.convolve(bass_env, np.ones(bass_win) / bass_win, mode="same")
+        energy_ref = max(
+            float(np.percentile(energy_smooth[beat_idx], 95)), 1e-9
+        )
+        bass_ref = max(float(np.percentile(bass_smooth[beat_idx], 95)), 1e-9)
+        beat_energy = np.clip(energy_smooth[beat_idx] / energy_ref, 0.0, 1.0)
+        beat_bass = np.clip(bass_smooth[beat_idx] / bass_ref, 0.0, 1.0)
         smooth_harm = np.convolve(harm_energy, np.ones(31) / 31.0, mode="same")
         harmonic_norm = smooth_harm[beat_idx] / max(float(np.percentile(smooth_harm, 90)), 1e-9)
         perc_norm = (
@@ -773,17 +902,25 @@ class ShowAnalyzer:
             peak = max(float(np.max(frame_energy[beat_idx[a:z]])), 1e-9)
             prominence[i] = float(frame_energy[beat_idx[i]]) / peak
 
+        energy_scale = max(float(np.percentile(bar_energy, 95)), 1e-9)
+        bass_scale = max(float(np.percentile(bar_bass, 95)), 1e-9)
+        onset_scale = max(float(np.percentile(bar_onset, 95)), 1e-9)
         sections = []
         for sec in raw:
             start_beat = float(np.searchsorted(beat_times, sec["start"]))
             end_beat = float(np.searchsorted(beat_times, sec["end"]))
+            label = str(sec["label"])
             sections.append({
-                "label": sec["label"],
+                "label": label,
                 "start": round(float(sec["start"]), 4),
                 "end": round(float(sec["end"]), 4),
                 "start_beat": round(start_beat, 3),
                 "end_beat": round(max(start_beat, end_beat), 3),
                 "beats_in_section": round(max(0.0, (sec["end"] - sec["start"]) / beat_period), 3),
+                "energy": round(min(1.0, float(sec["energy"]) / energy_scale), 4),
+                "bass": round(min(1.0, float(sec["bass"]) / bass_scale), 4),
+                "onset": round(min(1.0, float(sec["onset"]) / onset_scale), 4),
+                "mood": _SECTION_MOOD.get(label, "groove"),
             })
 
         return TrackMap(
@@ -800,6 +937,8 @@ class ShowAnalyzer:
             beat_harmonic=[round(float(v), 4) for v in np.clip(harmonic_norm, 0.0, 1.0)],
             beat_percussive=[round(float(v), 4) for v in np.clip(perc_norm, 0.0, 1.0)],
             beat_prominence=[round(float(v), 4) for v in np.clip(prominence, 0.0, 1.0)],
+            beat_energy=[round(float(v), 4) for v in beat_energy],
+            beat_bass=[round(float(v), 4) for v in beat_bass],
             sample_rate=int(sample_rate),
         )
 

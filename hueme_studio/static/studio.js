@@ -7,19 +7,107 @@ import {
   formatTime,
   toast,
 } from "./client.js";
+import { MDI } from "./icons.js";
 
 const client = new StudioClient();
 const $ = (selector) => document.querySelector(selector);
 
+// One icon language for every control.  Paths come from Material Design
+// Icons (Pictogrammers, Apache-2.0) and are vendored in icons.js.
+const ICONS = {
+  play: MDI.play,
+  pause: MDI.pause,
+  start: MDI["skip-previous"],
+  end: MDI["skip-next"],
+  loop: MDI.repeat,
+  undo: MDI.undo,
+  redo: MDI.redo,
+  split: MDI["content-cut"],
+  mute: MDI["volume-off"],
+  plus: MDI.plus,
+  minus: MDI.minus,
+  close: MDI.close,
+  folder: MDI["folder-outline"],
+  folderOpen: MDI["folder-open-outline"],
+  chevron: MDI["chevron-right"],
+  chevronDown: MDI["chevron-down"],
+  keyframe: MDI["rhombus-outline"],
+  function: MDI["function-variant"],
+  lock: MDI["lock-outline"],
+  power: MDI.power,
+  zoomIn: MDI["magnify-plus-outline"],
+  zoomOut: MDI["magnify-minus-outline"],
+  deck: MDI.monitor,
+  solo: MDI.target,
+  copy: MDI["content-copy"],
+  cut: MDI["content-cut"],
+  paste: MDI["content-paste"],
+  delete: MDI["delete-outline"],
+  duplicate: MDI["content-duplicate"],
+  blend: MDI["layers-triple-outline"],
+  layers: MDI["layers-plus"],
+  palette: MDI["palette-outline"],
+  auto: MDI["auto-fix"],
+  fx: MDI.creation,
+  settings: MDI["tune-variant"],
+  rename: MDI["rename-outline"],
+  eye: MDI["eye-outline"],
+  eyeOff: MDI["eye-off-outline"],
+  check: MDI.check,
+  warning: MDI["alert-outline"],
+  info: MDI["information-outline"],
+  refresh: MDI.refresh,
+  save: MDI["content-save-outline"],
+  drag: MDI.drag,
+  record: MDI.record,
+  stop: MDI.stop,
+  link: MDI["link-variant"],
+  filter: MDI["filter-variant"],
+  music: MDI["music-note"],
+  camera: MDI.camera,
+  grid: MDI.grid,
+  waveform: MDI.waveform,
+  color: MDI["format-color-fill"],
+  sparkles: MDI.creation,
+};
+
+function icon(name, className = "") {
+  const span = el("span", {
+    class: `icon${className ? ` ${className}` : ""}`,
+    "aria-hidden": "true",
+  });
+  const path = ICONS[name] || MDI["help-circle-outline"] || "";
+  span.innerHTML = `<svg viewBox="0 0 24 24"><path d="${path}"/></svg>`;
+  return span;
+}
+
+function setIcon(button, name, label) {
+  if (!button) return;
+  if (button.dataset.icon !== name) {
+    button.replaceChildren(icon(name, name === "play" || name === "pause" ? "svg-fill" : ""));
+    button.dataset.icon = name;
+  }
+  if (label) button.setAttribute("aria-label", label);
+}
+
 const dom = {
+  root: $("#studio-root"),
   showSelect: $("#show-select"),
   timecode: $("#timecode"),
   play: $("#btn-play"),
   toStart: $("#btn-to-start"),
   toEnd: $("#btn-to-end"),
   loop: $("#btn-loop"),
-  sync: $("#sync-status"),
+  sync: $("#ma-lock"),
+  maPair: $("#ma-pair"),
+  maRestart: $("#ma-restart"),
+  proxyBadge: $("#proxy-badge"),
+  hw: $("#hw-toggle"),
   link: $("#link-status"),
+  undo: $("#undo"),
+  redo: $("#redo"),
+  undoCount: $("#undo-count"),
+  redoCount: $("#redo-count"),
   mcp: $("#btn-mcp"),
   mcpDrawer: $("#mcp-drawer"),
   mcpClose: $("#mcp-close"),
@@ -32,20 +120,35 @@ const dom = {
   blueprintStatus: $("#blueprint-status"),
   audio: $("#preview-audio"),
   audioVolume: $("#audio-volume"),
+  librarySearch: $("#library-search"),
+  libraryCount: $("#library-count"),
+  splitLeft: $("#split-left"),
+  splitRight: $("#split-right"),
+  splitTimeline: $("#split-timeline"),
+  syncMarkers: $("#sync-markers"),
   presetList: $("#preset-list"),
   filterList: $("#filter-list"),
   rigSelect: $("#rig-select"),
   rigDirty: $("#rig-dirty"),
+  hardwareStatus: $("#hardware-status"),
   fixtureList: $("#fixture-list"),
   fixtureCount: $("#fixture-count"),
   groupList: $("#group-list"),
   groupEditor: $("#group-editor"),
   viewport: $("#viewport"),
+  fxPreview: $("#fx-preview"),
+  fxToggle: $("#fx-toggle"),
   viewportStatus: $("#viewport-status"),
+  transformHud: $("#transform-hud"),
   inspectorBody: $("#inspector-body"),
+  paletteList: $("#palette-list"),
+  paletteNew: $("#palette-new"),
   timeline: $("#timeline"),
   history: $("#history-label"),
   grid: $("#grid-select"),
+  autoKeys: $("#auto-keys"),
+  addGlobal: $("#add-track-global"),
+  addSub: $("#add-track-sub"),
 };
 
 const TRACK_COLORS = ["#d06b4a", "#5e9aa8", "#9b7fb5", "#8fa65a", "#b3925a"];
@@ -78,11 +181,20 @@ const camera = {
   target: [3.25, 4.0, 2.55],
   fov: (50 * Math.PI) / 180,
   fitted: false,
+  ortho: false,
+  orthoSize: 12,
 };
-const view = { start: 0, end: 0, labelW: 120, rulerH: 24, trackH: 28 };
+let axisTriadHits = [];
+let axisTriadHover = null;
+let lastFlatView = { axis: 1, opposite: false };
+const view = { start: 0, end: 0, labelW: 140, rulerH: 28, trackH: 28, audioH: 74, scrollY: 0 };
 let viewportSize = { w: 1, h: 1 };
 let timelineSize = { w: 1, h: 1 };
+let timelineRows = [];
+let lastShowId = null;
 let viewportDrag = null;
+let transformOp = null;
+let lastPointerClient = null;
 let timelineDrag = null;
 let drawQueued = false;
 let fieldSeq = 0;
@@ -95,6 +207,33 @@ let audioWarned = false;
 let audioNoticeShown = false;
 let mcpLog = [];
 let mcpTimer = 0;
+let timecodeMode = 0;
+let workspace = "compose";
+let proxyHealth = null;
+let audioAnalysis = null;
+let audioAnalysisKey = null;
+let audioAnalysisLoading = false;
+let audioLaneDrag = null;
+let heightDrag = null;
+let heightCommitTimer = 0;
+const collapsedFolders = new Set();
+const openLanes = new Set();
+const openExpressions = new Set();
+let lastHistory = { undo_depth: 0, redo_depth: 0 };
+let libraryQuery = "";
+const collapsedCategories = new Set();
+const openTracks = new Set();
+let contextMenu = null;
+let scrollDrag = null;
+let fxMode = false;
+let fxImage = null;
+let fxImageKey = "";
+let fxLoading = false;
+let fxQueued = false;
+let fxError = "";
+let clipboard = null;
+const LAYOUT_KEY = "hueme.studio.layout.v1";
+const TRACK_EXPANDED_KEY = "hueme.studio.openTracks.v1";
 
 function roomDoc() {
   return state?.rig?.document?.room || { min: [0, 0, 0], max: [6.5, 8, 5.1] };
@@ -121,6 +260,71 @@ function beatSeconds() {
 function gridSeconds() {
   const beats = { "1/1": 4, "1/2": 2, "1/4": 1, "1/8": 0.5, "1/16": 0.25 };
   return beatSeconds() * (beats[dom.grid.value] || 1);
+}
+
+function curveAt(values, index) {
+  if (!values?.length) return 0;
+  return clamp(Number(values[Math.min(index, values.length - 1)]) || 0, 0, 1);
+}
+
+// Mirrors BlueprintEnvelope/deterministic_envelope so timeline expression
+// lanes show the same audio values the Python compositor will use.
+function envelopeAt(t) {
+  const time = Math.max(0, Number(t) || 0);
+  const doc = showDoc();
+  const timing = doc?.timing || {};
+  const beatGrid = Number(timing.beat_grid_s || 60 / Number(timing.bpm || 120));
+  const beatOffset = Number(timing.beat_offset_s || 0);
+  const beatPos = (time - beatOffset) / Math.max(1e-6, beatGrid);
+  const beatPhase = beatPos - Math.floor(beatPos);
+  const barPos = ((Math.floor(beatPos) % 4) + 4) % 4;
+  const bpm = Number(timing.bpm || 120);
+  if (blueprint?.beats?.length) {
+    const beats = blueprint.beats.map(Number);
+    let index = 0;
+    for (let i = 0; i < beats.length; i += 1) {
+      if (beats[i] <= time) index = i;
+      else break;
+    }
+    const start = beats[index];
+    const period = beats[index + 1] > start
+      ? beats[index + 1] - start
+      : 60 / Math.max(1, bpm);
+    const phase = ((time - start) / period) % 1;
+    const curves = blueprint.curves || {};
+    const perc = curveAt(curves.percussive, index);
+    const harm = curveAt(curves.harmonic, index);
+    const prom = curveAt(curves.prominence, index);
+    const pulse = Math.exp(-phase * 3) * (0.45 + 0.55 * prom);
+    const kick = perc * Math.exp(-phase * 6);
+    const snare = index % 4 === 1 || index % 4 === 3
+      ? (perc * 0.9 + 0.05) * Math.exp(-phase * 10)
+      : 0.02;
+    const eighth = (phase * 2) % 1;
+    const hat = (0.25 + 0.75 * perc) * Math.exp(-eighth * 10);
+    const energy = curveAt(curves.energy, index) || clamp(0.3 + 0.4 * harm + 0.3 * perc, 0, 1);
+    const bass = curveAt(curves.bass, index) || clamp(0.15 + 0.85 * kick, 0, 1);
+    return {
+      pulse: clamp(pulse, 0, 1), kick: clamp(kick, 0, 1), snare: clamp(snare, 0, 1),
+      hat: clamp(hat, 0, 1), energy, harmonic: harm, percussive: perc,
+      prominence: prom, bass, mid: clamp(0.2 + 0.8 * snare, 0, 1), high: clamp(hat, 0, 1),
+      beatPos, beatPhase, barPos, bpm,
+    };
+  }
+  const eighth = (beatPos * 2) % 1;
+  const pulse = Math.exp(-beatPhase * 3);
+  const kick = Math.exp(-beatPhase * 8);
+  const snare = barPos === 1 || barPos === 3 ? Math.exp(-beatPhase * 11) : 0.02;
+  const hat = 0.5 * Math.exp(-eighth * 12);
+  const duration = Math.max(1, Number(doc?.duration_s || 60));
+  const energy = clamp(0.48 + 0.16 * Math.sin((2 * Math.PI * time) / (duration * 2)) + 0.1 * pulse, 0, 1);
+  const harmonic = 0.5 + 0.5 * Math.sin((2 * Math.PI * beatPos) / 16);
+  return {
+    pulse: clamp(pulse, 0, 1), kick: clamp(kick, 0, 1), snare: clamp(snare, 0, 1),
+    hat: clamp(hat, 0, 1), energy, harmonic, percussive: 0, prominence: 0,
+    bass: clamp(0.2 + 0.8 * kick, 0, 1), mid: clamp(0.3 + 0.3 * snare, 0, 1),
+    high: clamp(hat, 0, 1), beatPos, beatPhase, barPos, bpm,
+  };
 }
 
 function snapTime(value) {
@@ -160,6 +364,18 @@ function findTrack(id = selectedTrackId) {
 
 function presetById(id) {
   return state?.presets?.find((preset) => preset.id === id) || null;
+}
+
+function presetName(id) {
+  return presetById(id)?.name || id;
+}
+
+function clipDisplayName(clip) {
+  return clip?.name || presetName(clip?.preset);
+}
+
+function trackNameAuto(track) {
+  return Boolean(track?.name_auto);
 }
 
 function defaultParams(presetId) {
@@ -217,6 +433,7 @@ function requestDraw() {
     drawQueued = false;
     drawViewport();
     drawTimeline();
+    if (fxMode) refreshFxPreview();
   });
 }
 
@@ -239,47 +456,108 @@ function resizeAll() {
   viewportSize = { w: viewport.w, h: viewport.h };
   const timeline = sizeCanvas(dom.timeline);
   timelineSize = { w: timeline.w, h: timeline.h };
+  if (fxMode && dom.fxPreview) sizeCanvas(dom.fxPreview);
   requestDraw();
 }
 
-/* ------------------------------------------------------------------ state */
-function onState() {
-  state = client.state;
-  if (!state) return;
-  sanitizeSelection();
-  renderShowSelect();
-  renderRigSelect();
-  renderPresets();
-  renderFilters();
-  renderFixtures();
-  renderGroups();
-  renderInspector();
-  updateTransport();
-  updateDirty();
-  const total = duration();
-  if (!camera.fitted && state.rig.compiled.voxel_count >= 0) {
-    fitCamera(false);
-    camera.fitted = true;
+/* ------------------------------------------------------------ resizable panes */
+function layoutVar(name, value) {
+  const px = `${Math.round(value)}px`;
+  dom.root.style.setProperty(name, px);
+  document.documentElement.style.setProperty(name, px);
+}
+
+function loadLayout() {
+  let saved = null;
+  try {
+    saved = JSON.parse(localStorage.getItem(LAYOUT_KEY) || "null");
+  } catch {
+    saved = null;
   }
-  if (view.end <= 0 || view.end > total + 0.001) {
-    view.start = 0;
-    view.end = Math.max(1, Math.min(total || 1, 60));
+  const maxSide = Math.max(240, window.innerWidth - 500);
+  if (saved && Number.isFinite(saved.left)) layoutVar("--left-w", clamp(saved.left, 220, maxSide));
+  if (saved && Number.isFinite(saved.right)) layoutVar("--right-w", clamp(saved.right, 240, maxSide));
+  if (saved && Number.isFinite(saved.timeline)) {
+    layoutVar("--timeline-h", clamp(saved.timeline, 180, Math.max(200, window.innerHeight - 200)));
   }
-  resizeAll();
-  syncBlueprint();
-  syncAudioSource();
-  syncAudioPlayback();
+  try {
+    const tracks = JSON.parse(localStorage.getItem(TRACK_EXPANDED_KEY) || "[]");
+    if (Array.isArray(tracks)) tracks.forEach((id) => openTracks.add(id));
+  } catch {
+    /* ignore malformed layout cache */
+  }
+}
+
+function saveLayout() {
+  const style = getComputedStyle(dom.root);
+  const left = parseFloat(style.getPropertyValue("--left-w")) || 300;
+  const right = parseFloat(style.getPropertyValue("--right-w")) || 310;
+  const timeline = parseFloat(style.getPropertyValue("--timeline-h")) || 360;
+  try {
+    localStorage.setItem(LAYOUT_KEY, JSON.stringify({ left, right, timeline }));
+    localStorage.setItem(TRACK_EXPANDED_KEY, JSON.stringify([...openTracks]));
+  } catch {
+    /* private mode: layout is simply not persisted */
+  }
+}
+
+function bindSplitters() {
+  const bind = (element, orientation) => {
+    if (!element) return;
+    element.addEventListener("pointerdown", (event) => {
+      event.preventDefault();
+      const style = getComputedStyle(dom.root);
+      const startLeft = parseFloat(style.getPropertyValue("--left-w")) || 300;
+      const startRight = parseFloat(style.getPropertyValue("--right-w")) || 310;
+      const startTimeline = parseFloat(style.getPropertyValue("--timeline-h")) || 360;
+      const startX = event.clientX;
+      const startY = event.clientY;
+      element.setPointerCapture(event.pointerId);
+      element.classList.add("dragging");
+      document.body.classList.add("resizing");
+      const move = (moveEvent) => {
+        const maxSide = Math.max(240, window.innerWidth - 500);
+        if (orientation === "left") {
+          layoutVar("--left-w", clamp(startLeft + moveEvent.clientX - startX, 220, maxSide));
+        } else if (orientation === "right") {
+          layoutVar("--right-w", clamp(startRight - (moveEvent.clientX - startX), 240, maxSide));
+        } else {
+          layoutVar("--timeline-h", clamp(startTimeline - (moveEvent.clientY - startY), 180, Math.max(200, window.innerHeight - 200)));
+        }
+      };
+      const up = () => {
+        element.classList.remove("dragging");
+        document.body.classList.remove("resizing");
+        window.removeEventListener("pointermove", move);
+        window.removeEventListener("pointerup", up);
+        saveLayout();
+        resizeAll();
+      };
+      window.addEventListener("pointermove", move);
+      window.addEventListener("pointerup", up);
+    });
+    element.addEventListener("dblclick", () => {
+      const defaults = { left: "--left-w", right: "--right-w", timeline: "--timeline-h" };
+      const values = { left: 300, right: 310, timeline: 360 };
+      layoutVar(defaults[orientation], values[orientation]);
+      saveLayout();
+      resizeAll();
+    });
+  };
+  bind(dom.splitLeft, "left");
+  bind(dom.splitRight, "right");
+  bind(dom.splitTimeline, "timeline");
 }
 
 function updateBlueprintStatus() {
   const meta = state?.show?.blueprint;
   const audio = Boolean(meta?.audio_available);
   dom.blueprintStatus.textContent = meta
-    ? `${meta.bpm} BPM / ${meta.section_count} sections / ${audio ? "AUDIO" : "NO WAV"}`
+    ? `${meta.bpm} BPM / ${meta.section_count} sections / ${audio ? "AUDIO" : "ANALYSIS"}`
     : "NO AUDIO";
   dom.blueprintStatus.title = audio
-    ? "Attached WAV plays with the timeline"
-    : "Upload a 16-bit WAV to hear the timeline";
+    ? "Attached audio plays with the timeline"
+    : "Upload audio (WAV, MP3, FLAC, M4A, MP4, OGG)";
   dom.blueprintStatus.style.color = meta ? "var(--text-1)" : "var(--text-2)";
 }
 
@@ -324,6 +602,8 @@ function syncAudioSource() {
       audioSourceUrl = null;
       audioPendingSeek = null;
     }
+    audioAnalysis = null;
+    audioAnalysisKey = null;
     return;
   }
   if (url === audioSourceUrl || url === audioFailedUrl) return;
@@ -331,6 +611,72 @@ function syncAudioSource() {
   audioPendingSeek = previewTime();
   dom.audio.src = url;
   dom.audio.load();
+}
+
+async function syncAudioAnalysis() {
+  const url = audioUrl();
+  if (!url) {
+    audioAnalysis = null;
+    audioAnalysisKey = null;
+    requestDraw();
+    return;
+  }
+  if (url === audioAnalysisKey || audioAnalysisLoading) return;
+  audioAnalysisKey = url;
+  audioAnalysisLoading = true;
+  requestDraw();
+  try {
+    const response = await fetch(url);
+    if (!response.ok) throw new Error(`audio ${response.status}`);
+    const bytes = await response.arrayBuffer();
+    const AudioContextClass = window.AudioContext || window.webkitAudioContext;
+    if (!AudioContextClass) throw new Error("Web Audio unavailable");
+    const context = new AudioContextClass();
+    const decoded = await context.decodeAudioData(bytes.slice(0));
+    const channel = decoded.getChannelData(0);
+    const buckets = Math.min(4096, Math.max(512, Math.floor(channel.length / 256)));
+    const mins = new Float32Array(buckets);
+    const maxs = new Float32Array(buckets);
+    const rms = new Float32Array(buckets);
+    const step = channel.length / buckets;
+    let globalPeak = 1e-6;
+    for (let bucket = 0; bucket < buckets; bucket += 1) {
+      const start = Math.floor(bucket * step);
+      const end = Math.min(channel.length, Math.floor((bucket + 1) * step));
+      let lo = 0;
+      let hi = 0;
+      let sum = 0;
+      for (let index = start; index < end; index += 1) {
+        const value = channel[index];
+        if (value < lo) lo = value;
+        if (value > hi) hi = value;
+        sum += value * value;
+      }
+      mins[bucket] = lo;
+      maxs[bucket] = hi;
+      rms[bucket] = Math.sqrt(sum / Math.max(1, end - start));
+      globalPeak = Math.max(globalPeak, Math.abs(lo), Math.abs(hi));
+    }
+    for (let bucket = 0; bucket < buckets; bucket += 1) {
+      mins[bucket] /= globalPeak;
+      maxs[bucket] /= globalPeak;
+      rms[bucket] /= globalPeak;
+    }
+    audioAnalysis = {
+      buckets,
+      min: mins,
+      max: maxs,
+      rms,
+      duration: decoded.duration,
+    };
+    await context.close();
+  } catch {
+    audioAnalysis = null;
+    audioAnalysisKey = null;
+  } finally {
+    audioAnalysisLoading = false;
+    requestDraw();
+  }
 }
 
 function playPreviewAudio() {
@@ -383,9 +729,10 @@ async function syncBlueprint() {
 async function uploadBlueprint(file) {
   const showId = activeShowId();
   if (!file || !showId) return;
+  dom.syncMarkers.disabled = true;
   try {
     const response = await fetch(
-      `/api/shows/${encodeURIComponent(showId)}/blueprint?source=${encodeURIComponent(file.name)}`,
+      `/api/shows/${encodeURIComponent(showId)}/blueprint?source=${encodeURIComponent(file.name)}&sync_show=true`,
       {
         method: "POST",
         headers: { "Content-Type": "application/octet-stream" },
@@ -395,13 +742,46 @@ async function uploadBlueprint(file) {
     const text = await response.text();
     const data = text ? JSON.parse(text) : null;
     if (!response.ok) throw new Error(data?.detail || `${response.status} ${response.statusText}`);
-    toast(`AudioBlueprint: ${data.bpm} BPM, ${data.beat_count} beats`, "ok");
+    const sections = Number(data.section_count || 0);
+    const drops = Number(data.drop_count || 0);
+    toast(
+      `AudioBlueprint: ${data.bpm} BPM · ${sections} Sections · ${drops} Drops — Marker gesetzt`,
+      "success"
+    );
     blueprintKey = null;
     audioFailedUrl = null;
     audioNoticeShown = false;
     await client.refresh();
+    const markers = showDoc()?.timing?.markers?.length || 0;
+    if (!markers) {
+      toast("Analyse ohne Sections: Marker manuell setzen oder Sync erneut ausführen.", "info", 6000);
+    }
   } catch (error) {
     toast(error.message, "danger");
+  } finally {
+    dom.syncMarkers.disabled = false;
+  }
+}
+
+async function syncMarkersFromBlueprint() {
+  const showId = activeShowId();
+  if (!showId) return;
+  dom.syncMarkers.disabled = true;
+  try {
+    const result = await client.post(`/api/shows/${encodeURIComponent(showId)}/sync-from-blueprint`);
+    if (state?.show && result?.document) state.show.document = result.document;
+    blueprintKey = null;
+    lastHistory = result.history || lastHistory;
+    await syncBlueprint();
+    renderInspector();
+    requestDraw();
+    await refreshHistory();
+    const markers = state?.show?.document?.timing?.markers?.length || 0;
+    toast(`Marker synchronisiert: ${markers}`, "success");
+  } catch (error) {
+    toast(error.message, "danger");
+  } finally {
+    dom.syncMarkers.disabled = false;
   }
 }
 
@@ -417,6 +797,43 @@ function sanitizeSelection() {
   }
 }
 
+function onState() {
+  state = client.state;
+  if (!state) return;
+  proxyHealth = state.proxy_health || state.rig?.proxy_health || null;
+  if (lastShowId !== state.show.id) {
+    lastShowId = state.show.id;
+    view.scrollY = 0;
+    view.start = 0;
+    view.end = Math.max(1, Math.min(Number(state.show.document?.duration_s) || 1, 60));
+  }
+  sanitizeSelection();
+  renderShowSelect();
+  renderRigSelect();
+  renderPresets();
+  renderFilters();
+  renderPalettes();
+  renderFixtures();
+  renderGroups();
+  renderInspector();
+  updateTransport();
+  updateDirty();
+  updateTopbar();
+  syncAudioAnalysis();
+  const total = duration();
+  if (!camera.fitted && state.rig.compiled.voxel_count >= 0) {
+    fitCamera(false);
+    camera.fitted = true;
+  }
+  if (view.end <= 0 || view.end > total + 0.001) {
+    view.start = 0;
+    view.end = Math.max(1, Math.min(total || 1, 60));
+  }
+  resizeAll();
+  syncBlueprint();
+  syncAudioSource();
+  syncAudioPlayback();
+}
 function updateDirty() {
   dom.rigDirty.classList.toggle("hidden", !state.rig.dirty);
   dom.rigSelect.value = state.rig.active || "";
@@ -424,26 +841,114 @@ function updateDirty() {
   dom.rigSelect.title = active ? `${active.fixture_count} fixtures / ${active.voxel_count} voxels` : "";
 }
 
+function updateTopbar() {
+  if (!state) return;
+  const health = proxyHealth || { assigned_proxies: 0, required_proxies: 0, ok: false };
+  if (dom.proxyBadge) {
+    dom.proxyBadge.textContent = `PROXIES ${health.assigned_proxies}/${health.required_proxies} ${health.ok ? "OK" : "ERR"}`;
+    dom.proxyBadge.classList.toggle("bad", !health.ok);
+    dom.proxyBadge.title = [
+      `${health.hue_count ?? 0} Hue bulbs`,
+      `${health.assigned_proxies ?? 0} proxies assigned`,
+      `${health.required_proxies ?? 0} required`,
+      health.ok ? "proxy plan valid" : "proxy plan incomplete",
+    ].join(" | ");
+  }
+  const hardware = state.hardware || {};
+  if (dom.hw) {
+    dom.hw.classList.toggle("active", Boolean(hardware.enabled));
+    dom.hw.setAttribute("aria-pressed", String(Boolean(hardware.enabled)));
+    dom.hw.title = hardware.enabled
+      ? `Hardware output ON | ${hardware.tx_operations || 0} tx`
+      : "Hardware output OFF";
+    dom.hw.classList.toggle("bad", Boolean(hardware.enabled && hardware.last_error));
+  }
+  if (dom.hardwareStatus) {
+    const tx = Number(hardware.tx_operations || 0);
+    dom.hardwareStatus.textContent = hardware.enabled
+      ? `HW OUT ${hardware.started ? "READY" : "STARTING"} · ${tx} tx${hardware.last_error ? ` · ${hardware.last_error}` : ""}`
+      : "HW OUT OFF";
+    dom.hardwareStatus.title = hardware.last_error || (hardware.enabled ? "Hardware frames are being sent" : "Physical output is disabled");
+    dom.hardwareStatus.style.color = hardware.last_error
+      ? "var(--danger)"
+      : hardware.enabled
+        ? "var(--ok)"
+        : "var(--text-2)";
+  }
+  updateSync();
+  if (dom.undoCount) dom.undoCount.textContent = String(lastHistory.undo_depth || 0);
+  if (dom.redoCount) dom.redoCount.textContent = String(lastHistory.redo_depth || 0);
+  if (dom.undo) dom.undo.disabled = !(lastHistory.undo_depth > 0);
+  if (dom.redo) dom.redo.disabled = !(lastHistory.redo_depth > 0);
+  updateTimecode();
+}
+
 function updateTransport() {
   const playback = state?.playback || {};
-  dom.timecode.textContent = formatTime(playback.time_s || 0);
-  dom.play.textContent = playback.playing ? "PAUSE" : "PLAY";
+  setIcon(dom.play, playback.playing ? "pause" : "play", playback.playing ? "Pause" : "Play");
   dom.play.classList.toggle("active", Boolean(playback.playing));
   dom.loop.classList.toggle("active", Boolean(playback.loop));
   dom.link.textContent = client.connected ? "PREVIEW LIVE" : "OFFLINE";
   dom.link.style.color = client.connected ? "var(--ok)" : "var(--text-2)";
+  updateTimecode();
   updateSync();
 }
 
+function currentTime() {
+  return Number(client.frame?.time ?? state?.playback?.time_s ?? 0);
+}
+
+function timelineActive() {
+  if (document.activeElement === dom.timeline) return true;
+  if (!lastPointerClient) return false;
+  const pane = dom.timeline.closest(".timeline") || dom.timeline;
+  const rect = pane.getBoundingClientRect();
+  return (
+    lastPointerClient.x >= rect.left && lastPointerClient.x <= rect.right &&
+    lastPointerClient.y >= rect.top && lastPointerClient.y <= rect.bottom
+  );
+}
+
+function stepFrames(direction, count = 1) {
+  const total = duration();
+  if (total <= 0) return;
+  const fps = Math.max(1, Number(state?.playback?.fps || 30));
+  const frame = Math.round(currentTime() * fps) + direction * count;
+  const time = clamp(frame / fps, 0, total);
+  if (state?.playback?.playing) client.pause();
+  client.seek(time);
+}
+
+function timecodeText(time = currentTime()) {
+  if (timecodeMode === 1) {
+    const fps = Math.max(1, Number(state?.playback?.fps || 30));
+    return `F ${String(Math.max(0, Math.floor(time * fps))).padStart(6, "0")}`;
+  }
+  if (timecodeMode === 2) {
+    const grid = beatSeconds();
+    const offset = Number(showDoc()?.timing?.beat_offset_s || 0);
+    const beats = Math.max(0, (time - offset) / Math.max(1e-6, grid));
+    const bar = Math.floor(beats / 4) + 1;
+    const beat = Math.floor(beats % 4) + 1;
+    const tick = Math.floor((beats - Math.floor(beats)) * 100);
+    return `${String(bar).padStart(3, "0")}.${beat}.${String(tick).padStart(2, "0")}`;
+  }
+  return formatTime(time);
+}
+
+function updateTimecode() {
+  if (dom.timecode) dom.timecode.textContent = timecodeText();
+}
+
 const SYNC_LABELS = {
-  off: "MA OFF",
-  waiting: "MA WAIT",
-  unconfigured: "MA --",
+  off: "MA LOCK",
+  waiting: "MA LOCK",
+  unconfigured: "MA LOCK",
   disconnected: "MA OFFLINE",
   no_track: "MA IDLE",
   no_match: "MA NO MATCH",
   acquiring: "MA ACQ",
-  locked: "MA LOCK",
+  locked: "MA LOCKED",
   paused: "MA PAUSED",
   ended: "MA END",
 };
@@ -451,19 +956,24 @@ const SYNC_LABELS = {
 function updateSync() {
   if (!dom.sync) return;
   const sync = state?.sync || {};
-  dom.sync.textContent = SYNC_LABELS[sync.state] || "MA --";
+  dom.sync.textContent = SYNC_LABELS[sync.state] || "MA LOCK";
   dom.sync.disabled = !sync.configured;
-  dom.sync.classList.toggle("active", sync.state === "locked");
-  dom.sync.style.color =
-    sync.state === "locked"
+  const unpaired = Boolean(sync.configured && sync.connected && sync.paired === false);
+  dom.maPair?.classList.toggle("hidden", !unpaired);
+  dom.maRestart?.classList.toggle("hidden", !sync.configured);
+  const active = Boolean(sync.enabled);
+  dom.sync.classList.toggle("active", active);
+  dom.sync.setAttribute("aria-pressed", String(active));
+  dom.sync.style.color = active
+    ? sync.state === "locked"
       ? "var(--ok)"
-      : sync.state === "acquiring"
-        ? "var(--warn)"
-        : "";
+      : "var(--accent)"
+    : "";
   const track = sync.track;
   dom.sync.title = sync.configured
     ? [
-        sync.enabled ? "MA sync enabled" : "MA sync disabled",
+        sync.enabled ? "MA auto-show enabled" : "MA auto-show disabled",
+        unpaired ? "UNPAIRED - PAIR button shows the Sendspin token" : "paired",
         track ? `${track.artist || "?"} - ${track.title || "?"}` : "no track",
         sync.matched_show_id ? `show ${sync.matched_show_id}` : "no matching show",
         `${Math.round((sync.error_s || 0) * 1000)} ms / ${(sync.rate || 1).toFixed(3)}x`,
@@ -494,108 +1004,356 @@ function renderRigSelect() {
   }
 }
 
-function renderPresets() {
-  dom.presetList.replaceChildren(
-    ...(state.presets || []).map((preset) => {
-      const selected = findClip()?.clip.preset === preset.id;
-      const row = el(
-        "button",
-        {
-          class: `list-row${selected ? " selected" : ""}`,
-          type: "button",
-          title: preset.description,
-          onclick: () => applyPreset(preset.id),
-        },
-        el("span", { class: "row-name", text: preset.name }),
-        el("span", { class: "row-meta", text: String(preset.params.length) })
-      );
-      return row;
-    })
+const FILTER_CATEGORIES = {
+  spatial_blur: "Spatial",
+  mirror_symmetry: "Spatial",
+  grain_noise: "Texture",
+  color_grade: "Colour",
+  invert_color: "Colour",
+  dim2warm: "Colour",
+  hue_rotate: "Colour",
+  saturation: "Colour",
+  brightness_curve: "Colour",
+  strobe_shutter: "Time",
+  beat_gate: "Time",
+  inertia: "Time",
+  scanline: "Texture",
+  pixelate: "Texture",
+  posterize: "Texture",
+  audio_mod: "Audio",
+};
+
+function libraryQueryMatch(text) {
+  if (!libraryQuery) return true;
+  return String(text || "").toLowerCase().includes(libraryQuery);
+}
+
+// A native double-click fires click twice. Apply a library action once per
+// short window so a double-click cannot create two commits/undo entries.
+const libraryActionTimes = new Map();
+function libraryActionOnce(key, action) {
+  const now = performance.now();
+  const last = libraryActionTimes.get(key) || 0;
+  if (now - last < 350) return;
+  libraryActionTimes.set(key, now);
+  action();
+}
+
+function categoryGroup(category, entries, buildBody) {
+  const closed = !libraryQuery && collapsedCategories.has(category);
+  const head = el(
+    "button",
+    {
+      class: "preset-group-head",
+      type: "button",
+      "aria-expanded": String(!closed),
+      onclick: () => {
+        if (collapsedCategories.has(category)) collapsedCategories.delete(category);
+        else collapsedCategories.add(category);
+        renderPresets();
+        renderFilters();
+      },
+    },
+    el("span", { class: "group-toggle", text: closed ? "▸" : "▾" }),
+    el("span", { text: category }),
+    el("span", { class: "group-count", text: String(entries.length) })
+  );
+  return el(
+    "div",
+    { class: `preset-group${closed ? " closed" : ""}` },
+    head,
+    el("div", { class: "preset-group-body" }, ...buildBody(entries))
   );
 }
 
+function previewImage(kind, item) {
+  const src = kind === "preset"
+    ? `/api/presets/${encodeURIComponent(item.id)}/preview.png?t=0.65`
+    : `/api/filters/${encodeURIComponent(item.id)}/preview.png?t=0.65`;
+  const img = el("img", {
+    class: "preset-preview",
+    src,
+    alt: "",
+    loading: "lazy",
+    decoding: "async",
+    draggable: "false",
+  });
+  img.addEventListener("error", () => {
+    img.classList.add("preview-missing");
+    img.removeAttribute("src");
+  });
+  return img;
+}
+
+function renderPresets() {
+  const presets = state.presets || [];
+  const selected = findClip()?.clip.preset;
+  const groups = new Map();
+  for (const preset of presets) {
+    const category = preset.category || "Presets";
+    if (!libraryQueryMatch(`${preset.name} ${preset.description || ""} ${category}`)) continue;
+    if (!groups.has(category)) groups.set(category, []);
+    groups.get(category).push(preset);
+  }
+  const nodes = [];
+  for (const [category, entries] of groups) {
+    nodes.push(categoryGroup(category, entries, (items) =>
+      items.map((preset) => {
+        const row = el(
+          "button",
+          {
+            class: `list-row preset-row${selected === preset.id ? " selected" : ""}`,
+            type: "button",
+            title: preset.description,
+            draggable: "true",
+            onclick: () => libraryActionOnce(`preset:${preset.id}`, () => applyPreset(preset.id)),
+            oncontextmenu: (event) => {
+              event.preventDefault();
+              showContextMenu(event.clientX, event.clientY, [
+                { label: "Auf ausgewählten Clip anwenden", fn: () => applyPreset(preset.id) },
+                { label: "In Timeline am Playhead einfügen", fn: () => addPresetClipAtPlayhead(preset.id) },
+                { separator: true },
+                { label: "Preset-Info", fn: () => modalConfirm(preset.name, preset.description || preset.name, "OK"), disabled: !preset.description },
+              ]);
+            },
+            ondragstart: (event) => {
+              event.dataTransfer.setData(
+                "application/x-hueme-preset",
+                JSON.stringify({ preset: preset.id })
+              );
+              event.dataTransfer.effectAllowed = "copy";
+            },
+          },
+          previewImage("preset", preset),
+          el("span", { class: "row-text" },
+            el("span", { class: "row-name", text: preset.name }),
+            el("span", { class: "row-desc", text: preset.description || category })
+          ),
+          el("span", { class: "row-meta", text: `${preset.params.length}p` })
+        );
+        return row;
+      })
+    ));
+  }
+  if (!nodes.length) nodes.push(el("div", { class: "library-empty", text: libraryQuery ? "Keine Presets gefunden." : "Keine Presets geladen." }));
+  dom.presetList.replaceChildren(...nodes);
+  updateLibraryCount();
+}
+
 function renderFilters() {
-  dom.filterList.replaceChildren(
-    ...(state.filters || []).map((filter) =>
-      el(
-        "button",
-        {
-          class: "list-row",
-          type: "button",
-          title: filter.description,
-          onclick: () => addFilter(filter.id),
-        },
-        el("span", { class: "row-name", text: filter.name }),
-        el("span", { class: "row-meta", text: filter.params.length ? `${filter.params.length}p` : "" })
-      )
-    )
+  const filters = state.filters || [];
+  const groups = new Map();
+  for (const filter of filters) {
+    if (!libraryQueryMatch(`${filter.name} ${filter.description || ""}`)) continue;
+    const category = FILTER_CATEGORIES[filter.id] || "Utility";
+    if (!groups.has(category)) groups.set(category, []);
+    groups.get(category).push(filter);
+  }
+  const nodes = [];
+  const filterOrder = ["Spatial", "Colour", "Time", "Texture", "Audio", "Utility"];
+  const orderedGroups = [...groups.entries()].sort(
+    (a, b) => filterOrder.indexOf(a[0]) - filterOrder.indexOf(b[0])
   );
+  for (const [category, entries] of orderedGroups) {
+    nodes.push(categoryGroup(`${category} FX`, entries, (items) =>
+      items.map((filter) =>
+        el(
+          "button",
+          {
+            class: "list-row filter-row",
+            type: "button",
+            title: filter.description,
+            draggable: "true",
+            onclick: () => libraryActionOnce(`filter:${filter.id}`, () => addFilter(filter.id)),
+            oncontextmenu: (event) => {
+              event.preventDefault();
+              showContextMenu(event.clientX, event.clientY, [
+                { label: "Auf ausgewählten Clip anwenden", fn: () => addFilter(filter.id) },
+                { label: "Filter-Info", fn: () => modalConfirm(filter.name, filter.description || filter.name, "OK"), disabled: !filter.description },
+              ]);
+            },
+            ondragstart: (event) => {
+              event.dataTransfer.setData(
+                "application/x-hueme-filter",
+                JSON.stringify({ filter: filter.id })
+              );
+              event.dataTransfer.effectAllowed = "copy";
+            },
+          },
+          previewImage("filter", filter),
+          el("span", { class: "row-text" },
+            el("span", { class: "row-name", text: filter.name }),
+            el("span", { class: "row-desc", text: filter.description || category })
+          ),
+          el("span", { class: "row-meta", text: filter.params.length ? `${filter.params.length}p` : "" })
+        )
+      )
+    ));
+  }
+  if (!nodes.length) nodes.push(el("div", { class: "library-empty", text: libraryQuery ? "Keine Effekte gefunden." : "Keine Effekte geladen." }));
+  dom.filterList.replaceChildren(...nodes);
+  updateLibraryCount();
+}
+
+function updateLibraryCount() {
+  if (!dom.libraryCount) return;
+  const presets = (state?.presets || []).filter((preset) =>
+    libraryQueryMatch(`${preset.name} ${preset.description || ""} ${preset.category || ""}`)
+  ).length;
+  const filters = (state?.filters || []).filter((filter) =>
+    libraryQueryMatch(`${filter.name} ${filter.description || ""}`)
+  ).length;
+  dom.libraryCount.textContent = `${presets} / ${filters}`;
+}
+
+function selectFixtures(ids) {
+  selectedFixtures = new Set(ids);
+  inspectorTab = "fixture";
+  updateTabButtons();
+  renderFixtures();
+  renderGroups();
+  renderInspector();
+  requestDraw();
+}
+
+function fixtureRow(fixture) {
+  const selected = selectedFixtures.has(fixture.id);
+  const protocol = fixture.output?.protocol || "none";
+  const enabled = fixture.output?.enabled !== false;
+  const reasons = fixture.incomplete_reasons || [];
+  const visibility = el("button", {
+    class: `fixture-toggle${enabled ? " on" : ""}`,
+    type: "button",
+    title: enabled ? "Disable output" : "Enable output",
+    onclick: (event) => {
+      event.stopPropagation();
+      patchFixture(fixture.id, { output: { enabled: !enabled } });
+    },
+  }, icon("power"));
+  const row = el(
+    "div",
+    {
+      class: `tree-row tree-indent${selected ? " selected" : ""}${reasons.length ? " incomplete" : ""}`,
+      role: "button",
+      tabindex: "0",
+      draggable: "true",
+      title: reasons.length ? reasons.join("\n") : fixture.name,
+      onclick: (event) => selectFixture(fixture.id, event.shiftKey),
+      ondragstart: (event) => {
+        const ids = selectedFixtures.has(fixture.id) ? [...selectedFixtures] : [fixture.id];
+        event.dataTransfer.setData("application/x-hueme-fixtures", JSON.stringify(ids));
+        event.dataTransfer.effectAllowed = "copy";
+      },
+    },
+    reasons.length ? el("span", { class: "warning-dot" }) : el("span", { class: "warning-dot hidden" }),
+    visibility,
+    el("span", { class: `badge fixture-badge ${PROTOCOL_CLASS[protocol] || ""}`, text: PROTOCOL_LABEL[protocol] || protocol.toUpperCase() }),
+    el("span", { class: "row-name", text: fixture.name }),
+    el("span", {
+      class: "row-meta",
+      text: [reasons.length ? "!" : "", fixture.geometry?.type === "line" ? `${fixture.geometry.pixels}px` : "1"].filter(Boolean).join(" "),
+    })
+  );
+  row.addEventListener("keydown", (event) => {
+    if (event.key === "Enter" || event.code === "Space") {
+      event.preventDefault();
+      selectFixture(fixture.id, event.shiftKey);
+    }
+  });
+  return row;
+}
+
+function folderRow(folder, fixtures) {
+  const collapsed = collapsedFolders.has(folder.id);
+  const allSelected = fixtures.length > 0 && fixtures.every((fixture) => selectedFixtures.has(fixture.id));
+  const row = el(
+    "div",
+    {
+      class: `tree-folder${allSelected ? " active" : ""}`,
+      role: "button",
+      tabindex: "0",
+      title: `${fixtures.length} fixtures`,
+      onclick: () => selectFixtures(fixtures.map((fixture) => fixture.id)),
+    },
+    el("button", {
+      class: "fixture-toggle",
+      type: "button",
+      title: collapsed ? "Open folder" : "Collapse folder",
+      onclick: (event) => {
+        event.stopPropagation();
+        if (collapsed) collapsedFolders.delete(folder.id);
+        else collapsedFolders.add(folder.id);
+        renderFixtures();
+      },
+    }, icon("chevron", collapsed ? "" : "")),
+    el("span", { class: "folder-icon" }, icon("folder")),
+    el("span", { text: folder.name }),
+    el("span", { class: "folder-count", text: String(fixtures.length) })
+  );
+  if (collapsed) row.querySelector(".icon")?.classList.add("collapsed");
+  return row;
 }
 
 function renderFixtures() {
   const doc = state.rig.document;
   dom.fixtureCount.textContent = `${doc.fixtures.length} fx / ${state.rig.compiled.voxel_count} vox`;
-  const rows = doc.fixtures.map((fixture) => {
-    const selected = selectedFixtures.has(fixture.id);
-    const protocol = fixture.output?.protocol || "none";
-    const enabled = fixture.output?.enabled !== false;
-    const visibility = el("button", {
-      class: "button small icon-button",
-      type: "button",
-      title: enabled ? "Disable output" : "Enable output",
-      text: enabled ? "ON" : "OFF",
-      style: `width:30px;color:${enabled ? "var(--text-1)" : "var(--text-2)"}`,
-      onclick: (event) => {
-        event.stopPropagation();
-        patchFixture(fixture.id, { output: { enabled: !enabled } });
-      },
-    });
-    const row = el(
-      "div",
-      {
-        class: `list-row${selected ? " selected" : ""}`,
-        role: "button",
-        tabindex: "0",
-        draggable: "true",
-        onclick: (event) => selectFixture(fixture.id, event.shiftKey),
-        ondragstart: (event) => {
-          const ids = selectedFixtures.has(fixture.id) ? [...selectedFixtures] : [fixture.id];
-          event.dataTransfer.setData("application/x-hueme-fixtures", JSON.stringify(ids));
-          event.dataTransfer.effectAllowed = "copy";
-        },
-      },
-      visibility,
-      el("span", {
-        class: `badge ${PROTOCOL_CLASS[protocol] || ""}`,
-        text: PROTOCOL_LABEL[protocol] || protocol.toUpperCase(),
-      }),
-      el("span", { class: "row-name", text: fixture.name }),
-      el("span", {
-        class: "row-meta",
-        text: String(fixture.geometry?.type === "line" ? fixture.geometry.pixels : 1),
-      })
-    );
-    row.addEventListener("keydown", (event) => {
-      if (event.key === "Enter" || event.code === "Space") {
-        event.preventDefault();
-        selectFixture(fixture.id, event.shiftKey);
+  const fixturesByFolder = new Map();
+  for (const fixture of doc.fixtures) {
+    const key = fixture.folder_id || "";
+    if (!fixturesByFolder.has(key)) fixturesByFolder.set(key, []);
+    fixturesByFolder.get(key).push(fixture);
+  }
+  const nodes = [];
+  const folders = doc.folders || [];
+  const placed = new Set();
+  for (const folder of folders) {
+    const fixtures = fixturesByFolder.get(folder.id) || [];
+    if (!fixtures.length) continue;
+    nodes.push(folderRow(folder, fixtures));
+    if (!collapsedFolders.has(folder.id)) {
+      for (const fixture of fixtures) {
+        nodes.push(fixtureRow(fixture));
+        placed.add(fixture.id);
       }
-    });
-    return row;
-  });
-  dom.fixtureList.replaceChildren(...rows);
+    } else {
+      for (const fixture of fixtures) placed.add(fixture.id);
+    }
+  }
+  const loose = doc.fixtures.filter((fixture) => !placed.has(fixture.id));
+  if (loose.length) {
+    nodes.push(el("div", { class: "preset-category", text: "Unfiled" }));
+    nodes.push(...loose.map(fixtureRow));
+  }
+  if (!nodes.length) nodes.push(el("div", { class: "tree-empty", text: "No fixtures" }));
+  dom.fixtureList.replaceChildren(...nodes);
+}
+
+function groupFixtureIds(group) {
+  const compiled = state.rig.compiled;
+  if (group.type === "list") return group.fixtures || [];
+  if (group.type === "all") return state.rig.document.fixtures.map((fixture) => fixture.id);
+  const indices = compiled.groups?.[group.id] || [];
+  const fixtures = state.rig.document.fixtures;
+  const ids = new Set();
+  for (const voxel of indices) {
+    const fixtureIndex = compiled.voxel_fixture_index?.[voxel] ?? 0;
+    const fixture = fixtures[fixtureIndex];
+    if (fixture) ids.add(fixture.id);
+  }
+  return [...ids];
 }
 
 function renderGroups() {
   const doc = state.rig.document;
   const compiled = state.rig.compiled.groups || {};
-  dom.groupList.replaceChildren(
+  const nodes = [
+    el("div", { class: "preset-category", text: "Gruppen" }),
     ...doc.groups.map((group) => {
-      const count = compiled[group.id]?.length ?? 0;
+      const ids = groupFixtureIds(group);
       const row = el(
         "div",
         {
-          class: `list-row${selectedGroupId === group.id ? " selected" : ""}`,
+          class: `tree-row${selectedGroupId === group.id ? " selected" : ""}`,
           role: "button",
           tabindex: "0",
           ondragover: (event) => {
@@ -616,22 +1374,51 @@ function renderGroups() {
           },
           onclick: () => {
             selectedGroupId = group.id;
-            renderGroups();
+            if (ids.length) selectFixtures(ids);
+            else {
+              renderGroups();
+              renderInspector();
+              requestDraw();
+            }
           },
         },
         el("span", { class: "row-name", text: group.name }),
-        el("span", { class: "row-meta", text: `${group.type === "all" ? "ALL" : group.type.replace("spatial_", "")} ${count}` })
+        el("span", { class: "row-meta", text: `${group.type === "all" ? "ALL" : group.type.replace("spatial_", "")} ${ids.length}` })
       );
       row.addEventListener("keydown", (event) => {
         if (event.key === "Enter" || event.code === "Space") {
           event.preventDefault();
-          selectedGroupId = group.id;
-          renderGroups();
+          row.click();
         }
       });
       return row;
-    })
-  );
+    }),
+  ];
+  const smart = doc.smart_groups || [];
+  if (smart.length) {
+    nodes.push(el("div", { class: "preset-category", text: "Smart-Auswahl" }));
+    for (const group of smart) {
+      const ids = group.fixtures || [];
+      const row = el(
+        "div",
+        {
+          class: `tree-row smart-row${selectedGroupId === group.id ? " selected" : ""}`,
+          role: "button",
+          tabindex: "0",
+          title: "Smart selection group",
+          onclick: () => {
+            selectedGroupId = group.id;
+            selectFixtures(ids);
+          },
+        },
+        el("span", { class: "smart-hash", text: "#" }),
+        el("span", { class: "row-name", text: group.name }),
+        el("span", { class: "row-meta", text: String((compiled[group.id] || ids).length) })
+      );
+      nodes.push(row);
+    }
+  }
+  dom.groupList.replaceChildren(...nodes);
   renderGroupEditor();
 }
 
@@ -685,13 +1472,25 @@ function project(point) {
   const basis = cameraBasis();
   const relative = sub(point, basis.eye);
   const depth = dot(relative, basis.forward);
-  if (depth <= 0.05) return null;
+  if (!camera.ortho && depth <= 0.05) return null;
   const focal = (viewportSize.h * 0.5) / Math.tan(camera.fov * 0.5);
+  if (camera.ortho) {
+    const worldPerPixel = camera.orthoSize / Math.max(1, viewportSize.h);
+    return {
+      x: viewportSize.w * 0.5 + dot(relative, basis.right) / worldPerPixel,
+      y: viewportSize.h * 0.5 - dot(relative, basis.up) / worldPerPixel,
+      depth,
+      focal: depth * viewportSize.h / Math.max(1e-6, camera.orthoSize),
+      ortho: true,
+      worldPerPixel,
+    };
+  }
   return {
     x: viewportSize.w * 0.5 + (dot(relative, basis.right) * focal) / depth,
     y: viewportSize.h * 0.5 - (dot(relative, basis.up) * focal) / depth,
     depth,
     focal,
+    ortho: false,
   };
 }
 
@@ -703,12 +1502,194 @@ function fitCamera(redraw = true) {
   const radius = Math.hypot(max[0] - min[0], max[1] - min[1], max[2] - min[2]) / 2;
   camera.target = center;
   camera.distance = Math.max(2, (radius / Math.tan(camera.fov * 0.5)) * 1.25);
+  camera.orthoSize = Math.max(2, Math.max(max[0] - min[0], max[1] - min[1], max[2] - min[2]) * 1.3);
   camera.yaw = -0.78;
   camera.pitch = 0.52;
   if (redraw) requestDraw();
 }
 
+function setOrthoView(axis, opposite = false) {
+  const room = roomDoc();
+  const min = room.min;
+  const max = room.max;
+  const center = [
+    (min[0] + max[0]) / 2,
+    (min[1] + max[1]) / 2,
+    (min[2] + max[2]) / 2,
+  ];
+  const radius = Math.hypot(max[0] - min[0], max[1] - min[1], max[2] - min[2]) / 2;
+  const extent = Math.max(max[0] - min[0], max[1] - min[1], max[2] - min[2]);
+  camera.target = center;
+  camera.distance = Math.max(4, radius * 4.5);
+  camera.orthoSize = Math.max(2, extent * 1.3);
+  camera.ortho = true;
+  camera.pitch = 0;
+  if (axis === 0) {
+    camera.yaw = opposite ? -Math.PI / 2 : Math.PI / 2;
+    camera.pitch = 0;
+  } else if (axis === 1) {
+    camera.yaw = opposite ? Math.PI : 0;
+    camera.pitch = 0;
+  } else {
+    camera.yaw = 0;
+    camera.pitch = opposite ? -Math.PI / 2 + 1e-4 : Math.PI / 2 - 1e-4;
+  }
+  lastFlatView = { axis, opposite };
+  requestDraw();
+}
+
+function toggleCameraProjection() {
+  camera.ortho = !camera.ortho;
+  if (camera.ortho) {
+    const room = roomDoc();
+    const extent = Math.max(
+      room.max[0] - room.min[0],
+      room.max[1] - room.min[1],
+      room.max[2] - room.min[2]
+    );
+    camera.orthoSize = Math.max(2, extent * 1.3);
+  }
+  requestDraw();
+}
+
+function cameraViewLabel() {
+  if (Math.abs(camera.pitch) > 1.5) return camera.pitch > 0 ? "TOP" : "BOTTOM";
+  const tau = Math.PI * 2;
+  const yaw = ((camera.yaw % tau) + tau) % tau;
+  if (yaw < 0.02 || yaw > tau - 0.02) return "FRONT";
+  if (Math.abs(yaw - Math.PI) < 0.02) return "BACK";
+  if (Math.abs(yaw - Math.PI / 2) < 0.02) return "RIGHT";
+  if (Math.abs(yaw - (3 * Math.PI) / 2) < 0.02) return "LEFT";
+  return "USER";
+}
+
+function fxTargetClip() {
+  const selected = findClip();
+  if (selected) return selected;
+  const doc = showDoc();
+  if (!doc) return null;
+  const t = currentTime();
+  for (const track of doc.tracks) {
+    const clip = track.clips.find((item) => t >= item.start_s && t < item.end_s);
+    if (clip) return { track, clip };
+  }
+  return null;
+}
+
+function fxRequestPayload() {
+  const found = fxTargetClip();
+  const doc = showDoc();
+  if (!found || !doc) return null;
+  const hasFilters = (found.clip.filters || []).some((filter) => filter.enabled);
+  return {
+    clip: found.clip,
+    t: Number(currentTime().toFixed(3)),
+    timing: doc.timing,
+    width: hasFilters ? 48 : 128,
+    height: hasFilters ? 27 : 72,
+  };
+}
+
+function setFxMode(enabled) {
+  fxMode = Boolean(enabled);
+  dom.root.classList.toggle("fx-mode", fxMode);
+  dom.fxToggle?.classList.toggle("active", fxMode);
+  dom.fxPreview?.classList.toggle("hidden", !fxMode);
+  if (!fxMode) {
+    if (fxImage?.close) fxImage.close();
+    fxImage = null;
+    fxImageKey = "";
+    fxError = "";
+  } else {
+    refreshFxPreview(true);
+  }
+  requestDraw();
+}
+
+async function refreshFxPreview(force = false) {
+  if (!fxMode) return;
+  const payload = fxRequestPayload();
+  if (!payload) {
+    if (fxImage?.close) fxImage.close();
+    fxImage = null;
+    fxImageKey = "";
+    fxError = "";
+    requestDraw();
+    return;
+  }
+  const key = JSON.stringify(payload);
+  if (!force && key === fxImageKey) return;
+  if (fxLoading) {
+    fxQueued = true;
+    return;
+  }
+  fxLoading = true;
+  try {
+    const response = await fetch("/api/preview/effect", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    });
+    if (!response.ok) {
+      const detail = await response.text();
+      throw new Error(detail || `Preview HTTP ${response.status}`);
+    }
+    const bitmap = await createImageBitmap(await response.blob());
+    if (fxMode) {
+      if (fxImage?.close) fxImage.close();
+      fxImage = bitmap;
+      fxImageKey = key;
+      fxError = "";
+    } else if (bitmap.close) {
+      bitmap.close();
+    }
+  } catch (error) {
+    fxError = error.message || "Preview failed";
+    fxImageKey = key;
+  } finally {
+    fxLoading = false;
+    const again = fxQueued;
+    fxQueued = false;
+    if (again) refreshFxPreview();
+    requestDraw();
+  }
+}
+
+function drawFxPreview() {
+  const canvas = dom.fxPreview;
+  if (!canvas) return;
+  const { w, h, context } = sizeCanvas(canvas);
+  context.fillStyle = "#08090b";
+  context.fillRect(0, 0, w, h);
+  if (fxImage) {
+    const ratio = Math.min(w / fxImage.width, h / fxImage.height);
+    const dw = fxImage.width * ratio;
+    const dh = fxImage.height * ratio;
+    context.imageSmoothingEnabled = true;
+    context.drawImage(fxImage, (w - dw) / 2, (h - dh) / 2, dw, dh);
+  } else {
+    context.fillStyle = "#2a2d33";
+    context.font = "11px JetBrains Mono, monospace";
+    context.textAlign = "center";
+    context.fillText(
+      fxError || (fxLoading ? "RENDERING FX …" : "KEIN CLIP UNTER DEM PLAYHEAD"),
+      w / 2,
+      h / 2
+    );
+    context.textAlign = "left";
+  }
+  const found = fxTargetClip();
+  const label = found
+    ? `FX FRONT · ${clipDisplayName(found.clip)} · ${presetName(found.clip.preset)} · OHNE FIXTURES`
+    : "FX FRONT · OHNE FIXTURES";
+  dom.viewportStatus.textContent = label;
+}
+
 function drawViewport() {
+  if (fxMode) {
+    drawFxPreview();
+    return;
+  }
   const context = dom.viewport.getContext("2d");
   const { w, h } = viewportSize;
   context.clearRect(0, 0, w, h);
@@ -720,15 +1701,27 @@ function drawViewport() {
   const floor = min[2];
   const basis = cameraBasis();
 
-  // Floor grid: 0.5 m minor, 2 m major.
+  // Floor grid: 0.5 m minor, 2 m major. Draw far lines first with depth fade
+  // so the box reads as a solid space instead of crossing wires.
   const step = 0.5;
+  const gridLines = [];
   for (let x = min[0]; x <= max[0] + 1e-6; x += step) {
     const major = Math.abs(x / 2 - Math.round(x / 2)) < 1e-6;
-    drawWorldLine(context, [x, min[1], floor], [x, max[1], floor], major ? "#24272c" : "#191b1f");
+    const a = [x, min[1], floor];
+    const b = [x, max[1], floor];
+    const pa = project(a);
+    const pb = project(b);
+    if (!pa || !pb) continue;
+    gridLines.push({ a, b, color: major ? "#24272c" : "#191b1f", depth: (pa.depth + pb.depth) * 0.5, width: 1, alphaNear: 0.9, alphaFar: 0.3, widthGain: 0.2 });
   }
   for (let y = min[1]; y <= max[1] + 1e-6; y += step) {
     const major = Math.abs(y / 2 - Math.round(y / 2)) < 1e-6;
-    drawWorldLine(context, [min[0], y, floor], [max[0], y, floor], major ? "#24272c" : "#191b1f");
+    const a = [min[0], y, floor];
+    const b = [max[0], y, floor];
+    const pa = project(a);
+    const pb = project(b);
+    if (!pa || !pb) continue;
+    gridLines.push({ a, b, color: major ? "#24272c" : "#191b1f", depth: (pa.depth + pb.depth) * 0.5, width: 1, alphaNear: 0.9, alphaFar: 0.3, widthGain: 0.2 });
   }
 
   // Room box edges.
@@ -747,81 +1740,162 @@ function drawViewport() {
     [4, 5], [5, 6], [6, 7], [7, 4],
     [0, 4], [1, 5], [2, 6], [3, 7],
   ];
+  const roomLines = [];
   for (const [a, b] of edges) {
-    drawWorldLine(context, corners[a], corners[b], "#202329");
+    const pa = project(corners[a]);
+    const pb = project(corners[b]);
+    if (!pa || !pb) continue;
+    roomLines.push({
+      a: corners[a],
+      b: corners[b],
+      color: "#2b3038",
+      depth: (pa.depth + pb.depth) * 0.5,
+      width: 1,
+      alphaNear: 1.0,
+      alphaFar: 0.22,
+      widthGain: 0.7,
+    });
   }
-
-  // Light cones and floor pools first so fixtures stay legible.
-  for (const fixture of state.rig.document.fixtures) {
-    if (fixture.geometry.type !== "point") continue;
-    drawFloorPool(context, fixture);
-    drawCone(context, fixture);
+  const allDepths = [...gridLines, ...roomLines].map((line) => line.depth);
+  const nearDepth = allDepths.length ? Math.min(...allDepths) : 0;
+  const farDepth = allDepths.length ? Math.max(...allDepths) : 1;
+  const depthLines = [...gridLines, ...roomLines].sort((a, b) => b.depth - a.depth);
+  for (const line of depthLines) {
+    const ratio = clamp((line.depth - nearDepth) / Math.max(1e-6, farDepth - nearDepth), 0, 1);
+    context.globalAlpha = line.alphaNear + (line.alphaFar - line.alphaNear) * ratio;
+    drawWorldLine(context, line.a, line.b, line.color, line.width + (1 - ratio) * line.widthGain);
   }
+  context.globalAlpha = 1;
 
-  const fixtures = state.rig.document.fixtures;
+  // Light cones and floor pools were visually noisy and often projected
+  // through walls. Keep only the fixture's own glow and strip colours.
+
+  const fixtures = state.rig.document.fixtures
+    .map((fixture) => {
+      const centre = project(fixtureCenter(fixture.id));
+      return { fixture, depth: centre?.depth ?? camera.distance };
+    })
+    .sort((a, b) => b.depth - a.depth)
+    .map((entry) => entry.fixture);
   for (const fixture of fixtures) {
     const slice = voxelSlice(fixture.id);
     const offset = overrideOffset(fixture.id);
-    const points = fixturePositions(fixture.id).map((point) => add(point, offset));
+    let points = fixturePositions(fixture.id).map((point) => add(point, offset));
+    if (transformOp && transformOp.ids.includes(fixture.id)) {
+      points = points.map((point) => previewTransformPoint(point, transformOp, fixture.id));
+    }
     if (!points.length) continue;
     const selected = selectedFixtures.has(fixture.id);
     if (fixture.geometry.type === "point") {
       const projected = project(points[0]);
       if (!projected) continue;
       const [r, g, b] = rgbAt(slice[0]);
-      const radius = clamp(220 / projected.depth, 2.2, 7);
-      const glow = context.createRadialGradient(projected.x, projected.y, 0, projected.x, projected.y, radius * 4);
-      glow.addColorStop(0, `rgba(${r},${g},${b},0.5)`);
-      glow.addColorStop(1, `rgba(${r},${g},${b},0)`);
-      context.fillStyle = glow;
+      const peak = Math.max(r, g, b) / 255;
+      const radius = clamp(190 / projected.depth, 3, 9);
+      if (peak > 0.015) {
+        context.save();
+        context.globalCompositeOperation = "lighter";
+        const glow = context.createRadialGradient(
+          projected.x, projected.y, 0,
+          projected.x, projected.y, radius * (3.4 + peak * 2.2)
+        );
+        glow.addColorStop(0, `rgba(${r},${g},${b},${(0.42 * peak + 0.05).toFixed(3)})`);
+        glow.addColorStop(0.35, `rgba(${r},${g},${b},${(0.18 * peak).toFixed(3)})`);
+        glow.addColorStop(1, `rgba(${r},${g},${b},0)`);
+        context.fillStyle = glow;
+        context.beginPath();
+        context.arc(projected.x, projected.y, radius * (3.4 + peak * 2.2), 0, Math.PI * 2);
+        context.fill();
+        context.restore();
+      }
+      // Tiny fixture reference dot; no beam geometry.
+      context.fillStyle = peak > 0.015 ? `rgba(${r},${g},${b},0.9)` : "#343841";
       context.beginPath();
-      context.arc(projected.x, projected.y, radius * 4, 0, Math.PI * 2);
+      context.arc(projected.x, projected.y, Math.max(1.6, radius * 0.34), 0, Math.PI * 2);
       context.fill();
-      context.strokeStyle = "#4a4e56";
-      context.lineWidth = 1;
+      context.strokeStyle = selected ? "#e8862e" : "#565b66";
+      context.lineWidth = selected ? 1.5 : 1;
       context.beginPath();
-      context.arc(projected.x, projected.y, radius + 1.5, 0, Math.PI * 2);
+      context.arc(projected.x, projected.y, Math.max(2.4, radius * 0.55), 0, Math.PI * 2);
       context.stroke();
-      context.fillStyle = `rgb(${r},${g},${b})`;
-      context.beginPath();
-      context.arc(projected.x, projected.y, radius, 0, Math.PI * 2);
-      context.fill();
       if (selected) drawFixtureBox(context, points, 0.12);
     } else {
-      const ends = [project(points[0]), project(points[points.length - 1])];
-      if (ends[0] && ends[1]) {
-        context.strokeStyle = "#2b2e34";
-        context.lineWidth = 4;
-        context.beginPath();
-        context.moveTo(ends[0].x, ends[0].y);
-        context.lineTo(ends[1].x, ends[1].y);
-        context.stroke();
-      }
-      let last = null;
-      for (let index = 0; index < points.length; index += 1) {
+      const projectedPoints = [];
+      const step = Math.max(1, Math.floor(points.length / 180));
+      for (let index = 0; index < points.length; index += step) {
         const projected = project(points[index]);
         if (!projected) continue;
         const [r, g, b] = rgbAt(slice[0] + index);
-        if (last) {
-          context.strokeStyle = `rgb(${r},${g},${b})`;
-          context.lineWidth = clamp(160 / projected.depth, 1, 4);
+        projectedPoints.push({ ...projected, color: [r, g, b], peak: Math.max(r, g, b) });
+      }
+      if (projectedPoints.length > 1) {
+        const drawPass = (widthScale, alpha, additive) => {
+          context.save();
+          if (additive) context.globalCompositeOperation = "lighter";
+          context.lineCap = "round";
+          context.lineJoin = "round";
+          for (let index = 1; index < projectedPoints.length; index += 1) {
+            const a = projectedPoints[index - 1];
+            const b = projectedPoints[index];
+            const width = clamp(95 / ((a.depth + b.depth) / 2), 1.4, 4.2) * widthScale;
+            const [r, g, bch] = b.color;
+            context.strokeStyle = alpha == null
+              ? `rgb(${r},${g},${bch})`
+              : `rgba(${r},${g},${bch},${alpha})`;
+            context.lineWidth = width;
+            context.beginPath();
+            context.moveTo(a.x, a.y);
+            context.lineTo(b.x, b.y);
+            context.stroke();
+          }
+          context.restore();
+        };
+        // Housing first, then two additive bloom passes, then the LED core.
+        // Housing stays visible even when the LED output is near black.
+        context.save();
+        context.lineCap = "round";
+        context.strokeStyle = "#2e333d";
+        context.lineWidth = 7;
+        context.beginPath();
+        context.moveTo(projectedPoints[0].x, projectedPoints[0].y);
+        for (const point of projectedPoints.slice(1)) context.lineTo(point.x, point.y);
+        context.stroke();
+        context.strokeStyle = "#14171c";
+        context.lineWidth = 4;
+        context.stroke();
+        context.restore();
+        drawPass(3.4, 0.10, true);
+        drawPass(1.9, 0.28, true);
+        drawPass(1.0, null, false);
+        drawPass(0.75, 0.85, true);
+        context.save();
+        context.globalCompositeOperation = "lighter";
+        for (let index = 0; index < projectedPoints.length; index += 4) {
+          const point = projectedPoints[index];
+          if (point.peak < 150) continue;
+          const halo = context.createRadialGradient(point.x, point.y, 0, point.x, point.y, 7);
+          halo.addColorStop(0, `rgba(${point.color[0]},${point.color[1]},${point.color[2]},${(point.peak / 255 * 0.35).toFixed(3)})`);
+          halo.addColorStop(1, `rgba(${point.color[0]},${point.color[1]},${point.color[2]},0)`);
+          context.fillStyle = halo;
           context.beginPath();
-          context.moveTo(last.x, last.y);
-          context.lineTo(projected.x, projected.y);
-          context.stroke();
+          context.arc(point.x, point.y, 7, 0, Math.PI * 2);
+          context.fill();
         }
-        last = projected;
-        if (index % Math.max(1, Math.floor(points.length / 24)) === 0) {
-          context.fillStyle = `rgb(${r},${g},${b})`;
-          context.fillRect(projected.x - 1, projected.y - 1, 2, 2);
-        }
+        context.restore();
       }
       if (selected) drawFixtureBox(context, points, 0.1);
     }
-    if (selected) {
+    if (selected && selectedFixtures.size === 1) {
       const center = points.reduce((acc, point) => add(acc, point), [0, 0, 0]).map((v) => v / points.length);
       drawAxisHandles(context, center);
     }
+  }
+
+  if (selectedFixtures.size > 1) {
+    const selectedPoints = [...selectedFixtures].flatMap((id) =>
+      fixturePositions(id).map((point) => add(point, overrideOffset(id)))
+    );
+    if (selectedPoints.length) drawFixtureBox(context, selectedPoints, 0.08);
   }
 
   if (viewportDrag?.mode === "marquee") {
@@ -834,15 +1908,48 @@ function drawViewport() {
   }
 
   drawAxisTriad(context, basis);
-  dom.viewportStatus.textContent = `${camera.pitch > 1.3 ? "TOP" : camera.pitch < -1.3 ? "BOTTOM" : "PERSP"}  |  ${state.rig.compiled.voxel_count} VOX  |  ${selectedFixtures.size} SELECTED`;
+  drawTransformGizmo(context);
+  dom.viewportStatus.textContent = `${camera.ortho ? "ORTHO" : "PERSP"} ${cameraViewLabel()}  |  ${state.rig.compiled.voxel_count} VOX  |  ${selectedFixtures.size} SELECTED`;
 }
 
-function drawWorldLine(context, start, end, color) {
+function drawTransformGizmo(context) {
+  if (!transformOp) return;
+  const anchor = transformOp.anchor;
+  const origin = project(anchor);
+  if (!origin) return;
+  const colors = ["#e05a5a", "#58a66b", "#5e9aa8"];
+  const length = 0.85;
+  for (let axis = 0; axis < 3; axis += 1) {
+    const active = transformOp.axis === axis;
+    const plane = transformOp.planeAxis === axis;
+    const end = project(add(anchor, scale(AXIS_VECTORS[axis], length)));
+    if (!end) continue;
+    context.strokeStyle = colors[axis];
+    context.globalAlpha = active ? 1 : plane ? 0.55 : 0.35;
+    context.lineWidth = active ? 3 : 1.5;
+    context.beginPath();
+    context.moveTo(origin.x, origin.y);
+    context.lineTo(end.x, end.y);
+    context.stroke();
+    context.globalAlpha = 1;
+    context.fillStyle = colors[axis];
+    context.font = "bold 9px JetBrains Mono, monospace";
+    context.fillText("XYZ"[axis], end.x + 3, end.y + 3);
+  }
+  context.globalAlpha = 1;
+  context.strokeStyle = "#e8862e";
+  context.lineWidth = 1;
+  context.beginPath();
+  context.arc(origin.x, origin.y, 4, 0, Math.PI * 2);
+  context.stroke();
+}
+
+function drawWorldLine(context, start, end, color, width = 1) {
   const a = project(start);
   const b = project(end);
   if (!a || !b) return;
   context.strokeStyle = color;
-  context.lineWidth = 1;
+  context.lineWidth = width;
   context.beginPath();
   context.moveTo(a.x, a.y);
   context.lineTo(b.x, b.y);
@@ -858,77 +1965,6 @@ function fixtureAim(fixture) {
       fixture.geometry.aim?.[2] ?? -1,
     ]
   );
-}
-
-function drawFloorPool(context, fixture) {
-  const offset = overrideOffset(fixture.id);
-  const center = add(fixturePositions(fixture.id)[0] || [0, 0, 0], offset);
-  const aim = fixtureAim(fixture);
-  const floor = roomDoc().min[2];
-  if (aim[2] > -0.05) return;
-  const distance = (floor - center[2]) / aim[2];
-  if (distance <= 0) return;
-  const hit = add(center, scale(aim, distance));
-  const room = roomDoc();
-  if (
-    hit[0] < room.min[0] || hit[0] > room.max[0] ||
-    hit[1] < room.min[1] || hit[1] > room.max[1]
-  ) {
-    return;
-  }
-  const projected = project(hit);
-  if (!projected) return;
-  const radius = clamp(projected.focal / Math.max(1, projected.depth) * 0.55, 8, 180);
-  const slice = voxelSlice(fixture.id);
-  const [r, g, b] = rgbAt(slice[0]);
-  context.save();
-  context.translate(projected.x, projected.y);
-  context.scale(1, 0.36);
-  const gradient = context.createRadialGradient(0, 0, 0, 0, 0, radius);
-  gradient.addColorStop(0, `rgba(${r},${g},${b},0.13)`);
-  gradient.addColorStop(1, `rgba(${r},${g},${b},0)`);
-  context.fillStyle = gradient;
-  context.beginPath();
-  context.arc(0, 0, radius, 0, Math.PI * 2);
-  context.fill();
-  context.restore();
-}
-
-function drawCone(context, fixture) {
-  const offset = overrideOffset(fixture.id);
-  const center = add(fixturePositions(fixture.id)[0] || [0, 0, 0], offset);
-  const aim = fixtureAim(fixture);
-  const beam = ((fixture.geometry.beam_deg ?? 45) * Math.PI) / 360;
-  const length = 2.4;
-  const radius = Math.tan(beam) * length;
-  let u = normalize(cross(aim, [0, 0, 1]));
-  if (!Number.isFinite(u[0]) || Math.hypot(...u) < 0.001) u = [1, 0, 0];
-  const v = cross(aim, u);
-  const points = [center];
-  for (let index = 0; index < 16; index += 1) {
-    const angle = (index / 16) * Math.PI * 2;
-    points.push(
-      add(
-        add(center, scale(aim, length)),
-        add(scale(u, Math.cos(angle) * radius), scale(v, Math.sin(angle) * radius))
-      )
-    );
-  }
-  const projected = points.map(project);
-  if (projected.some((point) => !point)) return;
-  const slice = voxelSlice(fixture.id);
-  const [r, g, b] = rgbAt(slice[0]);
-  context.save();
-  context.globalCompositeOperation = "lighter";
-  context.fillStyle = `rgba(${r},${g},${b},0.035)`;
-  context.beginPath();
-  context.moveTo(projected[0].x, projected[0].y);
-  for (let index = 1; index < projected.length; index += 1) {
-    context.lineTo(projected[index].x, projected[index].y);
-  }
-  context.closePath();
-  context.fill();
-  context.restore();
 }
 
 function drawFixtureBox(context, points, padding) {
@@ -992,26 +2028,52 @@ function drawAxisHandles(context, center) {
 }
 
 function drawAxisTriad(context, basis) {
-  const origin = [viewportSize.w - 42, viewportSize.h - 42];
+  axisTriadHits = [];
+  const origin = [viewportSize.w - 54, 58];
   const length = 22;
   const axes = [
-    { vector: [1, 0, 0], label: "X" },
-    { vector: [0, 1, 0], label: "Y" },
-    { vector: [0, 0, 1], label: "Z" },
+    { vector: [1, 0, 0], label: "X", color: "#e05a5a" },
+    { vector: [0, 1, 0], label: "Y", color: "#58a66b" },
+    { vector: [0, 0, 1], label: "Z", color: "#5e9aa8" },
   ];
-  context.font = "9px JetBrains Mono, monospace";
+  context.save();
+  context.fillStyle = "rgba(17,18,20,0.66)";
+  context.strokeStyle = "#2b2e34";
   context.lineWidth = 1;
-  for (const axis of axes) {
+  context.beginPath();
+  context.arc(origin[0], origin[1], 34, 0, Math.PI * 2);
+  context.fill();
+  context.stroke();
+  context.font = "9px JetBrains Mono, monospace";
+  for (let index = 0; index < axes.length; index += 1) {
+    const axis = axes[index];
     const dx = dot(axis.vector, basis.right) * length;
     const dy = -dot(axis.vector, basis.up) * length;
-    context.strokeStyle = "#7c8089";
-    context.fillStyle = "#7c8089";
+    const endX = origin[0] + dx;
+    const endY = origin[1] + dy;
+    const hovered = axisTriadHover === index;
+    context.strokeStyle = hovered ? "#e8862e" : axis.color;
+    context.fillStyle = hovered ? "#e8862e" : axis.color;
+    context.lineWidth = hovered ? 2.5 : 1.6;
     context.beginPath();
     context.moveTo(origin[0], origin[1]);
-    context.lineTo(origin[0] + dx, origin[1] + dy);
+    context.lineTo(endX, endY);
     context.stroke();
-    context.fillText(axis.label, origin[0] + dx * 1.18, origin[1] + dy * 1.18);
+    context.fillText(axis.label, endX + dx * 0.18, endY + dy * 0.18 + 3);
+    axisTriadHits.push({ axis: index, x: endX, y: endY, label: axis.label });
   }
+  context.fillStyle = camera.ortho ? "#e8862e" : "#7c8089";
+  context.font = "8px JetBrains Mono, monospace";
+  context.fillText(camera.ortho ? "ORTHO" : "PERSP", origin[0] - 15, origin[1] + 47);
+  axisTriadHits.push({ toggle: true, x: origin[0], y: origin[1] + 44 });
+  context.restore();
+}
+
+function axisTriadAt(x, y) {
+  for (const hit of axisTriadHits) {
+    if (Math.hypot(hit.x - x, hit.y - y) <= (hit.toggle ? 16 : 12)) return hit;
+  }
+  return null;
 }
 
 function fixtureAt(x, y) {
@@ -1062,15 +2124,108 @@ function xToTime(x) {
   return view.start + ((x - view.labelW) / Math.max(1, timelineSize.w - view.labelW)) * span;
 }
 
-function trackIndexAt(y) {
-  return Math.floor((y - view.rulerH) / view.trackH);
+function paramLanes(track) {
+  const params = new Set();
+  if (!track) return [];
+  for (const clip of track.clips || []) {
+    for (const keyframe of clip.keyframes || []) params.add(keyframe.param);
+    for (const param of Object.keys(clip.expressions || {})) params.add(param);
+  }
+  return [...params].slice(0, 6).map((param) => ({ param, expression: null }));
 }
 
-function clipRect(trackIndex, clip) {
-  const x0 = timeToX(clip.start_s);
-  const x1 = timeToX(clip.end_s);
-  const y = view.rulerH + trackIndex * view.trackH + 3;
-  return { x0, x1, y, h: view.trackH - 6 };
+function buildTimelineRows() {
+  const doc = showDoc();
+  if (!doc) {
+    timelineRows = [];
+    return [];
+  }
+  const tracks = doc.tracks || [];
+  const globals = tracks.filter((track) => track.kind === "global");
+  const layers = tracks.filter((track) => track.kind !== "global");
+  const emitted = new Set();
+  const ordered = [];
+  const emit = (track, depth = 0) => {
+    if (emitted.has(track.id)) return;
+    if (track.parent_id) {
+      const parent = layers.find((item) => item.id === track.parent_id);
+      if (parent) emit(parent, Math.max(0, depth - 1));
+    }
+    emitted.add(track.id);
+    ordered.push({ track, depth: track.kind === "sub" ? 1 : depth });
+    for (const child of layers) {
+      if (child.parent_id === track.id && !emitted.has(child.id)) {
+        emitted.add(child.id);
+        ordered.push({ track: child, depth: 1 });
+      }
+    }
+  };
+  for (let index = layers.length - 1; index >= 0; index -= 1) emit(layers[index], 0);
+  const visual = [
+    ...globals.map((track) => ({ track, depth: 0 })),
+    ...ordered,
+  ];
+  const selected = findClip();
+  let y = view.rulerH + view.audioH + 4 - view.scrollY;
+  const rows = [];
+  for (const entry of visual) {
+    const track = entry.track;
+    let lanes = [];
+    if (openTracks.has(track.id) || (selected && selected.track.id === track.id && openLanes.has(selected.clip.id))) {
+      lanes = paramLanes(track);
+    }
+    const baseH = clamp(Number(track.height_px) || 36, 26, 240);
+    const laneH = 18;
+    const h = baseH + lanes.length * laneH;
+    rows.push({
+      track,
+      depth: entry.depth,
+      y,
+      h,
+      baseH,
+      laneH,
+      lanes,
+      laneY: y + baseH,
+      expanded: openTracks.has(track.id) || (selected && selected.track.id === track.id && openLanes.has(selected.clip.id)),
+    });
+    y += h + 2;
+  }
+  timelineRows = rows;
+  const contentHeight = rows.reduce((sum, row) => sum + row.h + 2, 0);
+  const viewportH = Math.max(1, timelineSize.h - (view.rulerH + view.audioH) - 6);
+  const maxScroll = Math.max(0, contentHeight - viewportH);
+  if (view.scrollY > maxScroll) view.scrollY = maxScroll;
+  if (view.scrollY < 0) view.scrollY = 0;
+  return rows;
+}
+
+function timelineContentHeight() {
+  const rows = buildTimelineRows();
+  return rows.reduce((sum, row) => sum + row.h + 2, 0);
+}
+
+function rowAtY(y) {
+  const rows = buildTimelineRows();
+  for (let index = 0; index < rows.length; index += 1) {
+    const row = rows[index];
+    if (y >= row.y && y < row.y + row.h) return { row, index };
+  }
+  return null;
+}
+
+function clipRect(rowIndex, clip) {
+  const row = timelineRows[rowIndex];
+  if (!row) return { x0: 0, x1: 0, y: 0, h: 1 };
+  return {
+    x0: timeToX(clip.start_s),
+    x1: timeToX(clip.end_s),
+    y: row.y + 3,
+    h: Math.max(1, row.baseH - 6),
+  };
+}
+
+function formatTimelineLabel(time) {
+  return timecodeText(time);
 }
 
 function drawTimeline() {
@@ -1086,10 +2241,10 @@ function drawTimeline() {
     context.fillText("No show loaded", 12, 42);
     return;
   }
-
-  const tracks = doc.tracks || [];
+  const rows = buildTimelineRows();
   const laneTop = view.rulerH;
-  const laneBottom = Math.min(h, laneTop + tracks.length * view.trackH);
+  const laneBottom = h;
+  const audioBottom = laneTop + view.audioH;
 
   context.fillStyle = "#141518";
   context.fillRect(0, 0, view.labelW, h);
@@ -1098,8 +2253,9 @@ function drawTimeline() {
 
   // Beat grid. Coarsen until ticks are readable.
   let step = gridSeconds();
-  while ((step / Math.max(0.001, view.end - view.start)) * (w - view.labelW) < 5) step *= 2;
+  while ((step / Math.max(0.001, view.end - view.start)) * (w - view.labelW) < 6) step *= 2;
   const offset = Number(doc.timing?.beat_offset_s || 0);
+  let lastLabelX = -999;
   for (let time = offset + Math.floor((view.start - offset) / step) * step; time <= view.end; time += step) {
     if (time < 0) continue;
     const x = timeToX(time);
@@ -1110,51 +2266,125 @@ function drawTimeline() {
     context.moveTo(x + 0.5, view.rulerH);
     context.lineTo(x + 0.5, laneBottom);
     context.stroke();
-    if (w - view.labelW > 0 && Math.round((time - offset) / step) % 4 === 0) {
+    if (Math.round((time - offset) / step) % 4 === 0 && x - lastLabelX > 82) {
+      lastLabelX = x;
       context.fillStyle = "#7c8089";
       context.font = "9px JetBrains Mono, monospace";
-      context.fillText(formatClock(time), x + 3, 11);
+      context.fillText(formatTimelineLabel(time), x + 3, 11);
     }
   }
 
-  for (let index = 0; index < tracks.length; index += 1) {
-    const track = tracks[index];
-    const y = laneTop + index * view.trackH;
+  drawAudioLane(context, w);
+
+  // Track rows must never paint over the ruler or audio lane while scrolling.
+  context.save();
+  context.beginPath();
+  context.rect(0, audioBottom, w, Math.max(0, h - audioBottom));
+  context.clip();
+
+  // Highlight the layer that would receive a dragged clip.
+  const preview = timelineDrag?.preview;
+  const targetRowIndex = preview?.trackId
+    ? rows.findIndex((row) => row.track.id === preview.trackId)
+    : -1;
+  if (timelineDrag?.mode === "move" && targetRowIndex >= 0) {
+    const target = rows[targetRowIndex];
+    context.fillStyle = "rgba(232,134,46,0.07)";
+    context.fillRect(view.labelW, target.y - 1, w - view.labelW, target.h + 2);
+    context.strokeStyle = "#e8862e";
+    context.setLineDash([4, 3]);
+    context.strokeRect(view.labelW + 0.5, target.y - 0.5, w - view.labelW - 1, target.h + 1);
+    context.setLineDash([]);
+  }
+
+  for (let index = 0; index < rows.length; index += 1) {
+    const row = rows[index];
+    const track = row.track;
+    const y = row.y;
+    const baseH = row.baseH;
     context.fillStyle = index % 2 === 0 ? "#17181b" : "#191b1e";
-    context.fillRect(view.labelW, y, w - view.labelW, view.trackH);
-    context.fillStyle = track.muted ? "#4a4e56" : "#b3b6bd";
-    context.font = "11px Inter, sans-serif";
-    context.fillText(track.name, 8, y + 18);
-    context.fillStyle = track.muted ? "#c45a52" : "#4a4e56";
-    context.font = "9px JetBrains Mono, monospace";
-    context.fillText("M", 92, y + 17);
-    if (track.solo) {
-      context.fillStyle = "#c9a34a";
-      context.fillText("S", 104, y + 17);
-    }
+    context.fillRect(view.labelW, y, w - view.labelW, row.h);
     context.strokeStyle = "#2b2e34";
     context.beginPath();
-    context.moveTo(0, y + view.trackH + 0.5);
-    context.lineTo(w, y + view.trackH + 0.5);
+    context.moveTo(0, y + row.h + 0.5);
+    context.lineTo(w, y + row.h + 0.5);
     context.stroke();
+
+    // Header
+    const selectedTrack = selectedTrackId === track.id && !selectedClipId;
+    context.fillStyle = selectedTrack ? "#211a13" : "#141518";
+    context.fillRect(0, y, view.labelW, row.h);
+    context.fillStyle = trackColor(track.id);
+    context.fillRect(0, y, 3, row.h);
+    const indent = row.depth * 10;
+    if (track.kind === "global") {
+      context.fillStyle = "#c9a34a";
+      context.font = "8px JetBrains Mono, monospace";
+      context.fillText("GLOBAL", 8, y + 10);
+    } else if (track.kind === "sub") {
+      context.fillStyle = "#9b7fb5";
+      context.font = "8px JetBrains Mono, monospace";
+      context.fillText("SUB", 8 + indent, y + 10);
+    }
+    // Expand chevron (keyframe lanes)
+    context.fillStyle = row.expanded ? "#e8862e" : "#7c8089";
+    context.font = "10px JetBrains Mono, monospace";
+    context.fillText(row.expanded ? "▾" : "▸", 6 + indent, y + 22);
+    context.fillStyle = track.muted ? "#4a4e56" : "#e8e9ec";
+    context.font = "11px Inter, sans-serif";
+    context.fillText(track.name, 18 + indent, y + 22, view.labelW - 76);
+    // Mute / solo hit buttons on the right of the header.
+    const muteX = view.labelW - 38;
+    context.fillStyle = track.muted ? "#c45a52" : "#25282d";
+    context.fillRect(muteX, y + 5, 16, 15);
+    context.fillStyle = track.muted ? "#fff" : "#9da1aa";
+    context.font = "bold 9px JetBrains Mono, monospace";
+    context.fillText("M", muteX + 5, y + 16);
+    context.fillStyle = track.solo ? "#e8862e" : "#25282d";
+    context.fillRect(muteX + 18, y + 5, 16, 15);
+    context.fillStyle = track.solo ? "#111" : "#9da1aa";
+    context.fillText("S", muteX + 23, y + 16);
+    if (track.clipped_to_below) {
+      context.fillStyle = "#e8862e";
+      context.font = "12px JetBrains Mono, monospace";
+      context.fillText("↴", 38 + indent, y + 32);
+    }
+    context.fillStyle = "#4a4e56";
+    context.font = "8px JetBrains Mono, monospace";
+    context.fillText(`${String(track.blend_mode || "normal").toUpperCase()} · ${track.target_group}`, 10 + indent, y + baseH - 5, view.labelW - 82);
+
+    // Header bottom resize grip
+    context.fillStyle = heightDrag?.trackId === track.id ? "#e8862e" : "#2b2e34";
+    context.fillRect(0, y + row.h - 2, view.labelW, 2);
 
     const color = trackColor(track.id);
     for (const clip of track.clips) {
-      const preview = timelineDrag?.preview;
-      const effective = preview?.clipId === clip.id ? { ...clip, ...preview } : clip;
+      const activePreview = timelineDrag?.preview;
+      const isSourcePreview = activePreview?.clipId === clip.id;
+      // When dragging vertically the ghost is drawn on the destination row.
+      if (isSourcePreview && targetRowIndex >= 0 && targetRowIndex !== index) continue;
+      const effective = isSourcePreview ? { ...clip, ...activePreview } : clip;
       const rect = clipRect(index, effective);
       const x0 = Math.max(view.labelW, rect.x0);
       const x1 = Math.min(w, rect.x1);
       if (x1 <= view.labelW || x0 >= w) continue;
-      context.fillStyle = `${color}26`;
+      const dragging = isSourcePreview;
+      context.fillStyle = dragging ? `${color}48` : `${color}26`;
       context.fillRect(x0, rect.y, x1 - x0, rect.h);
       context.fillStyle = color;
       context.fillRect(x0, rect.y, x1 - x0, 2);
-      context.strokeStyle = clip.id === selectedClipId ? "#e8862e" : "#2b2e34";
-      context.lineWidth = 1;
+      if (clip.id === selectedClipId) {
+        context.fillStyle = "#e8862e";
+        context.fillRect(x0, rect.y, 2, rect.h);
+        context.fillRect(x1 - 2, rect.y, 2, rect.h);
+        context.fillRect(x0, rect.y + rect.h - 2, x1 - x0, 2);
+      }
+      context.strokeStyle = dragging ? "#ffffff" : clip.id === selectedClipId ? "#e8862e" : "#2b2e34";
+      context.lineWidth = dragging ? 1.5 : 1;
+      if (dragging) context.setLineDash([4, 3]);
       context.strokeRect(x0 + 0.5, rect.y + 0.5, Math.max(0, x1 - x0 - 1), rect.h - 1);
+      context.setLineDash([]);
 
-      // Fades.
       const fadeInX = timeToX(effective.start_s + (effective.fade_in_s || 0));
       const fadeOutX = timeToX(effective.end_s - (effective.fade_out_s || 0));
       context.strokeStyle = "#00000088";
@@ -1173,13 +2403,18 @@ function drawTimeline() {
 
       context.fillStyle = "#e8e9ec";
       context.font = "10px Inter, sans-serif";
-      const label = clip.name || clip.preset;
+      const label = clipDisplayName(clip);
       if (x1 - x0 > 26) {
         context.save();
         context.beginPath();
         context.rect(x0 + 3, rect.y + 2, x1 - x0 - 6, rect.h - 2);
         context.clip();
-        context.fillText(label, x0 + 4, rect.y + 14);
+        context.fillText(label, x0 + 4, rect.y + 13);
+        if (clip.expressions && Object.keys(clip.expressions).length) {
+          context.fillStyle = "#e8862e";
+          context.font = "9px JetBrains Mono, monospace";
+          context.fillText("f(x)", x0 + 4, rect.y + 24);
+        }
         context.restore();
       }
 
@@ -1201,29 +2436,143 @@ function drawTimeline() {
         }
       }
     }
+
+    // Parameter lanes under the selected/expanded track.
+    for (let lane = 0; lane < row.lanes.length; lane += 1) {
+      const info = row.lanes[lane];
+      const laneY = row.laneY + lane * row.laneH;
+      context.fillStyle = lane % 2 === 0 ? "#131417" : "#151619";
+      context.fillRect(view.labelW, laneY, w - view.labelW, row.laneH);
+      context.fillStyle = "#7c8089";
+      context.font = "8px JetBrains Mono, monospace";
+      context.fillText(`◇ ${info.param}`, view.labelW + 4, laneY + 11);
+      for (const clip of track.clips) {
+        const keys = (clip.keyframes || [])
+          .filter((keyframe) => keyframe.param === info.param && typeof keyframe.value === "number")
+          .sort((a, b) => a.t_s - b.t_s);
+        const expression = clip.expressions?.[info.param];
+        if (!keys.length && !expression) continue;
+        const cx0 = Math.max(view.labelW, timeToX(clip.start_s));
+        const cx1 = Math.min(w, timeToX(clip.end_s));
+        if (cx1 <= view.labelW || cx0 >= w) continue;
+        if (expression) {
+          context.strokeStyle = "#e8862e99";
+          context.beginPath();
+          for (let px = cx0; px <= cx1; px += 2) {
+            const previewT = xToTime(px);
+            let value = Number(clip.params?.[info.param] ?? clip.opacity ?? 0.5);
+            try {
+              const env = envelopeAt(previewT);
+              value = evalUiExpression(expression, {
+                ...env,
+                t: previewT,
+                local_t: previewT - clip.start_s,
+                val: value,
+                beat: env.beatPos,
+              });
+            } catch {
+              value = Number(clip.params?.[info.param] ?? 0.5);
+            }
+            const py = laneY + row.laneH - 3 - clamp(value, 0, 1) * (row.laneH - 5);
+            if (px === cx0) context.moveTo(px, py);
+            else context.lineTo(px, py);
+          }
+          context.stroke();
+        }
+        if (keys.length > 1) {
+          context.strokeStyle = "rgba(232,134,46,0.55)";
+          context.lineWidth = 1.25;
+          context.beginPath();
+          keys.forEach((keyframe, keyIndex) => {
+            const x = timeToX(clip.start_s + keyframe.t_s);
+            const py = laneY + row.laneH - 3 - clamp(keyframe.value, 0, 1) * (row.laneH - 5);
+            if (keyIndex === 0) context.moveTo(x, py);
+            else context.lineTo(x, py);
+          });
+          context.stroke();
+        }
+        for (const keyframe of keys) {
+          const x = timeToX(clip.start_s + keyframe.t_s);
+          if (x < view.labelW || x > w) continue;
+          const py = laneY + row.laneH - 3 - clamp(keyframe.value, 0, 1) * (row.laneH - 5);
+          context.fillStyle = "#e8862e";
+          context.beginPath();
+          context.moveTo(x, py - 3);
+          context.lineTo(x + 3, py);
+          context.lineTo(x, py + 3);
+          context.lineTo(x - 3, py);
+          context.closePath();
+          context.fill();
+        }
+      }
+    }
+  }
+  context.restore();
+
+  // Ghost clip on the destination row while dragging vertically.
+  if (timelineDrag?.mode === "move" && preview && targetRowIndex >= 0) {
+    const source = findClip(preview.clipId)?.clip;
+    if (source) {
+      const ghost = { ...source, ...preview };
+      const target = rows[targetRowIndex];
+      const gx0 = Math.max(view.labelW, timeToX(ghost.start_s));
+      const gx1 = Math.min(w, timeToX(ghost.end_s));
+      if (gx1 > gx0) {
+        context.save();
+        context.globalAlpha = 0.75;
+        context.fillStyle = `${trackColor(target.track.id)}40`;
+        context.fillRect(gx0, target.y + 3, gx1 - gx0, target.baseH - 6);
+        context.strokeStyle = "#ffffff";
+        context.setLineDash([5, 3]);
+        context.strokeRect(gx0 + 0.5, target.y + 3.5, gx1 - gx0 - 1, target.baseH - 7);
+        context.setLineDash([]);
+        context.fillStyle = "#ffffff";
+        context.font = "10px Inter, sans-serif";
+        if (gx1 - gx0 > 34) context.fillText(ghost.name || ghost.preset, gx0 + 4, target.y + 16);
+        context.restore();
+        // Time readout above the ghost.
+        context.fillStyle = "#e8862e";
+        context.font = "9px JetBrains Mono, monospace";
+        context.fillText(`${ghost.start_s.toFixed(2)}s`, gx0 + 2, target.y - 4);
+      }
+    }
   }
 
-  drawBlueprintWaveform(context, w, laneTop, laneBottom);
-
-  // Markers.
+  // Section markers and drop windows.
+  for (const window of blueprint?.drop_windows || []) {
+    const x0 = Math.max(view.labelW, timeToX(Number(window.start)));
+    const x1 = Math.min(w, timeToX(Number(window.end)));
+    if (x1 > x0) {
+      context.fillStyle = "rgba(208, 107, 74, 0.06)";
+      context.fillRect(x0, laneTop, x1 - x0, laneBottom - laneTop);
+    }
+  }
   for (const marker of doc.timing?.markers || []) {
     const x = timeToX(marker.t_s);
     if (x < view.labelW || x > w) continue;
-    context.strokeStyle = marker.kind === "drop" ? "#d06b4a" : "#7c8089";
+    context.strokeStyle = marker.kind === "drop" ? "#d06b4a" : "#6f7480";
     context.setLineDash([3, 3]);
     context.beginPath();
     context.moveTo(x + 0.5, 12);
     context.lineTo(x + 0.5, laneBottom);
     context.stroke();
     context.setLineDash([]);
-    context.fillStyle = "#7c8089";
+    context.fillStyle = marker.kind === "drop" ? "#d06b4a" : "#7c8089";
     context.font = "9px Inter, sans-serif";
-    context.fillText(marker.name, x + 3, 21);
+    context.fillText(marker.name, x + 3, 22);
+  }
+
+  // Vertical scrollbar for the track area.
+  const scroll = timelineScrollMetrics(rows, h);
+  if (scroll) {
+    context.fillStyle = "#0c0d10";
+    context.fillRect(scroll.x - 1, scroll.y, scroll.w + 2, scroll.h);
+    context.fillStyle = scrollDrag ? "#e8862e" : "#4a4e56";
+    context.fillRect(scroll.x, scroll.thumbY, scroll.w, scroll.thumbH);
   }
 
   // Playhead.
-  const time = client.frame?.time ?? state.playback?.time_s ?? 0;
-  const playhead = timeToX(time);
+  const playhead = timeToX(currentTime());
   if (playhead >= view.labelW && playhead <= w) {
     context.strokeStyle = "#e8862e";
     context.lineWidth = 1;
@@ -1249,69 +2598,214 @@ function drawTimeline() {
   context.moveTo(0, view.rulerH + 0.5);
   context.lineTo(w, view.rulerH + 0.5);
   context.stroke();
+  context.beginPath();
+  context.moveTo(0, audioBottom + 0.5);
+  context.lineTo(w, audioBottom + 0.5);
+  context.stroke();
 }
 
-function drawBlueprintWaveform(context, w, laneTop, laneBottom) {
-  if (!blueprint) return;
-  const doc = showDoc();
-  const duration = Number(blueprint.duration_s || doc?.duration_s || 0);
-  const wave = blueprint.waveform || [];
-  const laneHeight = Math.max(1, laneBottom - laneTop);
-  if (wave.length && duration > 0) {
-    const mid = laneTop + laneHeight / 2;
-    context.fillStyle = "rgba(94, 154, 168, 0.16)";
-    for (let x = Math.max(view.labelW, 0); x < w; x += 2) {
+function timelineScrollMetrics(rows = timelineRows, h = timelineSize.h) {
+  const contentHeight = rows.reduce((sum, row) => sum + row.h + 2, 0);
+  const top = view.rulerH + view.audioH + 4;
+  const viewportH = Math.max(1, h - top - 4);
+  if (contentHeight <= viewportH + 1) return null;
+  const w = 7;
+  const x = timelineSize.w - w - 2;
+  const maxScroll = contentHeight - viewportH;
+  const thumbH = Math.max(22, (viewportH / contentHeight) * (viewportH - 2));
+  const thumbY = top + (view.scrollY / maxScroll) * (viewportH - thumbH - 2);
+  return { x, y: top, w, h: viewportH, maxScroll, thumbH, thumbY, viewportH };
+}
+
+function scrollFromTimelineY(y) {
+  const scroll = timelineScrollMetrics();
+  if (!scroll) return;
+  const ratio = clamp((y - scroll.y - scroll.thumbH / 2) / Math.max(1, scroll.viewportH - scroll.thumbH), 0, 1);
+  view.scrollY = ratio * scroll.maxScroll;
+  requestDraw();
+}
+
+function drawAudioLane(context, w) {
+  const top = view.rulerH;
+  const height = view.audioH;
+  const bottom = top + height;
+  context.fillStyle = "#101216";
+  context.fillRect(0, top, w, height);
+  context.fillStyle = "#141518";
+  context.fillRect(0, top, view.labelW, height);
+  context.fillStyle = "#5e9aa8";
+  context.font = "9px Inter, sans-serif";
+  context.fillText("AUDIO", 8, top + 14);
+  context.fillStyle = "#4a4e56";
+  context.font = "8px JetBrains Mono, monospace";
+  const audioMeta = state?.show?.blueprint;
+  context.fillText(
+    audioAnalysis ? `${Number(audioMeta?.bpm || 0).toFixed(1)} BPM | MIN/MAX+RMS` : audioMeta ? `${Number(audioMeta.bpm || 0).toFixed(1)} BPM` : "NO AUDIO",
+    8,
+    top + 27
+  );
+  context.fillText("drag bottom = height", 8, top + 40);
+  const mid = top + height * 0.55;
+  const span = height * 0.36;
+  const duration = Number(audioAnalysis?.duration || blueprint?.duration_s || showDoc()?.duration_s || 0);
+  const analysis = audioAnalysis;
+  if (analysis && duration > 0) {
+    const buckets = analysis.buckets;
+    for (let x = view.labelW; x < w; x += 2) {
+      const time = xToTime(x);
+      if (time < 0 || time > duration) continue;
+      const index = Math.min(buckets - 1, Math.max(0, Math.floor((time / duration) * buckets)));
+      const lo = analysis.min[index];
+      const hi = analysis.max[index];
+      context.fillStyle = "rgba(94, 154, 168, 0.34)";
+      context.fillRect(x, mid - hi * span, 1, Math.max(1, (hi - lo) * span));
+      context.fillStyle = "rgba(232, 134, 46, 0.72)";
+      const rms = analysis.rms[index];
+      context.fillRect(x, mid - rms * span, 1, Math.max(1, rms * span * 2));
+    }
+  } else if (blueprint?.waveform?.length && duration > 0) {
+    const wave = blueprint.waveform;
+    for (let x = view.labelW; x < w; x += 2) {
       const time = xToTime(x);
       if (time < 0 || time > duration) continue;
       const index = Math.min(wave.length - 1, Math.floor((time / duration) * wave.length));
-      const amplitude = wave[index] * laneHeight * 0.34;
-      context.fillRect(x, mid - amplitude, 1, Math.max(1, amplitude * 2));
+      const amp = wave[index] * span;
+      context.fillStyle = "rgba(94, 154, 168, 0.28)";
+      context.fillRect(x, mid - amp, 1, Math.max(1, amp * 2));
     }
   }
-  for (const section of blueprint.sections || []) {
+  const SECTION_COLORS = {
+    intro: "#5e9aa8",
+    verse: "#8fa65a",
+    chorus: "#b3925a",
+    build: "#c9a34a",
+    drop: "#d06b4a",
+    bridge: "#9b7fb5",
+    break: "#6f7480",
+    breakdown: "#6f7480",
+    outro: "#5e9aa8",
+    pre_drop: "#e8862e",
+  };
+  for (const section of blueprint?.sections || []) {
     const x = timeToX(Number(section.start));
     if (x < view.labelW || x > w) continue;
-    context.strokeStyle = "#25282d";
+    const color = SECTION_COLORS[section.label] || "#6f7480";
+    context.strokeStyle = color;
+    context.globalAlpha = 0.7;
     context.beginPath();
-    context.moveTo(x + 0.5, laneTop);
-    context.lineTo(x + 0.5, laneBottom);
+    context.moveTo(x + 0.5, top);
+    context.lineTo(x + 0.5, bottom);
     context.stroke();
+    context.globalAlpha = 1;
+    context.fillStyle = color;
+    context.font = "8px Inter, sans-serif";
+    context.fillText(String(section.label).toUpperCase(), x + 3, bottom - 4);
   }
-  for (const window of blueprint.drop_windows || []) {
-    const x0 = Math.max(view.labelW, timeToX(Number(window.start)));
-    const x1 = Math.min(w, timeToX(Number(window.end)));
-    if (x1 <= x0) continue;
-    context.fillStyle = "rgba(208, 107, 74, 0.05)";
-    context.fillRect(x0, laneTop, x1 - x0, laneHeight);
-  }
+  context.fillStyle = heightDrag === "audio" ? "#e8862e" : "#2b2e34";
+  context.fillRect(0, bottom - 2, w, 2);
 }
 
 function clipAtPoint(x, y) {
   const doc = showDoc();
   if (!doc) return null;
-  const trackIndex = trackIndexAt(y);
-  if (trackIndex < 0 || trackIndex >= doc.tracks.length) return null;
-  const track = doc.tracks[trackIndex];
-  for (const clip of track.clips) {
-    const rect = clipRect(trackIndex, clip);
+  const hit = rowAtY(y);
+  if (!hit) return null;
+  const row = hit.row;
+  if (y >= row.laneY) return null;
+  for (const clip of row.track.clips) {
+    const rect = clipRect(hit.index, clip);
     if (x >= rect.x0 && x <= rect.x1 && y >= rect.y && y <= rect.y + rect.h) {
-      return { track, clip, trackIndex, rect };
+      return { track: row.track, clip, trackIndex: hit.index, rect };
     }
   }
   return null;
 }
 
+function keyframeAtPoint(x, y) {
+  const doc = showDoc();
+  if (!doc) return null;
+  const hit = rowAtY(y);
+  if (!hit || y < hit.row.laneY) return null;
+  const row = hit.row;
+  const lane = Math.floor((y - row.laneY) / row.laneH);
+  const info = row.lanes[lane];
+  if (!info) return null;
+  for (const track of [row.track]) {
+    for (const clip of track.clips) {
+      if (x < timeToX(clip.start_s) || x > timeToX(clip.end_s)) continue;
+      const keyframes = (clip.keyframes || []).filter((keyframe) => keyframe.param === info.param);
+      for (let index = 0; index < keyframes.length; index += 1) {
+        const keyframe = keyframes[index];
+        const kx = timeToX(clip.start_s + keyframe.t_s);
+        if (Math.abs(kx - x) <= 5) {
+          return { clip, track: row.track, param: info.param, index, keyframe, lane };
+        }
+      }
+    }
+  }
+  return null;
+}
+
+function evalUiExpression(expression, context) {
+  // Mirrors the backend's safe evaluator for the small expression lane preview.
+  // The authoritative value still comes from the Python compositor.
+  const names = ["sin", "cos", "abs", "exp", "min", "max", "floor", "round", "noise", "clamp"];
+  const fn = {
+    sin: Math.sin, cos: Math.cos, abs: Math.abs, exp: Math.exp, min: Math.min, max: Math.max,
+    floor: Math.floor, round: Math.round, clamp: (value, lo, hi) => Math.max(lo, Math.min(hi, value)),
+    noise: (value) => {
+      const raw = Math.sin(Number(value) * 12.9898) * 43758.5453123;
+      return raw - Math.floor(raw);
+    },
+  };
+  let text = String(expression || "").replace(/TAU/g, String(Math.PI * 2)).replace(/\bpi\b/g, String(Math.PI));
+  for (const name of names) text = text.replace(new RegExp(`\\b${name}\\(`, "g"), `__fn.${name}(`);
+  const keys = Object.keys(context);
+  const values = keys.map((key) => context[key]);
+  // eslint-disable-next-line no-new-func
+  return Function("__fn", ...keys, `"use strict"; return (${text});`)(fn, ...values);
+}
+
 /* ---------------------------------------------------------------- inspector */
 function fieldRow(labelText, control, options = {}) {
   const id = `f_${(fieldSeq += 1)}`;
+  let field = control;
+  if (control instanceof HTMLInputElement && control.type === "number") {
+    field = stepperWrap(control);
+  }
   const label = el("label", {
     for: control.id || id,
     text: labelText,
     "data-scrub-label": options.scrub ? control.id || id : undefined,
   });
   if (!control.id) control.id = id;
-  const row = el("div", { class: "field-row" }, label, control);
+  const row = el("div", { class: "field-row" }, label, field);
   return row;
+}
+
+function stepperWrap(input) {
+  input.classList.add("number");
+  const step = Number(input.dataset.step || input.step || 0.01) || 0.01;
+  const bump = (direction, event) => {
+    const current = Number(input.value) || 0;
+    const factor = event?.shiftKey ? 10 : 1;
+    const next = current + direction * step * factor;
+    const min = input.min === "" ? -Infinity : Number(input.min);
+    const max = input.max === "" ? Infinity : Number(input.max);
+    input.value = String(clamp(next, min, max));
+    input.dispatchEvent(new Event("change", { bubbles: true }));
+  };
+  return el(
+    "div",
+    { class: "stepper" },
+    input,
+    el(
+      "div",
+      { class: "stepper-buttons" },
+      el("button", { type: "button", title: "Step up", "aria-label": "Step up", onclick: (event) => bump(1, event) }, (() => { const node = icon("chevron"); node.style.transform = "rotate(-90deg)"; return node; })()),
+      el("button", { type: "button", title: "Step down", "aria-label": "Step down", onclick: (event) => bump(-1, event) }, (() => { const node = icon("chevron"); node.style.transform = "rotate(90deg)"; return node; })())
+    )
+  );
 }
 
 function numberInput(value, onChange, options = {}) {
@@ -1324,6 +2818,12 @@ function numberInput(value, onChange, options = {}) {
     max: options.max,
   });
   input.dataset.step = String(options.step ?? 0.01);
+  input.addEventListener("keydown", (event) => {
+    if (event.key !== "Enter") return;
+    event.preventDefault();
+    input.dispatchEvent(new Event("change", { bubbles: true }));
+    input.blur();
+  });
   input.addEventListener("change", () => {
     if (input.value === "") {
       if (options.allowEmpty) onChange(null);
@@ -1334,6 +2834,59 @@ function numberInput(value, onChange, options = {}) {
     if (Number.isFinite(parsed)) onChange(parsed);
   });
   return input;
+}
+
+function rangeControl(value, onChange, options = {}) {
+  const min = Number(options.min ?? 0);
+  const max = Number(options.max ?? 1);
+  const step = Number(options.step ?? 0.01);
+  let current = clamp(Number(value), min, max);
+  const input = numberInput(current, (next) => {
+    current = clamp(Number(next), min, max);
+    paint(current);
+    onChange(current);
+  }, { step, min, max });
+  const fill = el("div", { class: "range-fill" });
+  const head = el("div", { class: "range-head" });
+  const track = el("div", { class: "range-track", role: "slider", tabindex: "0", "aria-valuemin": String(min), "aria-valuemax": String(max) }, fill, head);
+  const paint = (next) => {
+    const ratio = clamp((next - min) / Math.max(1e-9, max - min), 0, 1);
+    fill.style.width = `${ratio * 100}%`;
+    head.style.left = `${ratio * 100}%`;
+    track.setAttribute("aria-valuenow", String(Number(next.toFixed(4))));
+  };
+  const setFromEvent = (event) => {
+    const rect = track.getBoundingClientRect();
+    const ratio = clamp((event.clientX - rect.left) / Math.max(1, rect.width), 0, 1);
+    current = clamp(min + ratio * (max - min), min, max);
+    current = Math.round(current / step) * step;
+    input.value = String(Number(current.toFixed(6)));
+    paint(current);
+  };
+  track.addEventListener("pointerdown", (event) => {
+    event.preventDefault();
+    track.setPointerCapture(event.pointerId);
+    setFromEvent(event);
+  });
+  track.addEventListener("pointermove", (event) => {
+    if (!track.hasPointerCapture(event.pointerId)) return;
+    setFromEvent(event);
+  });
+  track.addEventListener("pointerup", (event) => {
+    if (!track.hasPointerCapture(event.pointerId)) return;
+    track.releasePointerCapture(event.pointerId);
+    onChange(current);
+  });
+  track.addEventListener("keydown", (event) => {
+    if (event.key !== "ArrowLeft" && event.key !== "ArrowRight") return;
+    event.preventDefault();
+    current = clamp(current + (event.key === "ArrowRight" ? step : -step) * (event.shiftKey ? 10 : 1), min, max);
+    input.value = String(Number(current.toFixed(6)));
+    paint(current);
+    onChange(current);
+  });
+  paint(current);
+  return el("div", { class: "range-widget" }, track, stepperWrap(input));
 }
 
 function textInput(value, onChange, options = {}) {
@@ -1391,6 +2944,251 @@ function colorField(value, onChange) {
   return el("div", { style: "display:flex;gap:4px;align-items:center" }, swatch, text);
 }
 
+function paletteById(id) {
+  return (state?.palettes || []).find((palette) => palette.id === id) || null;
+}
+
+function paletteCss(colors) {
+  const stops = (colors || []).filter((color) => Array.isArray(color) && color.length === 3);
+  if (!stops.length) return "transparent";
+  if (stops.length === 1) return `rgb(${stops[0].join(",")})`;
+  return `linear-gradient(90deg, ${stops
+    .map((color, index) => `rgb(${color.join(",")}) ${(index / (stops.length - 1)) * 100}%`)
+    .join(", ")})`;
+}
+
+function paletteControl(clip, spec, value) {
+  const palette = paletteById(value);
+  const strip = el("span", {
+    class: "palette-strip",
+    style: `background:${palette ? paletteCss(palette.colors) : "transparent"}`,
+    title: palette?.name || value,
+  });
+  const select = selectInput(value, (state.palettes || []).map((item) => [item.id, item.name]), (next) => {
+    commitClip(clip.id, `palette ${spec.key}`, (target) => {
+      target.params = { ...target.params, [spec.key]: next };
+    });
+  });
+  const edit = el("button", {
+    class: "button small",
+    type: "button",
+    title: "Palette bearbeiten oder sichern",
+    "aria-label": "Edit palette",
+    onclick: () => openPaletteEditor(palette, {
+      onApply: (id) => commitClip(clip.id, `palette ${spec.key}`, (target) => {
+        target.params = { ...target.params, [spec.key]: id };
+      }),
+    }),
+  }, icon("palette"), el("span", { text: "Edit" }));
+  return el(
+    "div",
+    { class: "palette-control" },
+    strip,
+    el("div", { class: "palette-control-row" }, select, edit)
+  );
+}
+
+async function deletePalette(palette) {
+  if (!palette || palette.builtin) {
+    toast("Eingebaute Paletten können nicht gelöscht werden.", "info");
+    return false;
+  }
+  const confirmed = await modalConfirm(
+    "Palette löschen",
+    `"${palette.name}" dauerhaft löschen?`,
+    "Löschen"
+  );
+  if (!confirmed) return false;
+  try {
+    await client.del(`/api/palettes/${encodeURIComponent(palette.id)}`);
+    await client.refresh();
+    toast("Palette gelöscht", "success");
+    return true;
+  } catch (error) {
+    toast(error.message, "danger");
+    return false;
+  }
+}
+
+function openPaletteEditor(palette, options = {}) {
+  const editing = palette && !palette.builtin ? palette : null;
+  const colors = (palette?.colors || [[255, 96, 24], [140, 30, 190], [0, 180, 255]])
+    .map((color) => [...color]);
+  let stops = colors.slice(0, 16);
+  const dialog = document.createElement("dialog");
+  const form = document.createElement("form");
+  form.method = "dialog";
+  const nameInput = el("input", {
+    class: "input",
+    type: "text",
+    value: palette ? (palette.builtin ? `${palette.name} Kopie` : palette.name) : "Neue Palette",
+    maxlength: "48",
+    required: true,
+  });
+  const preview = el("div", { class: "palette-preview" });
+  const stopList = el("div", { class: "palette-stops" });
+  const addButton = el("button", { class: "button small", type: "button" }, icon("plus"), el("span", { text: "Farbe" }));
+  const paint = () => {
+    preview.style.background = paletteCss(stops);
+    addButton.disabled = stops.length >= 16;
+  };
+  const rebuildStops = () => {
+    stopList.replaceChildren(
+      ...stops.map((color, index) => {
+        const input = el("input", {
+          type: "color",
+          value: rgbToHex(color),
+          "aria-label": `Farbe ${index + 1}`,
+          oninput: (event) => {
+            stops[index] = hexToRgb(event.target.value);
+            paint();
+          },
+        });
+        const remove = el("button", {
+          class: "button small icon-button",
+          type: "button",
+          title: "Farbe entfernen",
+          "aria-label": "Remove colour",
+          disabled: stops.length <= 2,
+          onclick: () => {
+            stops.splice(index, 1);
+            rebuildStops();
+            paint();
+          },
+        }, icon("minus"));
+        return el("div", { class: "palette-stop-row" }, input, el("span", { class: "mono", text: rgbToHex(color) }), remove);
+      })
+    );
+  };
+  addButton.addEventListener("click", () => {
+    if (stops.length >= 16) return;
+    stops.push([...stops[stops.length - 1]]);
+    rebuildStops();
+    paint();
+  });
+  rebuildStops();
+  paint();
+
+  const deleteButton = editing
+    ? el("button", {
+        class: "button small danger",
+        type: "button",
+        text: "Löschen",
+        onclick: async () => {
+          if (await deletePalette(editing)) dialog.close();
+        },
+      })
+    : null;
+
+  const save = el("button", {
+    class: "button primary",
+    type: "submit",
+    text: editing ? "Speichern" : "Als neue Palette sichern",
+  });
+  const actions = el(
+    "div",
+    { class: "dialog-actions" },
+    deleteButton,
+    el("span", { class: "spacer", style: "flex:1" }),
+    el("button", { class: "button", type: "button", text: "Abbrechen", onclick: () => dialog.close("cancel") }),
+    save
+  );
+  form.append(
+    el("div", { class: "dialog-head", text: editing ? "Palette bearbeiten" : "Neue Palette" }),
+    el("div", { class: "dialog-body" },
+      fieldRow("Name", nameInput),
+      preview,
+      el("div", { class: "list-subhead" }, el("span", { text: "Farben" }), addButton),
+      stopList,
+      el("p", { class: "empty-state", text: "2–16 Farben. Die Vorschau und alle Effekte interpolieren in Oklab." })
+    ),
+    actions
+  );
+  dialog.append(form);
+  dialog.addEventListener("close", () => dialog.remove());
+  form.addEventListener("submit", async (event) => {
+    event.preventDefault();
+    const name = nameInput.value.trim();
+    if (!name) {
+      nameInput.focus();
+      return;
+    }
+    save.disabled = true;
+    try {
+      const payload = { name, colors: stops };
+      if (editing) payload.id = editing.id;
+      const saved = await client.post("/api/palettes", payload);
+      await client.refresh();
+      dialog.close();
+      toast(`Palette "${saved.name}" gespeichert`, "success");
+      options.onApply?.(saved.id);
+    } catch (error) {
+      toast(error.message, "danger");
+    } finally {
+      save.disabled = false;
+    }
+  });
+  document.body.append(dialog);
+  dialog.showModal();
+  nameInput.focus();
+  nameInput.select();
+}
+
+function applyPaletteToClip(paletteId) {
+  const found = findClip();
+  if (!found) {
+    toast("Clip in der Timeline auswählen, dann Palette anwenden.", "info");
+    return;
+  }
+  const preset = presetById(found.clip.preset);
+  const spec = preset?.params?.find((item) => item.type === "palette");
+  if (!spec) {
+    toast(`${preset?.name || found.clip.preset} hat keinen Palette-Parameter.`, "info");
+    return;
+  }
+  commitClip(found.clip.id, `palette ${spec.key}`, (target) => {
+    target.params = { ...target.params, [spec.key]: paletteId };
+  });
+  toast(`Palette auf ${clipDisplayName(found.clip)} angewendet`, "success", 1600);
+}
+
+function renderPalettes() {
+  if (!dom.paletteList) return;
+  const rows = (state?.palettes || []).map((palette) => {
+    const strip = el("span", {
+      class: "palette-strip",
+      style: `background:${paletteCss(palette.colors)}`,
+    });
+    return el(
+      "button",
+      {
+        class: "list-row palette-row",
+        type: "button",
+        title: palette.builtin ? "Eingebaute Palette" : "Eigene Palette",
+        onclick: () => applyPaletteToClip(palette.id),
+        ondblclick: () => openPaletteEditor(palette, { onApply: applyPaletteToClip }),
+        oncontextmenu: (event) => {
+          event.preventDefault();
+          showContextMenu(event.clientX, event.clientY, [
+            { label: "Auf Clip anwenden", icon: "palette", fn: () => applyPaletteToClip(palette.id) },
+            { label: "Bearbeiten / kopieren", icon: "settings", fn: () => openPaletteEditor(palette, { onApply: applyPaletteToClip }) },
+            { separator: true },
+            { label: "Palette löschen", icon: "delete", danger: !palette.builtin, disabled: palette.builtin, fn: () => deletePalette(palette) },
+          ]);
+        },
+      },
+      strip,
+      el("span", { class: "row-text" },
+        el("span", { class: "row-name", text: palette.name }),
+        el("span", { class: "row-desc", text: palette.builtin ? "BUILT-IN" : "EIGEN" })
+      ),
+      el("span", { class: "row-meta mono", text: `${palette.colors.length}` })
+    );
+  });
+  if (!rows.length) rows.push(el("div", { class: "library-empty", text: "Keine Paletten geladen." }));
+  dom.paletteList.replaceChildren(...rows);
+}
+
 function toggleRow(labelText, checked, onChange) {
   const input = el("input", { type: "checkbox" });
   input.checked = Boolean(checked);
@@ -1410,7 +3208,7 @@ function vec3Field(labelText, value, onChange, options = {}) {
       current[index] = parsed;
       onChange([...current]);
     }, { step: options.step ?? 0.01 });
-    return input;
+    return stepperWrap(input);
   });
   return fieldRow(labelText, el("div", { class: "triple" }, ...inputs), { scrub: true });
 }
@@ -1424,24 +3222,307 @@ function section(title, ...children) {
   );
 }
 
+function paramKey(clip, param) {
+  return `${clip.id}:${param}`;
+}
+
+function keyframeAtPlayhead(clip, param) {
+  const local = clamp(currentTime() - clip.start_s, 0, Math.max(0, clip.end_s - clip.start_s));
+  return (clip.keyframes || []).find(
+    (keyframe) => keyframe.param === param && Math.abs(keyframe.t_s - local) <= 0.08
+  );
+}
+
+function toggleParamKeyframe(clip, param, value) {
+  const existing = keyframeAtPlayhead(clip, param);
+  if (existing) {
+    const local = clamp(currentTime() - clip.start_s, 0, Math.max(0, clip.end_s - clip.start_s));
+    commitClip(clip.id, `remove keyframe ${param}`, (target) => {
+      target.keyframes = (target.keyframes || []).filter(
+        (keyframe) => !(keyframe.param === param && Math.abs(keyframe.t_s - local) <= 0.08)
+      );
+    });
+    return;
+  }
+  addParamKeyframe(clip, param, value);
+}
+
+function addParamKeyframe(clip, param, value) {
+  const local = clamp(currentTime() - clip.start_s, 0, Math.max(0, clip.end_s - clip.start_s));
+  const numeric = Number(value);
+  if (!Number.isFinite(numeric)) {
+    toast("Keyframes need a numeric value", "info");
+    return;
+  }
+  commitClip(clip.id, `keyframe ${param}`, (target) => {
+    target.keyframes = (target.keyframes || []).filter(
+      (keyframe) => !(keyframe.param === param && Math.abs(keyframe.t_s - local) <= 1e-4)
+    );
+    target.keyframes.push({ t_s: Number(local.toFixed(4)), param, value: numeric, easing: "linear" });
+    target.keyframes.sort((a, b) => a.t_s - b.t_s);
+  });
+}
+
+function expressionEditor(clip, param, value) {
+  const key = paramKey(clip, param);
+  if (!openExpressions.has(key)) return null;
+  const expression = clip.expressions?.[param] || "";
+  const input = el("input", {
+    class: "input",
+    type: "text",
+    value: expression,
+    placeholder: "0.5 + 0.5 * sin(beatPhase * TAU)",
+    spellcheck: "false",
+  });
+  const setExpression = () => {
+    const text = input.value.trim();
+    commitClip(clip.id, text ? `expression ${param}` : `clear expression ${param}`, (target) => {
+      target.expressions = { ...(target.expressions || {}) };
+      if (text) target.expressions[param] = text;
+      else delete target.expressions[param];
+    });
+  };
+  const presets = [
+    ["Sinus 1Hz", "0.5 + 0.5 * sin(t * TAU)"],
+    ["Beat Pulse 1/4", "0.5 + 0.5 * sin(beatPhase * TAU)"],
+    ["Kick Envelope", "clamp(val * (0.25 + 0.75 * kick), 0, 1)"],
+    ["Wiggle", "val + 0.12 * sin(t * 17.0) * noise(t * 3.0)"],
+    ["Bar Square", "0.35 + 0.65 * (1 - (barPos % 2))"],
+  ];
+  const tokens = ["t", "beat", "beatPhase", "barPos", "bpm", "kick", "energy", "val", "sin(", "cos(", "clamp(", "noise(", "TAU"];
+  const insert = (text) => {
+    const start = input.selectionStart ?? input.value.length;
+    const end = input.selectionEnd ?? input.value.length;
+    input.value = `${input.value.slice(0, start)}${text}${input.value.slice(end)}`;
+    input.focus();
+    input.selectionStart = input.selectionEnd = start + text.length;
+  };
+  const editor = el(
+    "div",
+    { class: "expression-editor" },
+    el(
+      "div",
+      { class: "expr-row" },
+      input,
+      el("button", { class: "button small", type: "button", text: "Set", onclick: setExpression })
+    ),
+    el(
+      "div",
+      { class: "expr-presets" },
+      ...presets.map(([label, text]) =>
+        el("button", { type: "button", text: label, onclick: () => { input.value = text; input.focus(); } })
+      )
+    ),
+    el(
+      "div",
+      { class: "expr-tokens" },
+      ...tokens.map((token) =>
+        el("button", { type: "button", text: token, onclick: () => insert(token) })
+      )
+    ),
+    el("div", { class: "mono muted", style: "font-size:8px", text: `val = ${Number(value).toFixed(3)} | deterministic, audio optional` })
+  );
+  return editor;
+}
+
+function paramRow(clip, param, labelText, control, value, options = {}) {
+  const key = paramKey(clip, param);
+  const expression = Boolean(clip.expressions?.[param]);
+  const keyed = Boolean(keyframeAtPlayhead(clip, param));
+  const actions = options.noActions
+    ? null
+    : el(
+        "div",
+        { class: "param-actions" },
+        el("button", {
+          class: `button small${keyed ? " keyed" : ""}`,
+          type: "button",
+          title: keyed ? `Keyframe ${param} am Playhead entfernen` : `Keyframe ${param} am Playhead setzen`,
+          "aria-label": keyed ? `Remove keyframe ${param}` : `Keyframe ${param}`,
+          "aria-pressed": String(keyed),
+          onclick: () => toggleParamKeyframe(clip, param, value),
+        }, icon("keyframe")),
+        el("button", {
+          class: `button small${openExpressions.has(key) || expression ? " active" : ""}`,
+          type: "button",
+          title: `Function generator for ${param}`,
+          "aria-label": `Function generator ${param}`,
+          onclick: () => {
+            if (openExpressions.has(key)) openExpressions.delete(key);
+            else openExpressions.add(key);
+            renderInspector();
+          },
+        }, icon("function"))
+      );
+  return el(
+    "div",
+    { class: "param-row" },
+    el("label", { text: labelText }),
+    control,
+    actions
+  );
+}
+
+function presetParamControl(clip, spec, value) {
+  const update = (next) => {
+    commitClip(clip.id, `param ${spec.key}`, (target) => {
+      target.params = { ...target.params, [spec.key]: next };
+    });
+  };
+  if (spec.type === "range") {
+    return rangeControl(value, update, { min: spec.min ?? 0, max: spec.max ?? 1, step: spec.step ?? 0.01 });
+  }
+  return numberInput(value, update, { step: spec.step ?? 0.01, min: spec.min, max: spec.max });
+}
+
 function renderInspector() {
   if (!state) return;
   if (inspectorTab === "fixture") renderFixtureInspector();
+  else if (inspectorTab === "show") renderShowInspector();
   else renderClipInspector();
+}
+
+function renderShowInspector() {
+  const doc = showDoc();
+  if (!doc) {
+    dom.inspectorBody.replaceChildren(
+      el("div", { class: "inspector-title" }, el("strong", { text: "Show" }), el("span", { text: "none" }))
+    );
+    return;
+  }
+  dom.inspectorBody.replaceChildren(
+    ...renderShowSection(doc),
+    renderTracksSection(doc)
+  );
 }
 
 function renderFixtureInspector() {
   const ids = [...selectedFixtures];
   if (ids.length > 1) {
+    const group = selectedGroupId
+      ? (state.rig.document.groups || []).find((item) => item.id === selectedGroupId)
+      : null;
+    const dx = numberInput(0, () => {}, { step: 0.1 });
+    const dy = numberInput(0, () => {}, { step: 0.1 });
+    const dz = numberInput(0, () => {}, { step: 0.1 });
+    const axisSelect = selectInput("z", [["x", "X"], ["y", "Y"], ["z", "Z"]], () => {});
+    const angleInput = numberInput(90, () => {}, { step: 5, min: -360, max: 360 });
+    const scaleInput = numberInput(1.1, () => {}, { step: 0.05, min: 0.05, max: 10 });
+    const axisInput = axisSelect;
+    const axis = () => ["x", "y", "z"].indexOf(axisInput.value);
+    const applyMove = () => moveSelection(ids, [Number(dx.value) || 0, Number(dy.value) || 0, Number(dz.value) || 0]);
+    const applyRotate = () => rotateSelection(ids, Number(angleInput.value) || 0);
+    const applyScale = () => scaleSelection(ids, Number(scaleInput.value) || 1);
+    const applyOnEnter = (input, action) => {
+      input.addEventListener("keydown", (event) => {
+        if (event.key !== "Enter") return;
+        event.preventDefault();
+        action();
+      });
+    };
+    applyOnEnter(dx, applyMove);
+    applyOnEnter(dy, applyMove);
+    applyOnEnter(dz, applyMove);
+    applyOnEnter(angleInput, applyRotate);
+    applyOnEnter(scaleInput, applyScale);
     dom.inspectorBody.replaceChildren(
-      el("div", { class: "inspector-title" }, el("strong", { text: `${ids.length} fixtures` }), el("span", { text: "multi-select" })),
-      el("p", { class: "empty-state", text: "Drag the selection onto a list group to add it. Open a single fixture to edit transforms and output." }),
-      el("button", {
-        class: "button small",
-        type: "button",
-        text: "Delete Selection",
-        onclick: () => deleteFixtures(ids),
-      })
+      el(
+        "div",
+        { class: "inspector-title" },
+        el("strong", { text: group ? `Gruppe: ${group.name}` : `${ids.length} Fixtures` }),
+        el("span", { text: `${ids.length} ausgewählt` })
+      ),
+      el("p", {
+        class: "empty-state",
+        text: "Im Viewport ziehen bewegt die ganze Auswahl. Für präzise Gruppen-Transforms die Felder unten nutzen.",
+      }),
+      section(
+        "Gruppe transformieren",
+        el(
+          "div",
+          { class: "field-row" },
+          el("label", { text: "Offset X/Y/Z" }),
+          el("div", { class: "triple" }, dx, dy, dz)
+        ),
+        el("div", { class: "section-actions" },
+          el("button", {
+            class: "button small",
+            type: "button",
+            text: "Verschieben",
+            onclick: () => moveSelection(ids, [Number(dx.value) || 0, Number(dy.value) || 0, Number(dz.value) || 0]),
+          }),
+          el("button", {
+            class: "button small",
+            type: "button",
+            text: "Auf Auswahlzentrum",
+            title: "Offsets relativ zum Gruppenmittelpunkt anwenden",
+            onclick: () => moveSelection(ids, [Number(dx.value) || 0, Number(dy.value) || 0, Number(dz.value) || 0]),
+          })
+        ),
+        fieldRow("Align-Achse", axisSelect),
+        el("div", { class: "section-actions" },
+          angleInput,
+          el("button", {
+            class: "button small",
+            type: "button",
+            text: "Rotieren Z",
+            onclick: () => rotateSelection(ids, Number(angleInput.value) || 0),
+          }),
+          el("button", {
+            class: "button small",
+            type: "button",
+            text: "−90°",
+            onclick: () => rotateSelection(ids, -90),
+          })
+        ),
+        el("div", { class: "section-actions" },
+          scaleInput,
+          el("button", {
+            class: "button small",
+            type: "button",
+            text: "Skalieren",
+            onclick: () => scaleSelection(ids, Number(scaleInput.value) || 1),
+          })
+        ),
+        el("div", { class: "section-actions" },
+          el("button", { class: "button small", type: "button", text: "Align Min", onclick: () => alignSelection(ids, axis(), "min") }),
+          el("button", { class: "button small", type: "button", text: "Align Mitte", onclick: () => alignSelection(ids, axis(), "center") }),
+          el("button", { class: "button small", type: "button", text: "Align Max", onclick: () => alignSelection(ids, axis(), "max") }),
+          el("button", {
+            class: "button small",
+            type: "button",
+            text: "Verteilen",
+            title: "Gleichmäßig entlang der gewählten Achse verteilen",
+            onclick: () => distributeSelection(ids, axis()),
+          })
+        )
+      ),
+        el("div", { class: "section-actions" },
+          el("button", {
+            class: "button small",
+            type: "button",
+            text: "Offsets einrechnen",
+            title: "Alle Drag-Offsets in die lokale Geometrie übernehmen",
+            onclick: () => bakeSelectionOffsets(ids),
+          }),
+          el("button", {
+            class: "button small",
+            type: "button",
+            text: "Auswahl aufheben",
+            onclick: () => {
+              selectedFixtures.clear();
+              renderFixtures();
+              renderInspector();
+              requestDraw();
+            },
+          }),
+          el("button", {
+            class: "button small danger",
+            type: "button",
+            text: "Delete Selection",
+            onclick: () => deleteFixtures(ids),
+          })
+        )
     );
     return;
   }
@@ -1458,13 +3539,22 @@ function renderFixtureInspector() {
   const transform = fixture.transform || {};
   const output = fixture.output || {};
   const caps = fixture.capabilities || {};
+  const reasons = fixture.incomplete_reasons || [];
   const children = [
     el(
       "div",
-      { class: "inspector-title" },
+      { class: `inspector-title${reasons.length ? " incomplete-title" : ""}` },
       el("strong", { text: fixture.name }),
       el("span", { text: fixture.id })
     ),
+    reasons.length
+      ? el(
+          "div",
+          { class: "proxy-warning" },
+          el("strong", { text: "Unvollständig" }),
+          ...reasons.map((reason) => el("div", { text: reason }))
+        )
+      : null,
     section(
       "Fixture",
       fieldRow("Name", textInput(fixture.name, (value) => patch({ name: value || fixture.id }))),
@@ -1489,7 +3579,7 @@ function renderFixtureInspector() {
     children.push(
       section(
         "Point Geometry",
-        vec3Field("Position", geometry.pos, (value) => patch({ geometry: { pos: value } })),
+        vec3Field("Position (lokal)", geometry.pos, (value) => patch({ geometry: { pos: value } })),
         vec3Field("Aim", geometry.aim, (value) => patch({ geometry: { aim: value } })),
         fieldRow("Beam deg", numberInput(geometry.beam_deg, (value) => patch({ geometry: { beam_deg: value } }), { step: 1, min: 1, max: 179 }), { scrub: true })
       )
@@ -1498,8 +3588,8 @@ function renderFixtureInspector() {
     children.push(
       section(
         "Line Geometry",
-        vec3Field("Start", geometry.start, (value) => patch({ geometry: { start: value } })),
-        vec3Field("End", geometry.end, (value) => patch({ geometry: { end: value } })),
+        vec3Field("Start (lokal)", geometry.start, (value) => patch({ geometry: { start: value } })),
+        vec3Field("End (lokal)", geometry.end, (value) => patch({ geometry: { end: value } })),
         fieldRow("Pixels", numberInput(geometry.pixels, (value) => patch({ geometry: { pixels: Math.round(value) } }), { step: 1, min: 2, max: 4096 }), { scrub: true }),
         vec3Field("Aim", geometry.aim, (value) => patch({ geometry: { aim: value } })),
         fieldRow("Beam deg", numberInput(geometry.beam_deg, (value) => patch({ geometry: { beam_deg: value } }), { step: 1, min: 1, max: 179 }), { scrub: true })
@@ -1510,10 +3600,32 @@ function renderFixtureInspector() {
   children.push(
     section(
       "Transform",
-      vec3Field("Translate", transform.translate, (value) => patch({ transform: { translate: value } })),
+      el(
+        "div",
+        { class: "field-row" },
+        el("label", { text: "Weltposition" }),
+        el("span", {
+          class: "mono",
+          style: "font-size:10px;color:var(--text-1)",
+          text: fixtureCenter(fixture.id).map((value) => value.toFixed(2)).join(" / "),
+        })
+      ),
+      vec3Field("Offset (Welt)", transform.translate, (value) => patch({ transform: { translate: value } })),
       vec3Field("Rotate", transform.rotate_deg, (value) => patch({ transform: { rotate_deg: value } })),
       vec3Field("Pivot", transform.pivot, (value) => patch({ transform: { pivot: value } })),
-      vec3Field("Scale", transform.scale, (value) => patch({ transform: { scale: value } }), { step: 0.01 })
+      vec3Field("Scale", transform.scale, (value) => patch({ transform: { scale: value } }), { step: 0.01 }),
+      el("p", {
+        class: "empty-state",
+        style: "padding:2px 0 4px",
+        text: "Position ist die lokale Geometrie-Koordinate. Offset ist ein zusätzlicher Welt-Versatz nach Rotation/Skalierung (Viewport-Drag schreibt hier hinein). Zum Aufräumen: Offset einrechnen.",
+      }),
+      el("button", {
+        class: "button small",
+        type: "button",
+        text: "Offset einrechnen",
+        title: "Offset in Position/Start/End übernehmen und Offset auf 0 setzen",
+        onclick: () => bakeFixtureOffset(fixture.id),
+      })
     ),
     section(
       "Capabilities",
@@ -1534,7 +3646,7 @@ function renderFixtureInspector() {
       onclick: () => deleteFixtures([fixture.id]),
     })
   );
-  dom.inspectorBody.replaceChildren(...children);
+  dom.inspectorBody.replaceChildren(...children.filter(Boolean));
 }
 
 function renderClipInspector() {
@@ -1555,52 +3667,69 @@ function renderClipInspector() {
       el(
         "div",
         { class: "inspector-title" },
-        el("strong", { text: clip.name || clip.preset }),
+        el("strong", { text: clipDisplayName(clip) }),
         el("span", { text: `${track.name} / ${clip.id}` })
       ),
       section(
         "Clip",
-        fieldRow("Name", textInput(clip.name || "", (value) => commitClip(clip.id, "rename clip", (target) => { target.name = value || null; }))),
+        fieldRow("Name", textInput(clip.name || "", (value) => commitClip(clip.id, "rename clip", (target) => { target.name = value.trim() || null; }), { placeholder: `Auto: ${presetName(clip.preset)}` })),
+        toggleRow("Name automatisch", !clip.name, (auto) => commitClip(clip.id, "auto clip name", (target) => {
+          target.name = auto ? null : clipDisplayName(clip);
+        })),
         fieldRow("Start", numberInput(clip.start_s, (value) => commitClip(clip.id, "trim clip", (target) => { target.start_s = clamp(value, 0, target.end_s - 0.1); }), { step: 0.01, min: 0 }), { scrub: true }),
         fieldRow("End", numberInput(clip.end_s, (value) => commitClip(clip.id, "trim clip", (target) => { target.end_s = clamp(value, target.start_s + 0.1, duration()); }), { step: 0.01, min: 0 }), { scrub: true }),
         fieldRow("Fade in", numberInput(clip.fade_in_s, (value) => commitClip(clip.id, "fade", (target) => { target.fade_in_s = clamp(value, 0, target.end_s - target.start_s); }), { step: 0.01, min: 0 }), { scrub: true }),
         fieldRow("Fade out", numberInput(clip.fade_out_s, (value) => commitClip(clip.id, "fade", (target) => { target.fade_out_s = clamp(value, 0, target.end_s - target.start_s); }), { step: 0.01, min: 0 }), { scrub: true }),
-        fieldRow("Opacity", numberInput(clip.opacity, (value) => commitClip(clip.id, "opacity", (target) => { target.opacity = clamp(value, 0, 1); }), { step: 0.01, min: 0, max: 1 }), { scrub: true }),
-        fieldRow("Preset", selectInput(clip.preset, (state.presets || []).map((item) => [item.id, item.name]), (value) => commitClip(clip.id, "change preset", (target) => { target.preset = value; target.params = defaultParams(value); }))),
+        paramRow(clip, "opacity", "Opacity", rangeControl(clip.opacity, (value) => commitClip(clip.id, "opacity", (target) => { target.opacity = clamp(value, 0, 1); }), { min: 0, max: 1, step: 0.01 }), clip.opacity),
+        expressionEditor(clip, "opacity", clip.opacity),
+        fieldRow("Preset", selectInput(clip.preset, (state.presets || []).map((item) => [item.id, `${item.category || "Preset"}: ${item.name}`]), (value) => commitClip(clip.id, "change preset", (target) => { target.preset = value; target.params = defaultParams(value); }))),
         toggleRow("ZCL snap", clip.snap_zcl, (value) => commitClip(clip.id, "snap", (target) => { target.snap_zcl = value; }))
       )
     );
 
     if (preset) {
-      const rows = preset.params.map((spec) => {
+      const rows = [];
+      for (const spec of preset.params) {
         const value = clip.params?.[spec.key] ?? spec.default;
         if (spec.type === "color") {
-          return fieldRow(spec.label, colorField(value, (next) => {
+          rows.push(fieldRow(spec.label, colorField(value, (next) => {
+            commitClip(clip.id, `param ${spec.key}`, (target) => {
+              target.params = { ...target.params, [spec.key]: next };
+            });
+          })));
+        } else if (spec.type === "palette") {
+          rows.push(fieldRow(spec.label, paletteControl(clip, spec, value)));
+        } else if (spec.type === "vec3") {
+          rows.push(vec3Field(spec.label, value, (next) => {
+            commitClip(clip.id, `param ${spec.key}`, (target) => {
+              target.params = { ...target.params, [spec.key]: next };
+            });
+          }, { step: 0.01 }));
+        } else if (spec.type === "bool") {
+          rows.push(toggleRow(spec.label, Boolean(value), (next) => {
             commitClip(clip.id, `param ${spec.key}`, (target) => {
               target.params = { ...target.params, [spec.key]: next };
             });
           }));
-        }
-        if (spec.type === "bool") {
-          return toggleRow(spec.label, Boolean(value), (next) => {
+        } else if (spec.type === "select") {
+          rows.push(fieldRow(spec.label, selectInput(String(value), spec.options || [], (next) => {
             commitClip(clip.id, `param ${spec.key}`, (target) => {
               target.params = { ...target.params, [spec.key]: next };
             });
-          });
+          })));
+        } else {
+          rows.push(
+            paramRow(
+              clip,
+              spec.key,
+              spec.label,
+              presetParamControl(clip, spec, value),
+              value
+            )
+          );
+          rows.push(expressionEditor(clip, spec.key, value));
         }
-        if (spec.type === "select") {
-          return fieldRow(spec.label, selectInput(String(value), spec.options || [], (next) => {
-            commitClip(clip.id, `param ${spec.key}`, (target) => {
-              target.params = { ...target.params, [spec.key]: next };
-            });
-          }));
-        }
-        return fieldRow(spec.label, numberInput(value, (next) => {
-          commitClip(clip.id, `param ${spec.key}`, (target) => {
-            target.params = { ...target.params, [spec.key]: next };
-          });
-        }, { step: spec.step ?? 0.01, min: spec.min, max: spec.max }), { scrub: true });
-      });
+      }
       children.push(section("Preset Parameters", ...rows));
     }
 
@@ -1622,7 +3751,167 @@ function renderClipInspector() {
   dom.inspectorBody.replaceChildren(...children);
 }
 
+function bindCurrentMaTrack() {
+  const track = state?.sync?.track;
+  if (!track || (!track.artist && !track.title)) {
+    toast("Kein Music-Assistant-Track aktiv. Erst Track starten, dann binden.", "info");
+    return;
+  }
+  commitShow("bind MA track", (target) => {
+    target.match = target.match || {};
+    target.match.artist = track.artist || "";
+    target.match.title = track.title || "";
+    target.match.duration_s = Number(track.duration_s || 0);
+    target.match.ma_item_ids = track.item_id ? [track.item_id] : [];
+    target.match.normalized_keys = [];
+  });
+  toast(`Show gebunden an ${track.artist || "?"} – ${track.title || "?"}`, "success");
+}
+
+async function setSyncOffset(offsetMs) {
+  if (!state?.sync?.configured) {
+    toast("Sendspin/MA ist nicht konfiguriert.", "info");
+    return;
+  }
+  const clamped = clamp(Number(offsetMs) || 0, -20000, 20000);
+  try {
+    state.sync = await client.post("/api/sync", { offset_s: clamped / 1000 });
+    updateTopbar();
+    renderInspector();
+    toast(`MA Offset ${clamped > 0 ? "+" : ""}${Math.round(clamped)} ms`, "info", 1200);
+  } catch (error) {
+    toast(error.message, "danger");
+  }
+}
+
+
+function addCurrentMaTrackAlias() {
+  const track = state?.sync?.track;
+  if (!track || (!track.artist && !track.title)) {
+    toast("Kein Music-Assistant-Track aktiv.", "info");
+    return;
+  }
+  commitShow("add MA alias", (target) => {
+    target.match = target.match || {};
+    const keys = new Set(target.match.normalized_keys || []);
+    if (track.key) keys.add(track.key);
+    if (track.artist && track.title) keys.add(`${track.artist}|${track.title}`);
+    target.match.normalized_keys = [...keys];
+    if (track.item_id) {
+      target.match.ma_item_ids = [
+        ...new Set([...(target.match.ma_item_ids || []), track.item_id]),
+      ];
+    }
+  });
+  toast(`MA-Alias hinzugefügt: ${track.artist || "?"} – ${track.title || "?"}`, "success");
+}
+
+function clearMaMatch() {
+  commitShow("clear MA match", (target) => {
+    target.match = target.match || {};
+    target.match.artist = "";
+    target.match.title = "";
+    target.match.duration_s = 0;
+    target.match.ma_item_ids = [];
+    target.match.normalized_keys = [];
+  });
+}
+
+async function showSendspinPairing() {
+  try {
+    const sync = await client.get("/api/sync");
+    if (!sync?.configured) {
+      toast("Sendspin/MA ist nicht konfiguriert (--no-sync oder keine URL).", "info");
+      return;
+    }
+    const token = sync.pairing_token;
+    if (!token) {
+      toast("Pairing-Token noch nicht verfügbar: Sendspin verbindet noch.", "info");
+      return;
+    }
+    const dialog = document.createElement("dialog");
+    const form = document.createElement("form");
+    form.method = "dialog";
+    const input = el("input", {
+      class: "input mono",
+      readonly: true,
+      value: token,
+      style: "width:100%",
+    });
+    const copy = el("button", {
+      class: "button small",
+      type: "button",
+      text: "Kopieren",
+      onclick: () => {
+        const done = () => toast("Pairing-Token kopiert", "success");
+        if (navigator.clipboard?.writeText) {
+          navigator.clipboard.writeText(token).then(done, () => {
+            input.select();
+            document.execCommand?.("copy");
+            done();
+          });
+        } else {
+          input.select();
+          document.execCommand?.("copy");
+          done();
+        }
+      },
+    });
+    form.append(
+      el("div", { class: "dialog-head", text: "Sendspin Pairing-Token" }),
+      el("div", { class: "dialog-body" },
+        el("p", {
+          class: "empty-state",
+          text: "Music Assistant → Player „Hueme-Visualizer“ → Setup required → Pair device → Token einfügen.",
+        }),
+        input,
+        el("div", { class: "section-actions", style: "margin-top:6px" },
+          copy,
+          el("button", {
+            class: "button small",
+            type: "button",
+            text: "Sendspin neu starten",
+            onclick: async () => {
+              try {
+                state.sync = await client.post("/api/sync/restart");
+                updateTopbar();
+                toast("Sendspin neu verbunden", "success");
+              } catch (error) {
+                toast(error.message, "danger");
+              }
+            },
+          })
+        )
+      ),
+      el("div", { class: "dialog-actions" },
+        el("button", { class: "button primary", type: "submit", text: "Schließen" })
+      )
+    );
+    dialog.append(form);
+    dialog.addEventListener("close", () => dialog.remove());
+    document.body.append(dialog);
+    dialog.showModal();
+  } catch (error) {
+    toast(error.message, "danger");
+  }
+}
+
 function renderShowSection(doc) {
+  const markers = doc.timing.markers || [];
+  const markerChips = markers.map((marker, index) =>
+    el("span", { class: "chip" },
+      el("span", { class: "mono", text: formatTime(marker.t_s) }),
+      el("span", { text: marker.name }),
+      el("button", {
+        type: "button",
+        title: "Marker löschen",
+        "aria-label": "Remove marker",
+        onclick: () => commitShow("remove marker", (target) => {
+          target.timing.markers.splice(index, 1);
+        }),
+      }, icon("close"))
+    )
+  );
   return [
     el(
       "div",
@@ -1641,11 +3930,68 @@ function renderShowSection(doc) {
       }), { step: 0.1, min: 1 }), { scrub: true }),
       el("p", { class: "empty-state", text: "Select a clip in the timeline to edit its preset, mask, filters and keyframes." })
     ),
+    section(
+      "Music Assistant",
+      fieldRow("Artist", textInput(doc.match?.artist || "", (value) => commitShow("MA artist", (target) => {
+        target.match = target.match || {};
+        target.match.artist = value;
+        target.match.normalized_keys = [];
+      }))),
+      fieldRow("Titel", textInput(doc.match?.title || "", (value) => commitShow("MA title", (target) => {
+        target.match = target.match || {};
+        target.match.title = value;
+        target.match.normalized_keys = [];
+      }))),
+      fieldRow("Dauer", numberInput(doc.match?.duration_s || 0, (value) => commitShow("MA duration", (target) => {
+        target.match = target.match || {};
+        target.match.duration_s = Math.max(0, value);
+      }), { step: 0.1, min: 0 }), { scrub: true }),
+      fieldRow("Sync-Offset", numberInput(Number((state?.sync?.offset_s || 0) * 1000), setSyncOffset, { step: 10, min: -20000, max: 20000 }), { scrub: true }),
+      el("div", { class: "section-actions", style: "margin-top:5px" },
+        el("button", { class: "button small", type: "button", text: "−500", onclick: () => setSyncOffset(Number((state?.sync?.offset_s || 0) * 1000) - 500) }),
+        el("button", { class: "button small", type: "button", text: "−50", onclick: () => setSyncOffset(Number((state?.sync?.offset_s || 0) * 1000) - 50) }),
+        el("button", { class: "button small", type: "button", text: "+50", onclick: () => setSyncOffset(Number((state?.sync?.offset_s || 0) * 1000) + 50) }),
+        el("button", { class: "button small", type: "button", text: "+500", onclick: () => setSyncOffset(Number((state?.sync?.offset_s || 0) * 1000) + 500) })
+      ),
+      el("p", { class: "empty-state", text: "Positiv = Licht später, negativ = Licht früher (bis ±20 s). Wird automatisch aus der Sendspin-Zeit berechnet, Offset nur für die Speaker-/AVR-Kette." }),
+      el("div", { class: "section-actions", style: "margin-top:5px" },
+        el("button", { class: "button small", type: "button", text: "Aktuellen MA-Track binden", onclick: bindCurrentMaTrack }),
+        el("button", { class: "button small", type: "button", text: "Als Alias hinzufügen", onclick: addCurrentMaTrackAlias }),
+        el("button", { class: "button small", type: "button", text: "Match löschen", onclick: clearMaMatch })
+      ),
+      el("p", { class: "empty-state", text: state?.sync?.matched_show_id === doc.id ? "Auto-Show aktiv für diesen Track." : "Artist/Titel oder MA-Item-ID müssen zum laufenden Track passen." })
+    ),
+    section(
+      "Marker",
+      markerChips.length ? el("div", { class: "chip-list" }, ...markerChips) : el("p", { class: "empty-state", text: "Keine Marker. Audio importieren oder am Playhead setzen." }),
+      el("div", { class: "section-actions", style: "margin-top:5px" },
+        el("button", {
+          class: "button small",
+          type: "button",
+          text: "+ Marker am Playhead",
+          onclick: () => commitShow("add marker", (target) => {
+            const t = currentTime();
+            target.timing.markers.push({
+              t_s: Number(clamp(t, 0, target.duration_s).toFixed(3)),
+              name: `Cue ${target.timing.markers.length + 1}`,
+              kind: "cue",
+            });
+            target.timing.markers.sort((a, b) => a.t_s - b.t_s);
+          }),
+        }),
+        el("button", {
+          class: "button small",
+          type: "button",
+          text: "Marker synchronisieren",
+          onclick: syncMarkersFromBlueprint,
+        })
+      )
+    ),
     el("button", {
       class: "button small",
       type: "button",
       text: "Add Track",
-      onclick: addTrack,
+      onclick: () => addTrack("layer"),
     }),
   ];
 }
@@ -1674,13 +4020,13 @@ function renderTracksSection(doc) {
         },
       },
       el("span", { class: "row-name", text: track.name }),
-      el("span", { class: "row-meta", text: track.target_group }),
+      el("span", { class: "row-meta", text: `${track.kind === "global" ? "G " : track.kind === "sub" ? "S " : ""}${track.target_group}` }),
       el("button", {
         class: "button small icon-button",
         type: "button",
-        text: track.muted ? "M" : "m",
         title: "Mute track",
-        style: `width:20px;border-color:${track.muted ? "var(--danger)" : "var(--line-strong)"}`,
+        "aria-label": "Mute track",
+        style: `width:20px;color:${track.muted ? "var(--danger)" : "var(--text-2)"}`,
         onclick: (event) => {
           event.stopPropagation();
           commitShow("mute track", (target) => {
@@ -1688,13 +4034,13 @@ function renderTracksSection(doc) {
             if (item) item.muted = !item.muted;
           });
         },
-      }),
+      }, icon("mute")),
       el("button", {
         class: "button small icon-button",
         type: "button",
-        text: track.solo ? "S" : "s",
         title: "Solo track",
-        style: `width:20px;border-color:${track.solo ? "var(--accent-dim)" : "var(--line-strong)"}`,
+        "aria-label": "Solo track",
+        style: `width:20px;color:${track.solo ? "var(--warn)" : "var(--text-2)"}`,
         onclick: (event) => {
           event.stopPropagation();
           commitShow("solo track", (target) => {
@@ -1702,10 +4048,62 @@ function renderTracksSection(doc) {
             if (item) item.solo = !item.solo;
           });
         },
-      })
+      }, icon("solo")),
     );
   });
-  return section("Tracks", ...rows);
+  const selected = doc.tracks.find((track) => track.id === selectedTrackId);
+  const editor = [];
+  if (selected) {
+    const rigDoc = state?.rig?.document || {};
+    const targets = [
+      ["all", "All Fixtures"],
+      ...(rigDoc.groups || []).filter((group) => group.type !== "all").map((group) => [group.id, `Group: ${group.name}`]),
+      ...(rigDoc.smart_groups || []).map((group) => [group.id, `# ${group.name}`]),
+      ...(rigDoc.fixtures || []).map((fixture) => [fixture.id, `Lamp: ${fixture.name}`]),
+    ];
+    const patchTrack = (body, label = "edit track") => {
+      commitShow(label, (targetDoc) => {
+        const item = targetDoc.tracks.find((track) => track.id === selected.id);
+        if (item) Object.assign(item, body);
+      });
+    };
+    editor.push(
+      el("div", { class: "preset-category", text: `Ebene: ${selected.name}` }),
+      fieldRow("Name", textInput(selected.name, (value) => patchTrack({ name: value.trim() || selected.id, name_auto: false }, "rename track"))),
+      toggleRow("Name folgt Effekt", trackNameAuto(selected), (auto) => patchTrack({ name_auto: auto }, auto ? "auto track name" : "freeze track name")),
+      fieldRow("Art", selectInput(selected.kind || "layer", [
+        ["layer", "Lampenebene"],
+        ["global", "Global"],
+        ["sub", "Unterebene"],
+      ], (value) => {
+        const parent = value === "sub" ? (selected.parent_id || doc.tracks.find((track) => track.id !== selected.id)?.id || null) : null;
+        patchTrack({ kind: value, parent_id: parent }, "change layer kind");
+      })),
+      fieldRow("Parent", selectInput(selected.parent_id || "", [
+        ["", "None"],
+        ...doc.tracks.filter((track) => track.id !== selected.id).map((track) => [track.id, track.name]),
+      ], (value) => patchTrack({ parent_id: value || null }, "change parent"))),
+      fieldRow("Target", selectInput(selected.target_group, targets, (value) => patchTrack({ target_group: value }, "change target"))),
+      fieldRow("Blend", selectInput(selected.blend_mode, [
+        ["normal", "Normal"],
+        ["add", "Add"],
+        ["max", "Max"],
+        ["multiply", "Multiply"],
+        ["override", "Override"],
+      ], (value) => patchTrack({ blend_mode: value }))),
+      paramRow(
+        { id: selected.id, expressions: {}, start_s: 0, end_s: 1 },
+        "track_opacity",
+        "Opacity",
+        rangeControl(selected.opacity, (value) => patchTrack({ opacity: clamp(value, 0, 1) }), { min: 0, max: 1, step: 0.01 }),
+        selected.opacity,
+        { noActions: true }
+      ),
+      fieldRow("Height", rangeControl(selected.height_px || 36, (value) => patchTrack({ height_px: Math.round(value) }, "resize track"), { min: 24, max: 240, step: 1 })),
+      toggleRow("Clipping-Maske ↴", selected.clipped_to_below, (value) => patchTrack({ clipped_to_below: value }, "toggle clipping"))
+    );
+  }
+  return section("Tracks", ...rows, ...editor);
 }
 
 function renderMaskSection(clip) {
@@ -1753,35 +4151,101 @@ function renderMaskSection(clip) {
   return section("Spatial Mask", ...rows);
 }
 
+function filterParamRows(clip, filter, index) {
+  const info = state.filters?.find((item) => item.id === filter.type);
+  const rows = [];
+  for (const spec of info?.params || []) {
+    const value = filter.params?.[spec.key] ?? spec.default;
+    const setParam = (next) => commitClip(clip.id, `filter ${filter.type} ${spec.key}`, (target) => {
+      const item = target.filters[index];
+      if (!item) return;
+      item.params = { ...(item.params || {}), [spec.key]: next };
+    });
+    if (spec.type === "color") {
+      rows.push(fieldRow(spec.label, colorField(value, setParam)));
+    } else if (spec.type === "vec3") {
+      rows.push(vec3Field(spec.label, value, setParam, { step: spec.step ?? 0.01 }));
+    } else if (spec.type === "bool") {
+      rows.push(toggleRow(spec.label, Boolean(value), setParam));
+    } else if (spec.type === "select") {
+      rows.push(fieldRow(spec.label, selectInput(String(value), spec.options || [], setParam)));
+    } else {
+      rows.push(fieldRow(spec.label, rangeControl(value, setParam, {
+        min: spec.min ?? 0,
+        max: spec.max ?? 1,
+        step: spec.step ?? 0.01,
+      })));
+    }
+  }
+  return rows;
+}
+
 function renderFiltersSection(clip) {
   const filters = clip.filters || [];
-  const chips = filters.map((filter, index) =>
-    el(
-      "span",
-      { class: "chip" },
-      el("button", {
-        type: "button",
-        text: filter.enabled ? "ON" : "OFF",
-        title: "Toggle filter",
-        style: `color:${filter.enabled ? "var(--ok)" : "var(--text-2)"};width:18px`,
-        onclick: () => commitClip(clip.id, "filter", (target) => {
-          target.filters[index].enabled = !target.filters[index].enabled;
-        }),
-      }),
-      state.filters?.find((item) => item.id === filter.type)?.name || filter.type,
-      el("button", {
-        type: "button",
-        text: "x",
-        title: "Remove filter",
-        onclick: () => commitClip(clip.id, "remove filter", (target) => {
-          target.filters.splice(index, 1);
-        }),
-      })
-    )
-  );
+  const cards = filters.map((filter, index) => {
+    const info = state.filters?.find((item) => item.id === filter.type);
+    const move = (delta) => commitClip(clip.id, "reorder filter", (target) => {
+      const next = index + delta;
+      if (next < 0 || next >= target.filters.length) return;
+      const [item] = target.filters.splice(index, 1);
+      target.filters.splice(next, 0, item);
+    });
+    return el(
+      "div",
+      { class: `filter-card${filter.enabled ? " enabled" : ""}` },
+      el(
+        "div",
+        { class: "filter-card-head" },
+        el("button", {
+          class: "button small icon-button filter-enable",
+          type: "button",
+          title: filter.enabled ? "Filter ausschalten" : "Filter einschalten",
+          "aria-label": filter.enabled ? "Disable filter" : "Enable filter",
+          style: `color:${filter.enabled ? "var(--ok)" : "var(--text-2)"}`,
+          onclick: () => commitClip(clip.id, "toggle filter", (target) => {
+            const item = target.filters[index];
+            if (item) item.enabled = !item.enabled;
+          }),
+        }, icon(filter.enabled ? "eye" : "eyeOff")),
+        el("span", { class: "filter-card-title" },
+          el("strong", { text: info?.name || filter.type }),
+          el("span", { class: "mono muted", text: info ? `${info.params.length}p` : "?" })
+        ),
+        el("button", {
+          class: "button small icon-button", type: "button", title: "Nach oben",
+          "aria-label": "Move filter up", disabled: index === 0,
+          onclick: () => move(-1),
+        }, (() => { const node = icon("chevron"); node.style.transform = "rotate(-90deg)"; return node; })()),
+        el("button", {
+          class: "button small icon-button", type: "button", title: "Nach unten",
+          "aria-label": "Move filter down", disabled: index === filters.length - 1,
+          onclick: () => move(1),
+        }, (() => { const node = icon("chevron"); node.style.transform = "rotate(90deg)"; return node; })()),
+        el("button", {
+          class: "button small icon-button", type: "button", title: "Parameter zurücksetzen",
+          "aria-label": "Reset filter parameters",
+          onclick: () => commitClip(clip.id, "reset filter", (target) => {
+            const item = target.filters[index];
+            if (item) item.params = {};
+          }),
+        }, icon("refresh")),
+        el("button", {
+          class: "button small icon-button danger", type: "button", title: "Filter entfernen",
+          "aria-label": "Remove filter",
+          onclick: () => commitClip(clip.id, "remove filter", (target) => {
+            target.filters.splice(index, 1);
+          }),
+        }, icon("delete"))
+      ),
+      el("div", { class: "filter-card-body" }, ...filterParamRows(clip, filter, index))
+    );
+  });
   return section(
-    "Filters",
-    chips.length ? el("div", { class: "chip-list" }, ...chips) : el("p", { class: "empty-state", text: "No filters. Click a filter in the library to add it." })
+    "Filter Stack",
+    cards.length
+      ? el("div", { class: "filter-stack" }, ...cards)
+      : el("p", { class: "empty-state", text: "No filters. Click a filter in the library to add it." }),
+    el("p", { class: "empty-state", text: "Reihenfolge von oben nach unten. Jeder Parameter ist direkt editierbar." })
   );
 }
 
@@ -1793,24 +4257,95 @@ function renderKeyframeSection(clip) {
       el("span", { class: "mono", text: `${keyframe.t_s.toFixed(2)}s ${keyframe.param}` }),
       el("button", {
         type: "button",
-        text: "x",
         title: "Remove keyframe",
+        "aria-label": "Remove keyframe",
         onclick: () => commitClip(clip.id, "remove keyframe", (target) => {
           target.keyframes.splice(index, 1);
         }),
-      })
+      }, icon("close"))
     )
   );
-  const local = client.frame ? client.frame.time - clip.start_s : 0;
+  const expressions = Object.entries(clip.expressions || {}).map(([param, expression]) =>
+    el(
+      "div",
+      { class: "chip" },
+      el("span", { class: "mono", text: `f ${param}` }),
+      el("span", { class: "mono muted", style: "max-width:150px;overflow:hidden;text-overflow:ellipsis", text: expression }),
+      el("button", {
+        type: "button",
+        title: "Remove expression",
+        "aria-label": "Remove expression",
+        onclick: () => commitClip(clip.id, "remove expression", (target) => {
+          delete target.expressions[param];
+        }),
+      }, icon("close"))
+    )
+  );
+  const lanesOpen = openLanes.has(clip.id);
+  const ownerTrack = findClip(clip.id)?.track;
+  const trackLanesOpen = Boolean(ownerTrack && openTracks.has(ownerTrack.id));
+  const local = currentTime() - clip.start_s;
   return section(
-    "Keyframes",
+    "Keyframes & Generatoren",
     rows.length ? el("div", { class: "chip-list" }, ...rows) : el("p", { class: "empty-state", text: "No keyframes on this clip." }),
-    el("button", {
-      class: "button small",
-      type: "button",
-      text: "Key Opacity",
-      onclick: () => addOpacityKeyframe(clip.id, clamp(local, 0, clip.end_s - clip.start_s)),
-    })
+    expressions.length ? el("div", { class: "chip-list" }, ...expressions) : null,
+    el("label", { class: "lane-toggle" },
+      el("input", {
+        type: "checkbox",
+        checked: lanesOpen,
+        onchange: (event) => {
+          if (event.target.checked) openLanes.add(clip.id);
+          else openLanes.delete(clip.id);
+          requestDraw();
+        },
+      }),
+      el("span", { text: "Parameter-Lanes in der Timeline" })
+    ),
+    ownerTrack
+      ? el("label", { class: "lane-toggle" },
+          el("input", {
+            type: "checkbox",
+            checked: trackLanesOpen,
+            onchange: (event) => {
+              if (event.target.checked) openTracks.add(ownerTrack.id);
+              else openTracks.delete(ownerTrack.id);
+              saveLayout();
+              renderInspector();
+              requestDraw();
+            },
+          }),
+          el("span", { text: "Alle Keyframe-Lanes dieser Spur (Doppelklick = Key setzen)" })
+        )
+      : null,
+    el("div", { class: "section-actions", style: "margin-top:4px" },
+      el("button", {
+        class: "button small",
+        type: "button",
+        text: "Key Opacity",
+        onclick: () => addOpacityKeyframe(clip.id, clamp(local, 0, clip.end_s - clip.start_s)),
+      }),
+      el("button", {
+        class: "button small",
+        type: "button",
+        text: "Kick Keys",
+        title: "Generate kick keyframes from the ML analysis",
+        onclick: () => autoKeyframes("kick", "opacity"),
+      }),
+      el("button", {
+        class: "button small",
+        type: "button",
+        text: "Snare Keys",
+        title: "Generate snare accent keyframes from the ML analysis",
+        onclick: () => autoKeyframes("snare", "opacity"),
+      }),
+      el("button", {
+        class: "button small",
+        type: "button",
+        text: "Energy Keys",
+        title: "Generate section-energy keyframes",
+        onclick: () => autoKeyframes("energy", "brightness"),
+      })
+    )
   );
 }
 
@@ -1843,6 +4378,65 @@ function updateTabButtons() {
   });
 }
 
+async function bakeFixtureOffset(id) {
+  const fixture = findFixture(id);
+  if (!fixture) return;
+  const translate = fixture.transform?.translate || [0, 0, 0];
+  if (!translate.some((value) => Math.abs(Number(value)) > 1e-9)) return;
+  const geometry = fixture.geometry || {};
+  const body = geometry.type === "line"
+    ? {
+        geometry: {
+          start: geometry.start.map((value, axis) => Number((Number(value) + Number(translate[axis])).toFixed(4))),
+          end: geometry.end.map((value, axis) => Number((Number(value) + Number(translate[axis])).toFixed(4))),
+        },
+        transform: { translate: [0, 0, 0] },
+      }
+    : {
+        geometry: {
+          pos: geometry.pos.map((value, axis) => Number((Number(value) + Number(translate[axis])).toFixed(4))),
+        },
+        transform: { translate: [0, 0, 0] },
+      };
+  await patchFixture(id, body, "Offset in Position eingerechnet");
+}
+
+async function bakeSelectionOffsets(ids) {
+  const body = (id) => {
+    const fixture = findFixture(id);
+    if (!fixture) return null;
+    const translate = fixture.transform?.translate || [0, 0, 0];
+    const geometry = fixture.geometry || {};
+    if (geometry.type === "line") {
+      return {
+        geometry: {
+          start: geometry.start.map((value, axis) => Number((Number(value) + Number(translate[axis])).toFixed(4))),
+          end: geometry.end.map((value, axis) => Number((Number(value) + Number(translate[axis])).toFixed(4))),
+        },
+        transform: { translate: [0, 0, 0] },
+      };
+    }
+    return {
+      geometry: {
+        pos: geometry.pos.map((value, axis) => Number((Number(value) + Number(translate[axis])).toFixed(4))),
+      },
+      transform: { translate: [0, 0, 0] },
+    };
+  };
+  const patches = ids.map((id) => {
+    const payload = body(id);
+    return payload ? client.patch(`/api/rig/fixtures/${id}`, payload) : null;
+  }).filter(Boolean);
+  if (!patches.length) return;
+  try {
+    await Promise.all(patches);
+    await client.refresh();
+    toast(`Offsets eingerechnet · ${ids.length} Fixtures`, "success", 1800);
+  } catch (error) {
+    toast(error.message, "danger");
+  }
+}
+
 async function patchFixture(id, patch, message) {
   try {
     await client.patch(`/api/rig/fixtures/${id}`, patch);
@@ -1852,6 +4446,371 @@ async function patchFixture(id, patch, message) {
     toast(error.message, "danger");
     client.refresh().catch(() => {});
   }
+}
+
+function selectionCentre(ids) {
+  const points = ids.map((id) => fixtureCenter(id)).filter((point) => point && Number.isFinite(point[0]));
+  if (!points.length) return [0, 0, 0];
+  const sum = points.reduce((acc, point) => add(acc, point), [0, 0, 0]);
+  return sum.map((value) => value / points.length);
+}
+
+async function transformFixtures(ids, compute, label = "transform selection") {
+  const centres = new Map(ids.map((id) => [id, fixtureCenter(id)]));
+  const pivot = selectionCentre(ids);
+  const patches = [];
+  for (const id of ids) {
+    const fixture = findFixture(id);
+    const before = centres.get(id);
+    if (!fixture || !before) continue;
+    const after = compute([...before], pivot, id);
+    if (!after) continue;
+    const translate = fixture.transform?.translate || [0, 0, 0];
+    const next = translate.map((value, axis) => Number((Number(value) + after[axis] - before[axis]).toFixed(4)));
+    patches.push(client.patch(`/api/rig/fixtures/${id}`, { transform: { translate: next } }));
+  }
+  if (!patches.length) return;
+  try {
+    await Promise.all(patches);
+    await client.refresh();
+    toast(`${label} · ${ids.length} Fixtures`, "success", 1800);
+  } catch (error) {
+    toast(error.message, "danger");
+    client.refresh().catch(() => {});
+  }
+}
+
+function moveSelection(ids, delta) {
+  return transformFixtures(
+    ids,
+    (point) => [point[0] + delta[0], point[1] + delta[1], point[2] + delta[2]],
+    "Verschieben"
+  );
+}
+
+function rotateSelection(ids, degrees) {
+  const angle = (degrees * Math.PI) / 180;
+  return transformFixtures(
+    ids,
+    (point, pivot) => {
+      const dx = point[0] - pivot[0];
+      const dy = point[1] - pivot[1];
+      return [
+        pivot[0] + dx * Math.cos(angle) - dy * Math.sin(angle),
+        pivot[1] + dx * Math.sin(angle) + dy * Math.cos(angle),
+        point[2],
+      ];
+    },
+    `Rotieren ${degrees}°`
+  );
+}
+
+function scaleSelection(ids, factor) {
+  return transformFixtures(
+    ids,
+    (point, pivot) => [
+      pivot[0] + (point[0] - pivot[0]) * factor,
+      pivot[1] + (point[1] - pivot[1]) * factor,
+      pivot[2] + (point[2] - pivot[2]) * factor,
+    ],
+    `Skalieren ×${factor}`
+  );
+}
+
+function alignSelection(ids, axis, mode) {
+  const points = new Map(ids.map((id) => [id, fixtureCenter(id)]));
+  const values = [...points.values()].map((point) => point[axis]);
+  if (!values.length) return;
+  const target = mode === "min" ? Math.min(...values) : mode === "max" ? Math.max(...values) : (Math.min(...values) + Math.max(...values)) / 2;
+  return transformFixtures(
+    ids,
+    (point) => {
+      const next = [...point];
+      next[axis] = target;
+      return next;
+    },
+    `Ausrichten ${["X", "Y", "Z"][axis]}`
+  );
+}
+
+function distributeSelection(ids, axis) {
+  if (ids.length < 3) {
+    toast("Verteilen braucht mindestens 3 Fixtures.", "info");
+    return;
+  }
+  const entries = ids
+    .map((id) => ({ id, point: fixtureCenter(id) }))
+    .sort((a, b) => a.point[axis] - b.point[axis]);
+  const first = entries[0].point[axis];
+  const last = entries[entries.length - 1].point[axis];
+  const step = (last - first) / (entries.length - 1);
+  const targets = new Map(entries.map((entry, index) => [entry.id, first + step * index]));
+  return transformFixtures(
+    ids,
+    (point, _pivot, id) => {
+      const next = [...point];
+      next[axis] = targets.get(id) ?? point[axis];
+      return next;
+    },
+    `Verteilen ${["X", "Y", "Z"][axis]}`
+  );
+}
+
+/* ---------------------------------------------------- Blender-style transforms */
+const AXIS_VECTORS = [
+  [1, 0, 0],
+  [0, 1, 0],
+  [0, 0, 1],
+];
+
+function previewTransformPoint(point, op, fixtureId) {
+  const pivot = op.perFixturePivot ? fixtureCenter(fixtureId) : op.anchor;
+  const relative = point.map((value, axis) => (value - pivot[axis]) * op.scale[axis]);
+  const angle = (op.rotateDeg * Math.PI) / 180;
+  if (op.rotateAxis === 0) {
+    const y = relative[1] * Math.cos(angle) - relative[2] * Math.sin(angle);
+    const z = relative[1] * Math.sin(angle) + relative[2] * Math.cos(angle);
+    relative[1] = y;
+    relative[2] = z;
+  } else if (op.rotateAxis === 1) {
+    const x = relative[0] * Math.cos(angle) + relative[2] * Math.sin(angle);
+    const z = -relative[0] * Math.sin(angle) + relative[2] * Math.cos(angle);
+    relative[0] = x;
+    relative[2] = z;
+  } else {
+    const x = relative[0] * Math.cos(angle) - relative[1] * Math.sin(angle);
+    const y = relative[0] * Math.sin(angle) + relative[1] * Math.cos(angle);
+    relative[0] = x;
+    relative[1] = y;
+  }
+  return relative.map(
+    (value, axis) => value + pivot[axis] + op.translate[axis]
+  );
+}
+
+function transformHudText() {
+  if (!transformOp) return "";
+  const op = transformOp;
+  const axisLabel = op.axis == null ? "" : ` AXIS ${"XYZ"[op.axis]}`;
+  const planeLabel = op.planeAxis == null ? "" : ` PLANE ${"XYZ"[op.planeAxis]}`;
+  const pivotLabel = op.perFixturePivot ? " · EINZEL-PIVOT" : " · GRUPPEN-ZENTRUM";
+  const modeLabels = { move: "G MOVE", rotate: "R ROTATE", scale: "S SCALE" };
+  let value = "";
+  if (op.mode === "move") value = `Δ ${op.translate.map((v) => v.toFixed(2)).join(" / ")} m`;
+  else if (op.mode === "rotate") value = `${op.rotateDeg.toFixed(1)}° um ${"XYZ"[op.rotateAxis]}`;
+  else value = `× ${op.scale.map((v) => v.toFixed(2)).join(" / ")}`;
+  return `${modeLabels[op.mode]}${axisLabel}${planeLabel}${pivotLabel}  ${value}  |  Shift fein · Ctrl Snap · X/Y/Z Achse · 2× Achse = Ebene · Enter/LMB OK · Esc/RMB abbrechen`;
+}
+
+function updateTransformHud() {
+  if (!dom.transformHud) return;
+  if (!transformOp) {
+    dom.transformHud.classList.add("hidden");
+    return;
+  }
+  dom.transformHud.textContent = transformHudText();
+  dom.transformHud.classList.remove("hidden");
+}
+
+function pointInViewport(client) {
+  if (!client) return false;
+  const rect = dom.viewport.getBoundingClientRect();
+  return (
+    client.x >= rect.left && client.x <= rect.right &&
+    client.y >= rect.top && client.y <= rect.bottom
+  );
+}
+
+function beginTransform(mode) {
+  if (transformOp || selectedFixtures.size === 0) return;
+  if (!pointInViewport(lastPointerClient)) {
+    toast("Maus über den Viewport bewegen, dann G/R/S.", "info", 2200);
+    return;
+  }
+  const ids = [...selectedFixtures];
+  if (document.activeElement instanceof HTMLElement) document.activeElement.blur();
+  const anchor = selectionCentre(ids);
+  const rect = dom.viewport.getBoundingClientRect();
+  const client = lastPointerClient || {
+    x: rect.left + rect.width / 2,
+    y: rect.top + rect.height / 2,
+  };
+  transformOp = {
+    mode,
+    ids,
+    anchor,
+    startX: client.x - rect.left,
+    startY: client.y - rect.top,
+    lastClient: client,
+    axis: null,
+    planeAxis: null,
+    translate: [0, 0, 0],
+    rotateDeg: 0,
+    rotateAxis: 2,
+    scale: [1, 1, 1],
+    fine: false,
+    snap: false,
+    perFixturePivot: false,
+    lastAxisAt: 0,
+  };
+  viewportDrag = null;
+  window.addEventListener("pointermove", onTransformPointerMove);
+  updateTransformHud();
+  requestDraw();
+  toast({ move: "G: Maus bewegen, X/Y/Z für Achse", rotate: "R: Maus kreisen oder X/Y/Z für Achse", scale: "S: Maus bewegen, X/Y/Z für Achse" }[mode], "info", 2600);
+}
+
+function onTransformPointerMove(event) {
+  if (!transformOp) return;
+  const rect = dom.viewport.getBoundingClientRect();
+  const x = event.clientX - rect.left;
+  const y = event.clientY - rect.top;
+  const op = transformOp;
+  const dx = x - op.startX;
+  const dy = y - op.startY;
+  op.fine = event.shiftKey;
+  op.snap = event.ctrlKey || event.metaKey;
+  op.perFixturePivot = event.altKey;
+  lastPointerClient = { x: event.clientX, y: event.clientY };
+  const basis = cameraBasis();
+  const anchorProjected = project(op.anchor);
+  const focal = anchorProjected?.focal || (viewportSize.h * 0.5) / Math.tan(camera.fov * 0.5);
+  const depth = anchorProjected?.depth || camera.distance;
+  const scaleFactor = depth / Math.max(1, focal);
+  const fine = op.fine ? 0.15 : 1.0;
+  if (op.mode === "move") {
+    let world = add(
+      scale(basis.right, dx * scaleFactor * fine),
+      scale(basis.up, -dy * scaleFactor * fine)
+    );
+    if (op.axis != null) {
+      const unit = AXIS_VECTORS[op.axis];
+      const amount = dot(world, unit);
+      world = scale(unit, amount);
+    }
+    if (op.planeAxis != null) world[op.planeAxis] = 0;
+    if (op.snap) {
+      world = world.map((value) => Math.round(value / 0.1) * 0.1);
+    }
+    op.translate = world.map((value) => Number(value.toFixed(4)));
+  } else if (op.mode === "rotate") {
+    let degrees;
+    if (anchorProjected) {
+      const a0 = Math.atan2(op.startY - anchorProjected.y, op.startX - anchorProjected.x);
+      const a1 = Math.atan2(y - anchorProjected.y, x - anchorProjected.x);
+      degrees = ((a1 - a0) * 180) / Math.PI;
+    } else {
+      degrees = (dx - dy) * 0.4;
+    }
+    degrees *= fine;
+    if (op.snap) degrees = Math.round(degrees / 15) * 15;
+    op.rotateDeg = Number(degrees.toFixed(2));
+    if (op.axis != null) op.rotateAxis = op.axis;
+    op.scale = [1, 1, 1];
+    op.translate = [0, 0, 0];
+  } else {
+    let factor = 1 + (dx - dy) * 0.006;
+    factor = 1 + (factor - 1) * fine;
+    factor = clamp(factor, 0.05, 20);
+    if (op.snap) factor = Math.max(0.1, Math.round(factor * 10) / 10);
+    const next = [1, 1, 1];
+    if (op.axis != null) {
+      next[op.axis] = factor;
+    } else if (op.planeAxis != null) {
+      next[0] = next[1] = next[2] = 1;
+      next[op.planeAxis] = factor;
+    } else {
+      next[0] = next[1] = next[2] = factor;
+    }
+    op.scale = next.map((value) => Number(value.toFixed(4)));
+    op.rotateDeg = 0;
+    op.translate = [0, 0, 0];
+  }
+  updateTransformHud();
+  requestDraw();
+}
+
+function cycleTransformAxis(axis) {
+  if (!transformOp) return;
+  const now = performance.now();
+  if (transformOp.axis === axis && now - transformOp.lastAxisAt < 420) {
+    transformOp.axis = null;
+    transformOp.planeAxis = axis;
+  } else {
+    transformOp.axis = axis;
+    transformOp.planeAxis = null;
+  }
+  transformOp.lastAxisAt = now;
+  if (transformOp.mode === "rotate") transformOp.rotateAxis = axis;
+  updateTransformHud();
+  requestDraw();
+}
+
+async function commitTransform() {
+  const op = transformOp;
+  if (!op) return;
+  window.removeEventListener("pointermove", onTransformPointerMove);
+  transformOp = null;
+  updateTransformHud();
+  requestDraw();
+  const changed =
+    op.translate.some((value) => Math.abs(value) > 1e-6) ||
+    Math.abs(op.rotateDeg) > 1e-6 ||
+    op.scale.some((value) => Math.abs(value - 1) > 1e-6);
+  if (!changed) return;
+  try {
+    await client.post("/api/rig/fixtures/transform", {
+      fixture_ids: op.ids,
+      translate: op.translate,
+      rotate_axis: "xyz"[op.rotateAxis],
+      rotate_deg: op.rotateDeg,
+      scale: op.scale,
+      pivot: op.perFixturePivot ? null : op.anchor.map((value) => Number(value.toFixed(4))),
+    });
+    await client.refresh();
+    toast(`Transform übernommen · ${op.ids.length} Fixtures`, "success", 1800);
+  } catch (error) {
+    const missingEndpoint = /404|405|not found|method not allowed/i.test(error.message || "");
+    const moveOnly = Math.abs(op.rotateDeg) < 1e-6 && op.scale.every((value) => Math.abs(value - 1) < 1e-6);
+    if (missingEndpoint && moveOnly) {
+      // Older studio servers only expose per-fixture PATCH. A pure G move can
+      // still be saved through translate offsets without the bake endpoint.
+      try {
+        const patches = op.ids.map((id) => {
+          const fixture = findFixture(id);
+          const translate = fixture?.transform?.translate || [0, 0, 0];
+          return client.patch(`/api/rig/fixtures/${id}`, {
+            transform: {
+              translate: translate.map((value, axis) => Number((Number(value) + op.translate[axis]).toFixed(4))),
+            },
+          });
+        });
+        await Promise.all(patches);
+        await client.refresh();
+        toast(`Transform übernommen (Offset) · ${op.ids.length} Fixtures`, "success", 2200);
+        return;
+      } catch (fallbackError) {
+        toast(fallbackError.message, "danger");
+        return;
+      }
+    }
+    toast(
+      missingEndpoint
+        ? "Server unterstützt Gruppen-Transforms noch nicht — Studio-Server neu starten."
+        : error.message,
+      "danger",
+      7000
+    );
+    client.refresh().catch(() => {});
+  }
+}
+
+function cancelTransform() {
+  if (!transformOp) return;
+  window.removeEventListener("pointermove", onTransformPointerMove);
+  transformOp = null;
+  updateTransformHud();
+  requestDraw();
 }
 
 async function deleteFixtures(ids) {
@@ -1889,6 +4848,227 @@ function applyPreset(presetId) {
     target.preset = presetId;
     target.params = defaultParams(presetId);
   });
+}
+
+async function addPresetClipAtPlayhead(presetId) {
+  const doc = showDoc();
+  if (!doc) return;
+  const track = findTrack() || doc.tracks[0];
+  if (!track) {
+    toast("Add a track first.", "info");
+    return;
+  }
+  const start = clamp(snapTime(currentTime()), 0, Math.max(0, doc.duration_s - 0.25));
+  const length = Math.min(Math.max(gridSeconds() * 4, 0.5), doc.duration_s - start);
+  if (length <= 0.05) {
+    toast("No room for a clip at the playhead.", "info");
+    return;
+  }
+  const ids = new Set(doc.tracks.flatMap((item) => item.clips.map((clip) => clip.id)));
+  const id = uniqueId("clip", ids);
+  await commitShow(`insert ${presetId}`, (target) => {
+    const targetTrack = target.tracks.find((item) => item.id === track.id);
+    if (!targetTrack) return;
+    targetTrack.clips.push({
+      id,
+      name: null,
+      start_s: start,
+      end_s: start + length,
+      preset: presetId,
+      opacity: 1,
+      params: defaultParams(presetId),
+      keyframes: [],
+      spatial_mask: { kind: "none" },
+      filters: [],
+      snap_zcl: false,
+    });
+  });
+  selectedClipId = id;
+  selectedTrackId = track.id;
+  inspectorTab = "clip";
+  updateTabButtons();
+  renderInspector();
+  requestDraw();
+  toast(`${presetById(presetId)?.name || presetId} eingefügt`, "success");
+}
+
+async function duplicateClip(clipId) {
+  const found = findClip(clipId);
+  if (!found) return;
+  const ids = new Set(showDoc().tracks.flatMap((track) => track.clips.map((clip) => clip.id)));
+  const id = uniqueId("clip", ids);
+  const length = found.clip.end_s - found.clip.start_s;
+  const start = clamp(found.clip.start_s + length, 0, Math.max(0, duration() - length));
+  await commitShow("duplicate clip", (doc) => {
+    const track = doc.tracks.find((item) => item.id === found.track.id);
+    if (!track) return;
+    const copy = deepClone(found.clip);
+    copy.id = id;
+    copy.start_s = start;
+    copy.end_s = start + length;
+    copy.keyframes = (copy.keyframes || []).filter((keyframe) => keyframe.t_s <= length);
+    track.clips.push(copy);
+  });
+  selectedClipId = id;
+  selectedTrackId = found.track.id;
+  renderInspector();
+  requestDraw();
+}
+
+function nextClipboardId(prefix, set) {
+  const id = uniqueId(prefix, set);
+  set.add(id);
+  return id;
+}
+
+function copyTrackToClipboard(track, cut = false) {
+  if (!track) return;
+  clipboard = { kind: "track", data: deepClone(track) };
+  toast(`Ebene "${track.name}" kopiert`, "info", 1400);
+  if (cut) deleteTrack(track.id);
+}
+
+async function pasteTrackData(source, label = "paste track", atIndex = null) {
+  const doc = showDoc();
+  if (!doc || !source) return null;
+  const copy = deepClone(source);
+  const trackIds = new Set(doc.tracks.map((track) => track.id));
+  const clipIds = new Set(doc.tracks.flatMap((track) => track.clips.map((clip) => clip.id)));
+  const newId = nextClipboardId("track", trackIds);
+  copy.id = newId;
+  if (!copy.name_auto) copy.name = `${copy.name} Kopie`;
+  copy.clips = (copy.clips || []).map((clip) => ({
+    ...clip,
+    id: nextClipboardId("clip", clipIds),
+    start_s: clamp(Number(clip.start_s) || 0, 0, Math.max(0, duration() - 0.1)),
+    end_s: clamp(Number(clip.end_s) || 1, 0.1, duration()),
+  }));
+  if (copy.kind === "sub" && !doc.tracks.some((track) => track.id === copy.parent_id)) {
+    copy.kind = "layer";
+    copy.parent_id = null;
+  }
+  await commitShow(label, (target) => {
+    const index = atIndex === null ? target.tracks.length : atIndex;
+    target.tracks.splice(Math.max(0, Math.min(index, target.tracks.length)), 0, copy);
+  });
+  selectedTrackId = newId;
+  selectedClipId = copy.clips[0]?.id || null;
+  renderInspector();
+  requestDraw();
+  return newId;
+}
+
+async function pasteTrack() {
+  if (clipboard?.kind !== "track") {
+    toast("Keine Ebene in der Zwischenablage.", "info");
+    return;
+  }
+  const doc = showDoc();
+  const index = doc?.tracks?.findIndex((track) => track.id === selectedTrackId);
+  await pasteTrackData(clipboard.data, "paste track", index == null || index < 0 ? null : index + 1);
+}
+
+async function duplicateTrack(trackId) {
+  const track = findTrack(trackId);
+  if (!track) return;
+  const doc = showDoc();
+  const index = doc?.tracks?.findIndex((item) => item.id === track.id);
+  await pasteTrackData(track, "duplicate track", index == null || index < 0 ? null : index + 1);
+}
+
+async function renameTrackPrompt(track) {
+  const values = await modalForm({
+    title: "Ebene umbenennen",
+    fields: [{ name: "name", label: "Name", value: track.name }],
+    confirmLabel: "Umbenennen",
+  });
+  if (!values) return;
+  const name = values.name.trim();
+  if (!name) return;
+  commitShow("rename track", (doc) => {
+    const target = doc.tracks.find((item) => item.id === track.id);
+    if (target) {
+      target.name = name;
+      target.name_auto = false;
+    }
+  });
+}
+
+function copyClipToClipboard(clip, track, cut = false) {
+  if (!clip) return;
+  clipboard = { kind: "clip", data: deepClone(clip), sourceTrackId: track?.id || null };
+  toast(`Clip "${clipDisplayName(clip)}" kopiert`, "info", 1400);
+  if (cut) deleteClip(clip.id);
+}
+
+async function pasteClip() {
+  if (clipboard?.kind !== "clip") {
+    toast("Kein Clip in der Zwischenablage.", "info");
+    return;
+  }
+  const doc = showDoc();
+  const track = findTrack() || doc?.tracks?.[0];
+  if (!doc || !track) {
+    toast("Keine Ebene zum Einfügen.", "info");
+    return;
+  }
+  const source = clipboard.data;
+  const length = Math.max(0.1, Number(source.end_s) - Number(source.start_s));
+  const start = clamp(snapTime(currentTime()), 0, Math.max(0, duration() - length));
+  const clipIds = new Set(doc.tracks.flatMap((item) => item.clips.map((clip) => clip.id)));
+  const copy = deepClone(source);
+  copy.id = nextClipboardId("clip", clipIds);
+  copy.name = source.name || null;
+  copy.start_s = start;
+  copy.end_s = start + length;
+  copy.keyframes = (copy.keyframes || []).filter((keyframe) => keyframe.t_s <= length);
+  await commitShow("paste clip", (target) => {
+    const item = target.tracks.find((candidate) => candidate.id === track.id);
+    if (item) item.clips.push(copy);
+  });
+  selectedClipId = copy.id;
+  selectedTrackId = track.id;
+  inspectorTab = "clip";
+  updateTabButtons();
+  renderInspector();
+  requestDraw();
+}
+
+async function renameClipPrompt(clip) {
+  const values = await modalForm({
+    title: "Clip umbenennen",
+    fields: [{ name: "name", label: "Name", value: clip.name || "", placeholder: `Auto: ${presetName(clip.preset)}`, optional: true }],
+    confirmLabel: "Umbenennen",
+    hint: "Leer lassen = Name folgt automatisch dem Effekt.",
+  });
+  if (!values) return;
+  commitClip(clip.id, "rename clip", (target) => {
+    target.name = values.name.trim() || null;
+  });
+}
+
+function resetClipName(clip) {
+  commitClip(clip.id, "auto clip name", (target) => {
+    target.name = null;
+  });
+}
+
+async function deleteTrack(trackId) {
+  const track = findTrack(trackId);
+  if (!track) return;
+  await commitShow("delete track", (doc) => {
+    doc.tracks = doc.tracks.filter((item) => item.id !== trackId);
+    for (const child of doc.tracks) {
+      if (child.parent_id === trackId) {
+        child.parent_id = null;
+        if (child.kind === "sub") child.kind = "layer";
+      }
+    }
+  });
+  if (selectedTrackId === trackId) selectedTrackId = null;
+  if (selectedClipId && !findClip(selectedClipId)) selectedClipId = null;
+  renderInspector();
+  requestDraw();
 }
 
 function addFilter(filterId) {
@@ -2000,32 +5180,169 @@ async function refreshHistory() {
   }
   try {
     const history = await client.get(`/api/shows/${id}/history`);
+    lastHistory = history;
     dom.history.textContent = `undo ${history.undo_depth} / redo ${history.redo_depth}`;
     dom.history.title = history.undo_labels.join("\n") || "No undo history";
+    updateTopbar();
   } catch {
     dom.history.textContent = "";
   }
 }
 
-async function addTrack() {
+async function addTrack(kind = "layer") {
   const doc = showDoc();
   if (!doc) return;
   const ids = new Set(doc.tracks.map((track) => track.id));
-  const id = uniqueId("track", ids);
-  await commitShow("add track", (target) => {
-    target.tracks.push({
+  const id = uniqueId(kind === "global" ? "global" : kind === "sub" ? "sub" : "track", ids);
+  let parent = null;
+  if (kind === "sub") {
+    parent = findTrack() || doc.tracks[doc.tracks.length - 1];
+    if (!parent) {
+      toast("Create a lamp layer before adding a sub-layer.", "info");
+      return;
+    }
+  }
+  await commitShow(`add ${kind} track`, (target) => {
+    const track = {
       id,
-      name: `Track ${target.tracks.length + 1}`,
-      target_group: "all",
+      name: kind === "global" ? `Global ${target.tracks.filter((item) => item.kind === "global").length + 1}` : kind === "sub" ? `Unterebene ${target.tracks.filter((item) => item.kind === "sub").length + 1}` : `Track ${target.tracks.length + 1}`,
+      name_auto: true,
+      target_group: kind === "sub" && parent ? parent.target_group : "all",
       blend_mode: "normal",
       opacity: 1,
       muted: false,
       solo: false,
+      kind,
+      parent_id: kind === "sub" && parent ? parent.id : null,
+      clipped_to_below: kind === "sub",
+      height_px: 36,
       clips: [],
-    });
+    };
+    if (kind === "global") target.tracks.unshift(track);
+    else if (kind === "sub" && parent) {
+      const index = target.tracks.findIndex((item) => item.id === parent.id);
+      target.tracks.splice(index + 1, 0, track);
+    } else target.tracks.push(track);
   });
   selectedTrackId = id;
   renderInspector();
+  requestDraw();
+}
+
+async function toggleClipping() {
+  const track = findTrack();
+  if (!track) {
+    toast("Select a track header first.", "info");
+    return;
+  }
+  await commitShow("toggle clipping mask", (doc) => {
+    const target = doc.tracks.find((item) => item.id === track.id);
+    if (target) target.clipped_to_below = !target.clipped_to_below;
+  });
+  requestDraw();
+}
+
+async function autoKeyframes(source = "kick", param = "opacity") {
+  const id = activeShowId();
+  const found = findClip();
+  if (!id) {
+    toast("No active show.", "info");
+    return;
+  }
+  try {
+    const result = await client.post(`/api/shows/${id}/auto-keyframes`, {
+      clip_id: found?.clip.id || null,
+      source,
+      param,
+      division: dom.grid.value || "1/8",
+      depth: 0.75,
+    });
+    state.show.document = result.document;
+    await refreshHistory();
+    renderInspector();
+    requestDraw();
+    toast(`${result.added} rhythm keyframes from ${result.analyzer}`, "success");
+  } catch (error) {
+    toast(error.message, "danger");
+  }
+}
+
+async function clearClipFilters() {
+  const found = findClip();
+  if (!found) {
+    toast("Select a clip first.", "info");
+    return;
+  }
+  await commitClip(found.clip.id, "clear filters", (target) => {
+    target.filters = [];
+  });
+}
+
+async function newShow() {
+  const values = await modalForm({
+    title: "Neue Show",
+    fields: [
+      { name: "name", label: "Name", value: "New Show" },
+      { name: "id", label: "Id", value: "new_show" },
+      { name: "duration_s", label: "Dauer (s)", value: "60" },
+      { name: "bpm", label: "BPM", value: "120" },
+    ],
+    confirmLabel: "Create",
+  });
+  if (!values) return;
+  const doc = {
+    schema_version: 1,
+    id: values.id || slug(values.name),
+    name: values.name || "New Show",
+    duration_s: Math.max(1, Number(values.duration_s) || 60),
+    match: { artist: "", title: values.name || "", normalized_keys: [], ma_item_ids: [], duration_s: 0 },
+    timing: { bpm: Math.max(1, Number(values.bpm) || 120) },
+    tracks: [
+      {
+        id: "base",
+        name: "Base Field",
+        name_auto: true,
+        target_group: "all",
+        blend_mode: "normal",
+        opacity: 0.7,
+        clips: [
+          {
+            id: "base_clip",
+            start_s: 0,
+            end_s: Math.max(1, Number(values.duration_s) || 60),
+            preset: "solid",
+            params: defaultParams("solid"),
+          },
+        ],
+      },
+    ],
+  };
+  try {
+    await client.post("/api/shows", doc);
+    await client.setTransport({ show_id: doc.id });
+    await client.refresh();
+    toast(`Created ${doc.name}`, "success");
+  } catch (error) {
+    toast(error.message, "danger");
+  }
+}
+
+async function saveSnapshot() {
+  const id = activeShowId();
+  if (!id) return;
+  const values = await modalForm({
+    title: "Snapshot",
+    fields: [{ name: "label", label: "Label", value: "manual snapshot" }],
+    confirmLabel: "Save",
+  });
+  if (!values) return;
+  try {
+    await client.post(`/api/shows/${id}/snapshot`, { label: values.label || "manual snapshot" });
+    await refreshHistory();
+    toast("Snapshot saved", "success");
+  } catch (error) {
+    toast(error.message, "danger");
+  }
 }
 
 async function addClip() {
@@ -2049,7 +5366,7 @@ async function addClip() {
     if (!targetTrack) return;
     targetTrack.clips.push({
       id,
-      name: "New Clip",
+      name: null,
       start_s: start,
       end_s: start + length,
       fade_in_s: 0,
@@ -2375,8 +5692,8 @@ function renderGroupEditor() {
           el("span", { class: "chip" }, fixtureId,
             el("button", {
               type: "button",
-              text: "x",
               title: "Remove from group",
+              "aria-label": "Remove from group",
               onclick: () => {
                 const next = group.fixtures.filter((id) => id !== fixtureId);
                 if (!next.length) {
@@ -2385,7 +5702,7 @@ function renderGroupEditor() {
                 }
                 saveGroup({ ...group, fixtures: next });
               },
-            })
+            }, icon("close"))
           )
         )
       ),
@@ -2563,6 +5880,91 @@ function bindScrub() {
   });
 }
 
+/* --------------------------------------------------------------- context menu */
+function hideContextMenu() {
+  if (!contextMenu) return;
+  contextMenu.remove();
+  contextMenu = null;
+  document.removeEventListener("pointerdown", outsideContextMenu, true);
+  document.removeEventListener("keydown", contextMenuKey, true);
+  window.removeEventListener("blur", hideContextMenu);
+  window.removeEventListener("resize", hideContextMenu);
+}
+
+function outsideContextMenu(event) {
+  if (contextMenu && !contextMenu.contains(event.target)) hideContextMenu();
+}
+
+function contextMenuKey(event) {
+  if (event.key === "Escape") hideContextMenu();
+}
+
+function contextMenuButton(item) {
+  return el(
+    "button",
+    {
+      type: "button",
+      role: item.children ? "menu" : "menuitem",
+      class: item.danger ? "danger" : undefined,
+      disabled: item.disabled || undefined,
+      "aria-haspopup": item.children ? "menu" : undefined,
+      onclick: (event) => {
+        if (item.children) {
+          event.preventDefault();
+          event.stopPropagation();
+          const wrap = event.currentTarget.parentElement;
+          wrap.classList.toggle("open");
+          return;
+        }
+        hideContextMenu();
+        item.fn?.();
+      },
+    },
+    item.icon ? icon(item.icon) : null,
+    el("span", { class: "ctx-text", text: item.label }),
+    item.checked ? icon("check") : null,
+    item.key ? el("span", { class: "ctx-key", text: item.key }) : null,
+    item.children ? icon("chevron") : null
+  );
+}
+
+function fillContextMenu(menu, items) {
+  for (const item of items) {
+    if (!item) continue;
+    if (item.separator) {
+      menu.append(el("div", { class: "ctx-sep" }));
+      continue;
+    }
+    if (item.children?.length) {
+      const submenu = el("div", { class: "ctx-menu ctx-sub", role: "menu" });
+      fillContextMenu(submenu, item.children);
+      menu.append(
+        el("div", { class: "ctx-sub-wrap" }, contextMenuButton(item), submenu)
+      );
+      continue;
+    }
+    menu.append(contextMenuButton(item));
+  }
+}
+
+function showContextMenu(x, y, items) {
+  hideContextMenu();
+  const menu = el("div", { class: "ctx-menu", role: "menu" });
+  fillContextMenu(menu, items);
+  if (x > window.innerWidth * 0.55) menu.classList.add("flip");
+  document.body.append(menu);
+  const rect = menu.getBoundingClientRect();
+  menu.style.left = `${Math.max(4, Math.min(x, window.innerWidth - rect.width - 6))}px`;
+  menu.style.top = `${Math.max(4, Math.min(y, window.innerHeight - rect.height - 6))}px`;
+  contextMenu = menu;
+  window.setTimeout(() => {
+    document.addEventListener("pointerdown", outsideContextMenu, true);
+  }, 0);
+  document.addEventListener("keydown", contextMenuKey, true);
+  window.addEventListener("blur", hideContextMenu);
+  window.addEventListener("resize", hideContextMenu);
+}
+
 /* -------------------------------------------------------------------- mcp */
 function mcpCell(label, value) {
   return el("div", {}, el("span", { class: "label", text: label }), String(value));
@@ -2624,7 +6026,191 @@ function openMcpDrawer(open) {
 }
 
 /* ------------------------------------------------------------------ events */
+function runCommand(command) {
+  const cameraButton = document.querySelector(`[data-camera="${command.replace("camera-", "")}"]`);
+  switch (command) {
+    case "new-show": newShow(); break;
+    case "load-audio": dom.blueprintFile.click(); break;
+    case "snapshot": saveSnapshot(); break;
+    case "live-deck": window.location.href = "/live"; break;
+    case "undo": undoShow(); break;
+    case "redo": redoShow(); break;
+    case "split": splitClip(); break;
+    case "delete-clip": if (selectedClipId) deleteClip(selectedClipId); break;
+    case "add-clip": addClip(); break;
+    case "add-layer": addTrack("layer"); break;
+    case "add-global": addTrack("global"); break;
+    case "add-sub": addTrack("sub"); break;
+    case "toggle-clip": toggleClipping(); break;
+    case "toggle-mute": toggleMute(); break;
+    case "focus-filters":
+      $("#section-filters")?.classList.add("open");
+      $("#section-filters")?.scrollIntoView({ block: "start" });
+      break;
+    case "clear-filters": clearClipFilters(); break;
+    case "auto-keys": autoKeyframes("kick", "opacity"); break;
+    case "camera-persp":
+    case "camera-front":
+    case "camera-top":
+    case "camera-side":
+      cameraButton?.click();
+      break;
+    case "fit-show":
+      view.start = 0;
+      view.end = Math.max(1, duration());
+      requestDraw();
+      break;
+    case "camera-fit": fitCamera(); break;
+    case "ma-pairing":
+      showSendspinPairing();
+      break;
+    case "sync-restart":
+      client
+        .post("/api/sync/restart")
+        .then((sync) => {
+          state.sync = sync;
+          updateTopbar();
+          toast("Sendspin neu verbunden", "success");
+        })
+        .catch((error) => toast(error.message, "danger"));
+      break;
+    case "system-restart":
+      modalConfirm(
+        "Studio neu starten",
+        "Der Server-Prozess wird neu gestartet. Hardware und Sync werden kurz unterbrochen.",
+        "Neu starten"
+      ).then(async (confirmed) => {
+        if (!confirmed) return;
+        try {
+          await client.post("/api/system/restart");
+          toast("Studio startet neu …", "info", 4000);
+          window.setTimeout(() => window.location.reload(), 3000);
+        } catch (error) {
+          toast(error.message, "danger");
+        }
+      });
+      break;
+    case "shortcuts":
+      modalConfirm(
+        "Tastenkürzel",
+        "Space Play/Pause | ←/→ Frame vor/zurück (Timeline) | Shift+←/→ 10 Frames | G Move | R Rotate | S Scale (mit Auswahl) | X/Y/Z Achse | 2× Achse = Ebene | Shift fein | Ctrl Snap | Alt Einzel-Pivot | Enter/LMB bestätigen | Esc/RMB abbrechen | Numpad 1/3/7 = Front/Rechts/Top ortho | Numpad 9 = Gegenansicht | Numpad 5 = Persp/Ortho | Numpad 0 = Persp Fit | S Split (ohne Auswahl) | M Mute | Delete Clip löschen | Strg+Z Undo | Strg+Shift+Z Redo | Alt+Klick Track = Clipping | Alt+Wheel = Spurhöhe | Shift+Alt+Wheel = alle Spuren",
+        "OK"
+      );
+      break;
+    case "about":
+      modalConfirm(
+        "Hueme Studio",
+        "Deterministische 3D-Show-Engine mit NLE-Timeline, ML-Audioanalyse, MCP-Co-Director und Hardware-HAL.",
+        "OK"
+      );
+      break;
+    default:
+      break;
+  }
+}
+
 function bindEvents() {
+  setIcon(dom.toStart, "start", "Go to start");
+  setIcon(dom.toEnd, "end", "Go to end");
+  setIcon(dom.loop, "loop", "Loop");
+  setIcon(dom.undo, "undo", "Undo");
+  setIcon(dom.redo, "redo", "Redo");
+  setIcon(dom.mcpClose, "close", "Close MCP drawer");
+  setIcon($("#split"), "split", "Split clip");
+  setIcon($("#mute"), "mute", "Mute track");
+  setIcon($("#add-clip"), "plus", "Add clip");
+  setIcon($("#zoom-in"), "zoomIn", "Zoom in");
+  setIcon($("#zoom-out"), "zoomOut", "Zoom out");
+  updateTransport();
+
+  dom.timecode.addEventListener("click", () => {
+    timecodeMode = (timecodeMode + 1) % 3;
+    updateTimecode();
+    toast(["Timecode", "Frames @ FPS", "Takt Bar.Beat.Sub"][timecodeMode], "info", 1200);
+  });
+
+  document.querySelectorAll(".menu-button").forEach((button) => {
+    button.addEventListener("click", (event) => {
+      event.stopPropagation();
+      const menu = button.closest(".menu");
+      const open = menu.classList.contains("open");
+      document.querySelectorAll(".menu.open").forEach((item) => item.classList.remove("open"));
+      if (!open) menu.classList.add("open");
+    });
+  });
+  document.querySelectorAll(".menu-drop [data-command]").forEach((button) => {
+    button.addEventListener("click", () => {
+      document.querySelectorAll(".menu.open").forEach((item) => item.classList.remove("open"));
+      runCommand(button.dataset.command);
+    });
+  });
+  document.addEventListener("click", () => {
+    document.querySelectorAll(".menu.open").forEach((item) => item.classList.remove("open"));
+  });
+
+  document.querySelectorAll("[data-workspace]").forEach((button) => {
+    button.addEventListener("click", () => {
+      workspace = button.dataset.workspace;
+      dom.root.classList.toggle("stage-mode", workspace === "stage");
+      document.querySelectorAll("[data-workspace]").forEach((item) => {
+        item.classList.toggle("active", item.dataset.workspace === workspace);
+        item.setAttribute("aria-selected", String(item.dataset.workspace === workspace));
+      });
+      resizeAll();
+    });
+  });
+
+  dom.hw?.addEventListener("click", async () => {
+    if (!state) return;
+    try {
+      state.hardware = await client.post("/api/hardware", {
+        enabled: !state.hardware?.enabled,
+      });
+      updateTopbar();
+      const hardware = state.hardware || {};
+      if (hardware.enabled) {
+        if (hardware.last_error) {
+          toast(`HW an, aber Treiberfehler: ${hardware.last_error}`, "danger", 8000);
+        } else {
+          toast(
+            `Hardware ON · ${hardware.started ? "Treiber verbunden" : "Treiber startet"} · ${hardware.tx_operations || 0} tx`,
+            "success"
+          );
+        }
+        // Let the HAL send a few frames, then report whether frames really left.
+        window.setTimeout(async () => {
+          try {
+            state.hardware = await client.get("/api/hardware");
+            updateTopbar();
+            const hw = state.hardware || {};
+            if (hw.enabled) {
+              if (hw.last_error) toast(`HW Fehler: ${hw.last_error}`, "danger", 8000);
+              else if (!hw.tx_operations) {
+                toast(
+                  "HW an, aber 0 Frames gesendet: Fixture-Output/Adresse prüfen (Rig & Output).",
+                  "info",
+                  8000
+                );
+              } else {
+                toast(`HW sendet · ${hw.tx_operations} tx`, "success", 3000);
+              }
+            }
+          } catch {
+            /* status refresh is best-effort */
+          }
+        }, 1400);
+      } else {
+        toast("Hardware output disabled", "info");
+      }
+    } catch (error) {
+      toast(error.message, "danger");
+    }
+  });
+
+  dom.addGlobal?.addEventListener("click", () => addTrack("global"));
+  dom.addSub?.addEventListener("click", () => addTrack("sub"));
+  dom.autoKeys?.addEventListener("click", () => autoKeyframes("kick", "opacity"));
+
   dom.showSelect.addEventListener("change", async () => {
     try {
       await client.setTransport({ show_id: dom.showSelect.value });
@@ -2681,6 +6267,14 @@ function bindEvents() {
   dom.mcp.addEventListener("click", () => openMcpDrawer(dom.mcpDrawer.classList.contains("hidden")));
   dom.mcpClose.addEventListener("click", () => openMcpDrawer(false));
   dom.mcpFilter.addEventListener("input", renderMcpLog);
+  dom.librarySearch?.addEventListener("input", () => {
+    libraryQuery = dom.librarySearch.value.trim().toLowerCase();
+    renderPresets();
+    renderFilters();
+  });
+  dom.paletteNew?.addEventListener("click", () => openPaletteEditor(null, { onApply: applyPaletteToClip }));
+  dom.fxToggle?.addEventListener("click", () => setFxMode(!fxMode));
+  dom.syncMarkers?.addEventListener("click", syncMarkersFromBlueprint);
   dom.blueprintLoad.addEventListener("click", () => dom.blueprintFile.click());
   dom.blueprintFile.addEventListener("change", () => {
     const file = dom.blueprintFile.files?.[0];
@@ -2722,10 +6316,21 @@ function bindEvents() {
     }
     try {
       state.sync = await client.post("/api/sync", { enabled: !state.sync.enabled });
-      updateSync();
+      updateTopbar();
     } catch (error) {
       toast(error.message, "danger");
     }
+  });
+  dom.maPair?.addEventListener("click", showSendspinPairing);
+  dom.maRestart?.addEventListener("click", () => {
+    client
+      .post("/api/sync/restart")
+      .then((sync) => {
+        state.sync = sync;
+        updateTopbar();
+        toast("Sendspin neu verbunden", "success");
+      })
+      .catch((error) => toast(error.message, "danger"));
   });
   $("#zoom-out").addEventListener("click", () => zoomTimeline(1.4, (view.start + view.end) / 2));
   $("#zoom-in").addEventListener("click", () => zoomTimeline(0.7, (view.start + view.end) / 2));
@@ -2737,6 +6342,7 @@ function bindEvents() {
 
   document.querySelectorAll("[data-camera]").forEach((button) => {
     button.addEventListener("click", () => {
+      if (fxMode) setFxMode(false);
       const room = roomDoc();
       camera.target = room.min.map((value, index) => (value + room.max[index]) / 2);
       if (button.dataset.camera === "front") {
@@ -2763,7 +6369,11 @@ function bindEvents() {
   $("#camera-fit").addEventListener("click", () => fitCamera());
 
   window.addEventListener("resize", resizeAll);
+  window.addEventListener("pointermove", (event) => {
+    lastPointerClient = { x: event.clientX, y: event.clientY };
+  }, { passive: true });
   bindScrub();
+  bindSplitters();
   bindViewport();
   bindTimeline();
   bindKeyboard();
@@ -2771,9 +6381,16 @@ function bindEvents() {
 
 function bindViewport() {
   const canvas = dom.viewport;
+  canvas.addEventListener("contextmenu", (event) => event.preventDefault());
 
   canvas.addEventListener("pointerdown", (event) => {
+    if (transformOp) {
+      if (event.button === 0) commitTransform();
+      else if (event.button === 2) cancelTransform();
+      return;
+    }
     canvas.focus();
+    hideContextMenu();
     const rect = canvas.getBoundingClientRect();
     const x = event.clientX - rect.left;
     const y = event.clientY - rect.top;
@@ -2788,12 +6405,26 @@ function bindViewport() {
       canvas.setPointerCapture(event.pointerId);
       return;
     }
-    if (event.altKey) {
-      viewportDrag = { mode: "orbit", x0: x, y0: y, yaw: camera.yaw, pitch: camera.pitch };
+    if (event.altKey || event.button === 2) {
+      viewportDrag = {
+        mode: "orbit",
+        x0: x,
+        y0: y,
+        yaw: camera.yaw,
+        pitch: camera.pitch,
+        button: event.button,
+        moved: false,
+      };
       canvas.setPointerCapture(event.pointerId);
       return;
     }
     if (event.button !== 0) return;
+    const triad = axisTriadAt(x, y);
+    if (triad) {
+      if (triad.toggle) toggleCameraProjection();
+      else setOrthoView(triad.axis, event.shiftKey);
+      return;
+    }
     const hit = fixtureAt(x, y);
     if (hit) {
       if (!selectedFixtures.has(hit)) selectFixture(hit, event.shiftKey);
@@ -2830,19 +6461,34 @@ function bindViewport() {
   });
 
   canvas.addEventListener("pointermove", (event) => {
-    if (!viewportDrag) return;
+    if (!viewportDrag) {
+      const rect = canvas.getBoundingClientRect();
+      const x = event.clientX - rect.left;
+      const y = event.clientY - rect.top;
+      const triad = axisTriadAt(x, y);
+      const nextHover = triad && !triad.toggle ? triad.axis : null;
+      if (axisTriadHover !== nextHover) {
+        axisTriadHover = nextHover;
+        requestDraw();
+      }
+      canvas.style.cursor = triad ? "pointer" : fixtureAt(x, y) ? "move" : "crosshair";
+      return;
+    }
     const rect = canvas.getBoundingClientRect();
     const x = event.clientX - rect.left;
     const y = event.clientY - rect.top;
     const drag = viewportDrag;
     if (drag.mode === "orbit") {
+      if (Math.hypot(x - drag.x0, y - drag.y0) > 4) drag.moved = true;
       camera.yaw = drag.yaw + (x - drag.x0) * 0.007;
       camera.pitch = clamp(drag.pitch - (y - drag.y0) * 0.007, -1.45, 1.45);
       requestDraw();
     } else if (drag.mode === "pan") {
       const basis = cameraBasis();
       const focal = (viewportSize.h * 0.5) / Math.tan(camera.fov * 0.5);
-      const scaleFactor = drag.distance / focal;
+      const scaleFactor = camera.ortho
+        ? camera.orthoSize / Math.max(1, viewportSize.h)
+        : drag.distance / focal;
       const delta = add(
         scale(basis.right, -(x - drag.x0) * scaleFactor),
         scale(basis.up, (y - drag.y0) * scaleFactor)
@@ -2881,6 +6527,35 @@ function bindViewport() {
     if (!viewportDrag) return;
     const drag = viewportDrag;
     viewportDrag = null;
+    if (drag.mode === "orbit" && drag.button === 2 && !drag.moved) {
+      const rect = canvas.getBoundingClientRect();
+      const x = event.clientX - rect.left;
+      const y = event.clientY - rect.top;
+      const hit = fixtureAt(x, y);
+      if (hit) {
+        if (!selectedFixtures.has(hit)) selectFixture(hit, false);
+        const fixture = findFixture(hit);
+        showContextMenu(event.clientX, event.clientY, [
+          { label: `${fixture?.name || hit} auswählen`, fn: () => selectFixture(hit, false) },
+          { label: fixture?.output?.enabled === false ? "Output aktivieren" : "Output deaktivieren", fn: () => patchFixture(hit, { output: { enabled: fixture?.output?.enabled === false } }) },
+          { label: "In Inspector öffnen", fn: () => { inspectorTab = "fixture"; updateTabButtons(); renderInspector(); } },
+          { separator: true },
+          { label: "Lampen-Kegel einpassen", fn: () => { const point = fixtureCenter(hit); camera.target = point; camera.distance = Math.max(2, camera.distance * 0.75); requestDraw(); } },
+          { label: "Fixture löschen", danger: true, fn: () => deleteFixtures([hit]) },
+        ]);
+      } else {
+        showContextMenu(event.clientX, event.clientY, [
+          { label: "Raum einpassen", fn: () => fitCamera() },
+          { label: "Perspektive", fn: () => { camera.yaw = -0.78; camera.pitch = 0.52; fitCamera(); } },
+          { label: "Front", fn: () => { camera.yaw = 0; camera.pitch = 0; fitCamera(); } },
+          { label: "Top", fn: () => { camera.yaw = 0; camera.pitch = 1.45; fitCamera(); } },
+          { separator: true },
+          { label: "Auswahl aufheben", fn: () => { selectedFixtures.clear(); renderFixtures(); renderInspector(); requestDraw(); } },
+        ]);
+      }
+      requestDraw();
+      return;
+    }
     if (drag.mode === "marquee") {
       const x0 = Math.min(drag.x0, drag.x1);
       const x1 = Math.max(drag.x0, drag.x1);
@@ -2936,11 +6611,77 @@ function bindViewport() {
     requestDraw();
   });
 
+  canvas.addEventListener("pointerleave", () => {
+    if (axisTriadHover !== null) {
+      axisTriadHover = null;
+      requestDraw();
+    }
+  });
+
   canvas.addEventListener("wheel", (event) => {
     event.preventDefault();
-    camera.distance = clamp(camera.distance * (1 + Math.sign(event.deltaY) * 0.1), 1, 80);
+    if (camera.ortho) {
+      camera.orthoSize = clamp(camera.orthoSize * (1 + Math.sign(event.deltaY) * 0.1), 0.5, 120);
+    } else {
+      camera.distance = clamp(camera.distance * (1 + Math.sign(event.deltaY) * 0.1), 1, 80);
+    }
     requestDraw();
   }, { passive: false });
+}
+
+function persistTrackHeights(trackHeights) {
+  const doc = showDoc();
+  if (!doc) return;
+  window.clearTimeout(heightCommitTimer);
+  heightCommitTimer = window.setTimeout(() => {
+    commitShow("resize tracks", (target) => {
+      for (const [id, height] of Object.entries(trackHeights)) {
+        const track = target.tracks.find((item) => item.id === id);
+        if (track) track.height_px = Math.round(clamp(height, 24, 240));
+      }
+    });
+  }, 180);
+  requestDraw();
+}
+
+function timelineHeaderZone(x, y, row) {
+  if (x > view.labelW) return null;
+  const indent = row.depth * 10;
+  if (Math.abs(y - (row.y + row.h)) <= 5) return "resize";
+  if (x <= 18 + indent) return "expand";
+  if (x >= view.labelW - 38 && x <= view.labelW - 22) return "mute";
+  if (x >= view.labelW - 20 && x <= view.labelW - 4) return "solo";
+  return "header";
+}
+
+function timelineCursorFor(x, y) {
+  if (!showDoc()) return "default";
+  const scroll = timelineScrollMetrics();
+  if (scroll && x >= scroll.x - 2 && y >= scroll.y && y <= scroll.y + scroll.h) return "over-scroll";
+  if (y <= view.rulerH) return "pointer";
+  const audioBottom = view.rulerH + view.audioH;
+  if (y <= audioBottom) {
+    if (x <= view.labelW && Math.abs(y - audioBottom) <= 7) return "over-resize";
+    return "pointer";
+  }
+  const hit = rowAtY(y);
+  if (!hit) return "default";
+  const zone = timelineHeaderZone(x, y, hit.row);
+  if (zone === "resize") return "over-resize";
+  if (zone) return "over-header";
+  if (y >= hit.row.laneY) return "pointer";
+  const clipHit = clipAtPoint(x, y);
+  if (clipHit) {
+    const edge = 6;
+    if (Math.abs(x - clipHit.rect.x0) <= edge || Math.abs(x - clipHit.rect.x1) <= edge) return "over-trim";
+    return "over-clip";
+  }
+  return "pointer";
+}
+
+function setTimelineCursor(cursor) {
+  const cls = cursor === "dragging" ? "dragging-clip" : cursor;
+  dom.timeline.className = `timeline-canvas${cls && cls !== "default" ? ` ${cls}` : ""}`;
 }
 
 function bindTimeline() {
@@ -2958,41 +6699,173 @@ function bindTimeline() {
       canvas.setPointerCapture(event.pointerId);
       return;
     }
-    const hit = clipAtPoint(x, y);
-    if (hit) {
-      selectedClipId = hit.clip.id;
-      selectedTrackId = hit.track.id;
+    const audioBottom = view.rulerH + view.audioH;
+    if (y <= audioBottom) {
+      if (x <= view.labelW && Math.abs(y - audioBottom) <= 7) {
+        audioLaneDrag = { startY: y, startH: view.audioH };
+        canvas.setPointerCapture(event.pointerId);
+        return;
+      }
+      const time = clamp(xToTime(x), 0, duration());
+      client.seek(time);
+      timelineDrag = { mode: "scrub" };
+      canvas.setPointerCapture(event.pointerId);
+      return;
+    }
+    const scroll = timelineScrollMetrics();
+    if (scroll && x >= scroll.x - 2 && y >= scroll.y && y <= scroll.y + scroll.h) {
+      scrollDrag = { startY: y, startScroll: view.scrollY };
+      scrollFromTimelineY(y);
+      canvas.setPointerCapture(event.pointerId);
+      return;
+    }
+    const hit = rowAtY(y);
+    if (!hit) return;
+    const row = hit.row;
+    const track = row.track;
+    if (x <= view.labelW) {
+      const zone = timelineHeaderZone(x, y, row);
+      if (zone === "resize") {
+        heightDrag = {
+          startY: y,
+          trackId: track.id,
+          startH: row.baseH,
+          all: event.shiftKey,
+          heights: Object.fromEntries(buildTimelineRows().map((item) => [item.track.id, item.track.height_px || 36])),
+        };
+        canvas.setPointerCapture(event.pointerId);
+        return;
+      }
+      if (zone === "expand") {
+        if (openTracks.has(track.id)) openTracks.delete(track.id);
+        else openTracks.add(track.id);
+        saveLayout();
+        requestDraw();
+        return;
+      }
+      if (zone === "mute") {
+        commitShow("mute track", (doc) => {
+          const target = doc.tracks.find((item) => item.id === track.id);
+          if (target) target.muted = !target.muted;
+        });
+        return;
+      }
+      if (zone === "solo") {
+        commitShow("solo track", (doc) => {
+          const target = doc.tracks.find((item) => item.id === track.id);
+          if (target) target.solo = !target.solo;
+        });
+        return;
+      }
+      if (event.altKey) {
+        commitShow("toggle clipping mask", (doc) => {
+          const target = doc.tracks.find((item) => item.id === track.id);
+          if (target) target.clipped_to_below = !target.clipped_to_below;
+        });
+        return;
+      }
+      selectedTrackId = track.id;
+      selectedClipId = null;
+      inspectorTab = "show";
+      updateTabButtons();
+      renderInspector();
+      requestDraw();
+      return;
+    }
+
+    const keyframeHit = keyframeAtPoint(x, y);
+    if (keyframeHit && !event.altKey) {
+      selectedClipId = keyframeHit.clip.id;
+      selectedTrackId = keyframeHit.track.id;
+      inspectorTab = "clip";
+      updateTabButtons();
+      renderInspector();
+      timelineDrag = {
+        mode: "keyframe",
+        clip: deepClone(keyframeHit.clip),
+        trackId: keyframeHit.track.id,
+        param: keyframeHit.param,
+        index: keyframeHit.index,
+        t0: keyframeHit.keyframe.t_s,
+        x0: x,
+      };
+      canvas.setPointerCapture(event.pointerId);
+      return;
+    }
+
+    const clipHit = clipAtPoint(x, y);
+    if (clipHit) {
+      selectedClipId = clipHit.clip.id;
+      selectedTrackId = clipHit.track.id;
       inspectorTab = "clip";
       updateTabButtons();
       renderInspector();
       requestDraw();
       const edge = 6;
-      if (Math.abs(x - hit.rect.x0) <= edge) {
-        timelineDrag = { mode: "trim-start", clip: deepClone(hit.clip), trackId: hit.track.id, x0: x };
-      } else if (Math.abs(x - hit.rect.x1) <= edge) {
-        timelineDrag = { mode: "trim-end", clip: deepClone(hit.clip), trackId: hit.track.id, x0: x };
+      if (Math.abs(x - clipHit.rect.x0) <= edge) {
+        timelineDrag = { mode: "trim-start", clip: deepClone(clipHit.clip), trackId: clipHit.track.id, x0: x };
+      } else if (Math.abs(x - clipHit.rect.x1) <= edge) {
+        timelineDrag = { mode: "trim-end", clip: deepClone(clipHit.clip), trackId: clipHit.track.id, x0: x };
       } else {
-        timelineDrag = { mode: "move", clip: deepClone(hit.clip), trackId: hit.track.id, x0: x };
+        timelineDrag = { mode: "move", clip: deepClone(clipHit.clip), trackId: clipHit.track.id, x0: x };
       }
       canvas.setPointerCapture(event.pointerId);
       return;
     }
-    const trackIndex = trackIndexAt(y);
-    if (trackIndex >= 0 && trackIndex < (showDoc()?.tracks.length || 0)) {
-      selectedTrackId = showDoc().tracks[trackIndex].id;
-      renderInspector();
-      requestDraw();
-    }
+
+    selectedTrackId = track.id;
+    selectedClipId = null;
+    inspectorTab = "clip";
+    updateTabButtons();
+    renderInspector();
+    requestDraw();
+    client.seek(clamp(xToTime(x), 0, duration()));
+    timelineDrag = { mode: "scrub" };
+    canvas.setPointerCapture(event.pointerId);
   });
 
   canvas.addEventListener("pointermove", (event) => {
-    if (!timelineDrag) return;
     const rect = canvas.getBoundingClientRect();
     const x = event.clientX - rect.left;
+    const y = event.clientY - rect.top;
+    if (scrollDrag) {
+      scrollFromTimelineY(y);
+      return;
+    }
+    if (audioLaneDrag) {
+      view.audioH = clamp(audioLaneDrag.startH + (y - audioLaneDrag.startY), 38, 240);
+      setTimelineCursor("over-resize");
+      requestDraw();
+      return;
+    }
+    if (heightDrag) {
+      const delta = y - heightDrag.startY;
+      const rows = buildTimelineRows();
+      for (const row of rows) {
+        if (heightDrag.all || row.track.id === heightDrag.trackId) {
+          row.track.height_px = Math.round(clamp((heightDrag.heights[row.track.id] || 36) + delta, 24, 240));
+        }
+      }
+      setTimelineCursor("over-resize");
+      requestDraw();
+      return;
+    }
+    if (!timelineDrag) {
+      setTimelineCursor(timelineCursorFor(x, y));
+      return;
+    }
     if (timelineDrag.mode === "scrub") {
+      setTimelineCursor("pointer");
       client.seek(clamp(xToTime(x), 0, duration()));
       return;
     }
+    if (timelineDrag.mode === "keyframe") {
+      timelineDrag.previewX = x;
+      setTimelineCursor("ew-resize");
+      requestDraw();
+      return;
+    }
+    setTimelineCursor(timelineDrag.mode === "move" ? "dragging" : "over-trim");
     const time = xToTime(x);
     const snap = (value) => (event.altKey ? value : snapTime(value));
     const clip = timelineDrag.clip;
@@ -3000,7 +6873,13 @@ function bindTimeline() {
       const delta = snap(clip.start_s + (x - timelineDrag.x0) / Math.max(1, timelineSize.w - view.labelW) * (view.end - view.start)) - clip.start_s;
       const length = clip.end_s - clip.start_s;
       const start = clamp(clip.start_s + delta, 0, Math.max(0, duration() - length));
-      timelineDrag.preview = { clipId: clip.id, start_s: start, end_s: start + length };
+      const hit = rowAtY(y);
+      timelineDrag.preview = {
+        clipId: clip.id,
+        start_s: start,
+        end_s: start + length,
+        trackId: hit?.row.track.id || timelineDrag.trackId,
+      };
     } else if (timelineDrag.mode === "trim-start") {
       const start = clamp(snap(time), 0, clip.end_s - 0.1);
       timelineDrag.preview = { clipId: clip.id, start_s: start, end_s: clip.end_s };
@@ -3011,12 +6890,46 @@ function bindTimeline() {
     requestDraw();
   });
 
-  canvas.addEventListener("pointerup", async () => {
+  canvas.addEventListener("pointerup", async (event) => {
+    if (scrollDrag) {
+      scrollDrag = null;
+      setTimelineCursor(timelineCursorFor(event.clientX - canvas.getBoundingClientRect().left, event.clientY - canvas.getBoundingClientRect().top));
+      requestDraw();
+      return;
+    }
+    if (audioLaneDrag) {
+      audioLaneDrag = null;
+      setTimelineCursor("default");
+      requestDraw();
+      return;
+    }
+    if (heightDrag) {
+      const heights = Object.fromEntries(
+        buildTimelineRows().map((row) => [row.track.id, row.track.height_px || 36])
+      );
+      heightDrag = null;
+      setTimelineCursor("default");
+      persistTrackHeights(heights);
+      return;
+    }
     if (!timelineDrag) return;
     const drag = timelineDrag;
     timelineDrag = null;
+    setTimelineCursor("default");
     if (drag.mode === "scrub") {
       requestDraw();
+      return;
+    }
+    const rect = canvas.getBoundingClientRect();
+    const x = event.clientX - rect.left;
+    if (drag.mode === "keyframe") {
+      const local = clamp(xToTime(x) - drag.clip.start_s, 0, drag.clip.end_s - drag.clip.start_s);
+      await commitClip(drag.clip.id, "move keyframe", (target) => {
+        const matches = (target.keyframes || []).filter((keyframe) => keyframe.param === drag.param);
+        const keyframe = matches[drag.index];
+        if (keyframe) keyframe.t_s = Number(local.toFixed(4));
+        target.keyframes.sort((a, b) => a.t_s - b.t_s);
+      });
       return;
     }
     const preview = drag.preview;
@@ -3025,13 +6938,22 @@ function bindTimeline() {
       return;
     }
     await commitShow(drag.mode === "move" ? "move clip" : "trim clip", (doc) => {
-      const track = doc.tracks.find((item) => item.id === drag.trackId);
-      const clip = track?.clips.find((item) => item.id === preview.clipId);
+      let sourceTrack = doc.tracks.find((item) => item.id === drag.trackId);
+      let clip = sourceTrack?.clips.find((item) => item.id === preview.clipId);
       if (!clip) return;
       if (drag.mode === "move") {
         const length = clip.end_s - clip.start_s;
         clip.start_s = preview.start_s;
         clip.end_s = preview.start_s + length;
+        if (preview.trackId && preview.trackId !== drag.trackId) {
+          const targetTrack = doc.tracks.find((item) => item.id === preview.trackId);
+          if (targetTrack) {
+            sourceTrack.clips = sourceTrack.clips.filter((item) => item.id !== preview.clipId);
+            targetTrack.clips.push(clip);
+            sourceTrack = targetTrack;
+            clip = targetTrack.clips[targetTrack.clips.length - 1];
+          }
+        }
       } else if (drag.mode === "trim-start") {
         clip.start_s = preview.start_s;
       } else {
@@ -3041,21 +6963,253 @@ function bindTimeline() {
       clip.fade_out_s = Math.min(clip.fade_out_s, clip.end_s - clip.start_s);
       clip.keyframes = (clip.keyframes || []).filter((keyframe) => keyframe.t_s <= clip.end_s - clip.start_s);
     });
+    if (drag.mode === "move" && preview.trackId) selectedTrackId = preview.trackId;
     requestDraw();
   });
 
   canvas.addEventListener("pointercancel", () => {
     timelineDrag = null;
+    heightDrag = null;
+    audioLaneDrag = null;
+    scrollDrag = null;
+    setTimelineCursor("default");
     requestDraw();
   });
 
-  canvas.addEventListener("wheel", (event) => {
+  canvas.addEventListener("contextmenu", (event) => {
     event.preventDefault();
     const rect = canvas.getBoundingClientRect();
     const x = event.clientX - rect.left;
+    const y = event.clientY - rect.top;
+    if (y <= view.rulerH) {
+      showContextMenu(event.clientX, event.clientY, [
+        { label: "Playhead hierher", fn: () => client.seek(clamp(xToTime(x), 0, duration())) },
+        { label: "Show einpassen", fn: () => { view.start = 0; view.end = Math.max(1, duration()); requestDraw(); } },
+        { label: "Alle Spuren einpassen", fn: () => { openTracks.clear(); saveLayout(); requestDraw(); } },
+      ]);
+      return;
+    }
+    const hit = rowAtY(y);
+    if (!hit) {
+      showContextMenu(event.clientX, event.clientY, [
+        { label: "Clip am Playhead hinzufügen", fn: () => addClip() },
+        { label: "Neue Lampenebene", fn: () => addTrack("layer") },
+        { label: "Globale Ebene", fn: () => addTrack("global") },
+      ]);
+      return;
+    }
+    const row = hit.row;
+    const track = row.track;
+    if (x <= view.labelW) {
+      const zone = timelineHeaderZone(x, y, row);
+      if (zone === "mute" || zone === "solo") return;
+      selectedTrackId = track.id;
+      selectedClipId = null;
+      inspectorTab = "show";
+      updateTabButtons();
+      renderInspector();
+      requestDraw();
+      const blendModes = [
+        ["normal", "Normal"],
+        ["add", "Add"],
+        ["max", "Max"],
+        ["multiply", "Multiply"],
+        ["override", "Override"],
+      ];
+      showContextMenu(event.clientX, event.clientY, [
+        { label: `${track.name} einstellen`, icon: "settings", fn: () => { inspectorTab = "show"; updateTabButtons(); renderInspector(); } },
+        { separator: true },
+        { label: "Kopieren", icon: "copy", key: "Ctrl+C", fn: () => copyTrackToClipboard(track) },
+        { label: "Ausschneiden", icon: "cut", key: "Ctrl+X", fn: () => copyTrackToClipboard(track, true) },
+        { label: "Einfügen", icon: "paste", key: "Ctrl+V", disabled: clipboard?.kind !== "track", fn: pasteTrack },
+        { label: "Duplizieren", icon: "duplicate", fn: () => duplicateTrack(track.id) },
+        { label: "Umbenennen…", icon: "rename", fn: () => renameTrackPrompt(track) },
+        { label: "Name folgt Effekt", icon: "auto", checked: trackNameAuto(track), fn: () => commitShow("toggle auto track name", (doc) => {
+          const target = doc.tracks.find((item) => item.id === track.id);
+          if (target) target.name_auto = !target.name_auto;
+        }) },
+        { label: "Blend-Modus", icon: "blend", children: blendModes.map(([value, label]) => ({
+          label,
+          checked: (track.blend_mode || "normal") === value,
+          fn: () => commitShow("change blend mode", (doc) => {
+            const target = doc.tracks.find((item) => item.id === track.id);
+            if (target) target.blend_mode = value;
+          }),
+        })) },
+        { label: track.muted ? "Stummschaltung aus" : "Stummschalten", icon: "mute", fn: () => commitShow("mute track", (doc) => { const target = doc.tracks.find((item) => item.id === track.id); if (target) target.muted = !target.muted; }) },
+        { label: track.solo ? "Solo aus" : "Solo", icon: "solo", fn: () => commitShow("solo track", (doc) => { const target = doc.tracks.find((item) => item.id === track.id); if (target) target.solo = !target.solo; }) },
+        { label: track.clipped_to_below ? "Clipping-Maske lösen" : "Als Clipping-Maske", icon: "layers", checked: track.clipped_to_below, fn: () => commitShow("toggle clipping mask", (doc) => { const target = doc.tracks.find((item) => item.id === track.id); if (target) target.clipped_to_below = !target.clipped_to_below; }) },
+        { label: "Unterebene hinzufügen", icon: "layers", fn: () => { selectedTrackId = track.id; addTrack("sub"); } },
+        { separator: true },
+        { label: "Ebene löschen", icon: "delete", danger: true, key: "Del", fn: () => deleteTrack(track.id) },
+      ]);
+      return;
+    }
+    const clipHit = clipAtPoint(x, y);
+    if (clipHit) {
+      selectedClipId = clipHit.clip.id;
+      selectedTrackId = clipHit.track.id;
+      inspectorTab = "clip";
+      updateTabButtons();
+      renderInspector();
+      requestDraw();
+      showContextMenu(event.clientX, event.clientY, [
+        { label: "Teilen", icon: "split", key: "S", fn: () => splitClip() },
+        { label: "Kopieren", icon: "copy", key: "Ctrl+C", fn: () => copyClipToClipboard(clipHit.clip, clipHit.track) },
+        { label: "Ausschneiden", icon: "cut", key: "Ctrl+X", fn: () => copyClipToClipboard(clipHit.clip, clipHit.track, true) },
+        { label: "Einfügen", icon: "paste", key: "Ctrl+V", disabled: clipboard?.kind !== "clip", fn: pasteClip },
+        { label: "Duplizieren", icon: "duplicate", fn: () => duplicateClip(clipHit.clip.id) },
+        { label: "Umbenennen…", icon: "rename", fn: () => renameClipPrompt(clipHit.clip) },
+        { label: "Name automatisch", icon: "auto", checked: !clipHit.clip.name, fn: () => resetClipName(clipHit.clip) },
+        { label: "Preset wechseln…", icon: "fx", fn: () => { inspectorTab = "clip"; updateTabButtons(); renderInspector(); $("#library-search")?.focus(); } },
+        { separator: true },
+        { label: "ZCL Snap", icon: "lock", checked: clipHit.clip.snap_zcl, fn: () => commitClip(clipHit.clip.id, "snap", (target) => { target.snap_zcl = !target.snap_zcl; }) },
+        { label: "Clip löschen", icon: "delete", danger: true, key: "Del", fn: () => deleteClip(clipHit.clip.id) },
+      ]);
+      return;
+    }
+    selectedTrackId = track.id;
+    selectedClipId = null;
+    renderInspector();
+    showContextMenu(event.clientX, event.clientY, [
+      { label: "Clip am Playhead hier einfügen", fn: () => addClip() },
+      { label: "Neue Unterebene", fn: () => { selectedTrackId = track.id; addTrack("sub"); } },
+      { label: openTracks.has(track.id) ? "Keyframe-Lanes schließen" : "Keyframe-Lanes öffnen", fn: () => { if (openTracks.has(track.id)) openTracks.delete(track.id); else openTracks.add(track.id); saveLayout(); requestDraw(); } },
+    ]);
+  });
+
+  canvas.addEventListener("dragover", (event) => {
+    if (
+      event.dataTransfer.types.includes("application/x-hueme-preset") ||
+      event.dataTransfer.types.includes("application/x-hueme-filter")
+    ) {
+      event.preventDefault();
+      event.dataTransfer.dropEffect = "copy";
+    }
+  });
+
+  canvas.addEventListener("drop", async (event) => {
+    event.preventDefault();
+    const rect = canvas.getBoundingClientRect();
+    const x = event.clientX - rect.left;
+    const y = event.clientY - rect.top;
+    const presetData = event.dataTransfer.getData("application/x-hueme-preset");
+    const filterData = event.dataTransfer.getData("application/x-hueme-filter");
+    if (presetData) {
+      let payload;
+      try { payload = JSON.parse(presetData); } catch { return; }
+      const hit = rowAtY(y);
+      if (!hit) {
+        toast("Drop the preset on a track row.", "info");
+        return;
+      }
+      const trackId = hit.row.track.id;
+      const start = clamp(snapTime(xToTime(x)), 0, Math.max(0, duration() - 0.2));
+      const length = Math.min(Math.max(gridSeconds() * 4, 0.5), duration() - start);
+      if (length <= 0.05) return;
+      const ids = new Set(showDoc().tracks.flatMap((track) => track.clips.map((clip) => clip.id)));
+      const id = uniqueId("clip", ids);
+      await commitShow(`drop ${payload.preset}`, (doc) => {
+        const track = doc.tracks.find((item) => item.id === trackId);
+        if (!track) return;
+        track.clips.push({
+          id,
+          name: null,
+          start_s: start,
+          end_s: start + length,
+          preset: payload.preset,
+          opacity: 1,
+          params: defaultParams(payload.preset),
+          keyframes: [],
+          spatial_mask: { kind: "none" },
+          filters: [],
+          snap_zcl: false,
+        });
+      });
+      selectedClipId = id;
+      selectedTrackId = trackId;
+      renderInspector();
+      requestDraw();
+      return;
+    }
+    if (filterData) {
+      let payload;
+      try { payload = JSON.parse(filterData); } catch { return; }
+      const hit = clipAtPoint(x, y);
+      if (!hit) {
+        toast("Drop the filter directly on a clip.", "info");
+        return;
+      }
+      await commitClip(hit.clip.id, "add filter", (target) => {
+        target.filters = target.filters || [];
+        target.filters.push({ type: payload.filter, enabled: true, params: {} });
+      });
+    }
+  });
+
+  canvas.addEventListener("dblclick", (event) => {
+    const rect = canvas.getBoundingClientRect();
+    const x = event.clientX - rect.left;
+    const y = event.clientY - rect.top;
+    if (y <= view.rulerH + view.audioH || x <= view.labelW) return;
+    const hit = rowAtY(y);
+    if (!hit || y < hit.row.laneY) return;
+    const lane = Math.floor((y - hit.row.laneY) / hit.row.laneH);
+    const info = hit.row.lanes[lane];
+    if (!info) return;
+    const time = xToTime(x);
+    const clip = hit.row.track.clips.find((item) => time >= item.start_s && time <= item.end_s);
+    if (!clip) return;
+    const local = clamp(snapTime(time) - clip.start_s, 0, clip.end_s - clip.start_s);
+    const numeric = Number(clip.params?.[info.param] ?? clip.opacity ?? 0.5);
+    commitClip(clip.id, `keyframe ${info.param}`, (target) => {
+      target.keyframes = (target.keyframes || []).filter(
+        (keyframe) => !(keyframe.param === info.param && Math.abs(keyframe.t_s - local) <= 1e-4)
+      );
+      target.keyframes.push({ t_s: Number(local.toFixed(4)), param: info.param, value: Number.isFinite(numeric) ? numeric : 0.5, easing: "linear" });
+      target.keyframes.sort((a, b) => a.t_s - b.t_s);
+    });
+    toast(`Keyframe ${info.param} @ ${local.toFixed(2)}s`, "success", 1800);
+  });
+
+  canvas.addEventListener("wheel", (event) => {
+    const rect = canvas.getBoundingClientRect();
+    const x = event.clientX - rect.left;
+    const y = event.clientY - rect.top;
+    if (event.altKey) {
+      event.preventDefault();
+      if (y > view.rulerH && y < view.rulerH + view.audioH) {
+        view.audioH = clamp(view.audioH + (event.deltaY > 0 ? -6 : 6), 38, 240);
+        requestDraw();
+        return;
+      }
+      const hit = rowAtY(y);
+      if (!hit) return;
+      const delta = event.deltaY > 0 ? -4 : 4;
+      const rows = buildTimelineRows();
+      const heights = {};
+      for (const row of rows) {
+        if (event.shiftKey || row.track.id === hit.row.track.id) {
+          row.track.height_px = Math.round(clamp((row.track.height_px || 36) + delta, 24, 240));
+        }
+        heights[row.track.id] = row.track.height_px || 36;
+      }
+      persistTrackHeights(heights);
+      requestDraw();
+      return;
+    }
+    event.preventDefault();
     if (event.ctrlKey || event.metaKey) {
       zoomTimeline(event.deltaY > 0 ? 1.15 : 0.87, xToTime(x));
-    } else {
+      return;
+    }
+    if (!event.shiftKey && !event.ctrlKey && !event.metaKey) {
+      view.scrollY = Math.max(0, view.scrollY + (event.deltaY > 0 ? 48 : -48));
+      buildTimelineRows();
+      requestDraw();
+      return;
+    }
+    {
       const span = view.end - view.start;
       const shift = (event.deltaY || event.deltaX) > 0 ? span * 0.08 : -span * 0.08;
       const maxStart = Math.max(0, duration() - span);
@@ -3064,42 +7218,7 @@ function bindTimeline() {
       requestDraw();
     }
   }, { passive: false });
-
-  canvas.addEventListener("keydown", (event) => {
-    const doc = showDoc();
-    if (!doc) return;
-    if (event.key === "ArrowLeft" || event.key === "ArrowRight") {
-      event.preventDefault();
-      const direction = event.key === "ArrowLeft" ? -1 : 1;
-      const step = gridSeconds() * (event.shiftKey ? 4 : 1);
-      client.seek(clamp((client.frame?.time || 0) + direction * step, 0, duration()));
-      return;
-    }
-    if (event.key === "ArrowUp" || event.key === "ArrowDown") {
-      event.preventDefault();
-      if (!doc.tracks.length) return;
-      const current = doc.tracks.findIndex((track) => track.id === selectedTrackId);
-      const direction = event.key === "ArrowUp" ? -1 : 1;
-      const index = clamp(
-        (current < 0 ? 0 : current) + direction,
-        0,
-        doc.tracks.length - 1
-      );
-      selectedTrackId = doc.tracks[index].id;
-      renderInspector();
-      requestDraw();
-      return;
-    }
-    if (event.key === "Enter" && selectedTrackId) {
-      event.preventDefault();
-      const track = findTrack();
-      const time = client.frame?.time ?? state.playback.time_s ?? 0;
-      const clip = track?.clips.find((item) => time >= item.start_s && time < item.end_s);
-      if (clip) selectClip(clip.id);
-    }
-  });
 }
-
 function zoomTimeline(factor, anchorTime) {
   const current = view.end - view.start;
   const span = clamp(current * factor, 0.25, Math.max(0.25, duration()));
@@ -3112,9 +7231,119 @@ function zoomTimeline(factor, anchorTime) {
 
 function bindKeyboard() {
   window.addEventListener("keydown", (event) => {
+    if (transformOp) {
+      const key = event.key.toLowerCase();
+      if (key === "escape") {
+        event.preventDefault();
+        cancelTransform();
+        return;
+      }
+      if (key === "enter") {
+        event.preventDefault();
+        commitTransform();
+        return;
+      }
+      if (key === "x" || key === "y" || key === "z") {
+        event.preventDefault();
+        cycleTransformAxis({ x: 0, y: 1, z: 2 }[key]);
+        return;
+      }
+      if (key === "shift" || key === "control" || key === "alt" || key === "meta") {
+        if (lastPointerClient) {
+          onTransformPointerMove({
+            clientX: lastPointerClient.x,
+            clientY: lastPointerClient.y,
+            shiftKey: event.shiftKey,
+            ctrlKey: event.ctrlKey,
+            metaKey: event.metaKey,
+            altKey: event.altKey,
+          });
+        }
+      }
+      return;
+    }
     const target = event.target;
     if (target instanceof HTMLElement && (target.matches("input, textarea, select") || target.isContentEditable)) return;
     const meta = event.metaKey || event.ctrlKey;
+    if (
+      !meta && !event.altKey &&
+      (event.key === "ArrowLeft" || event.key === "ArrowRight") &&
+      timelineActive()
+    ) {
+      event.preventDefault();
+      stepFrames(
+        event.key === "ArrowRight" ? 1 : -1,
+        event.shiftKey ? 10 : 1
+      );
+      return;
+    }
+    if (["Numpad1", "Numpad3", "Numpad7"].includes(event.code)) {
+      event.preventDefault();
+      const axis = event.code === "Numpad1" ? 1 : event.code === "Numpad3" ? 0 : 2;
+      setOrthoView(axis, event.ctrlKey || event.shiftKey);
+      return;
+    }
+    if (event.code === "Numpad9") {
+      event.preventDefault();
+      setOrthoView(lastFlatView.axis, !lastFlatView.opposite);
+      return;
+    }
+    if (event.code === "Numpad5") {
+      event.preventDefault();
+      toggleCameraProjection();
+      return;
+    }
+    if (event.code === "Numpad0") {
+      event.preventDefault();
+      camera.ortho = false;
+      fitCamera();
+      return;
+    }
+    if (["Numpad2", "Numpad4", "Numpad6", "Numpad8"].includes(event.code)) {
+      event.preventDefault();
+      const step = (15 * Math.PI) / 180;
+      if (event.code === "Numpad4") camera.yaw -= step;
+      else if (event.code === "Numpad6") camera.yaw += step;
+      else if (event.code === "Numpad8") camera.pitch = clamp(camera.pitch + step, -1.5, 1.5);
+      else camera.pitch = clamp(camera.pitch - step, -1.5, 1.5);
+      requestDraw();
+      return;
+    }
+    if (!meta && selectedFixtures.size > 0 && pointInViewport(lastPointerClient)) {
+      const key = event.key.toLowerCase();
+      if (key === "g" || key === "r" || key === "s") {
+        event.preventDefault();
+        beginTransform(key === "g" ? "move" : key === "r" ? "rotate" : "scale");
+        return;
+      }
+    }
+    const key = event.key.toLowerCase();
+    if (meta && (key === "c" || key === "x")) {
+      const found = findClip();
+      if (found) {
+        event.preventDefault();
+        copyClipToClipboard(found.clip, found.track, key === "x");
+        return;
+      }
+      const track = findTrack();
+      if (track) {
+        event.preventDefault();
+        copyTrackToClipboard(track, key === "x");
+        return;
+      }
+    }
+    if (meta && key === "v") {
+      if (clipboard?.kind === "clip") {
+        event.preventDefault();
+        pasteClip();
+        return;
+      }
+      if (clipboard?.kind === "track") {
+        event.preventDefault();
+        pasteTrack();
+        return;
+      }
+    }
     if (meta && event.key.toLowerCase() === "s") {
       event.preventDefault();
       saveRig();
@@ -3160,6 +7389,7 @@ function bindKeyboard() {
 
 /* -------------------------------------------------------------------- boot */
 async function boot() {
+  loadLayout();
   bindEvents();
   client.addEventListener("state", onState);
   client.addEventListener("frame", () => {
@@ -3185,6 +7415,15 @@ async function boot() {
     if (!dom.mcpDrawer.classList.contains("hidden")) renderMcpLog();
   });
   updateTabButtons();
+  window.setInterval(async () => {
+    if (!state?.hardware?.enabled) return;
+    try {
+      state.hardware = await client.get("/api/hardware");
+      updateTopbar();
+    } catch {
+      /* hardware status polling is best-effort */
+    }
+  }, 3000);
   try {
     await client.start();
     await refreshHistory();

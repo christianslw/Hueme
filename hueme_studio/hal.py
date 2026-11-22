@@ -43,6 +43,7 @@ class HalSettings(BaseModel):
             "proxies": [],
             "max_fixtures_per_frame": 10,
             "smoothing": "auto",
+            "smoothing_headroom": 1.5,
             "max_brightness": 2047,
             "brightness_mode": "max",
             "light_balance": True,
@@ -100,6 +101,17 @@ class OutputReport:
         }
 
 
+#: sRGB of a 1800 K amber LED die, normalised to red = 1.0.
+WARM_1800K_VECTOR = np.asarray([1.0, 0.576, 0.161], dtype=np.float64)
+
+
+def _smoothstep01(edge0: float, edge1: float, value: float) -> float:
+    if edge1 <= edge0:
+        return 1.0 if value >= edge1 else 0.0
+    t = max(0.0, min(1.0, (float(value) - edge0) / (edge1 - edge0)))
+    return t * t * (3.0 - 2.0 * t)
+
+
 def extract_warm_channel(
     rgb: tuple[int, int, int] | list[int] | np.ndarray,
     *,
@@ -107,18 +119,35 @@ def extract_warm_channel(
 ) -> tuple[int, int, int, int]:
     """Extract the warm-white/amber channel for a 5V SK6812 RGB+1800K strip.
 
-    The amber LED carries the neutral component; the RGB dies carry the
-    saturated residual.  This preserves hue and keeps warm whites on the
-    1800K channel instead of mixing three dies to fake them.
+    The amber die is not neutral white: 1800 K sits at roughly
+    ``[255, 147, 41]``.  Pure amber should land almost entirely on W with no
+    RGB residue, while neutral white should also land on W without leaving a
+    blue cast on the RGB dies.  We blend the subtraction vector between a
+    neutral ``[1, 1, 1]`` component and the 1800 K vector based on alignment
+    with the warm direction.  Warm whites keep using the amber die; neutral
+    white has zero RGB residue.
     """
     arr = np.clip(np.asarray(rgb, dtype=np.float64)[:3], 0.0, 255.0)
-    r, g, b = float(arr[0]), float(arr[1]), float(arr[2])
-    warm = min(r, g, b) * max(0.0, float(white_gain))
+    gain = max(0.0, float(white_gain))
+    norm = float(np.linalg.norm(arr))
+    vector_norm = float(np.linalg.norm(WARM_1800K_VECTOR))
+    if norm <= 1e-9 or vector_norm <= 1e-9:
+        return (0, 0, 0, 0)
+    alignment = float(np.dot(arr, WARM_1800K_VECTOR) / (norm * vector_norm))
+    blend = _smoothstep01(0.93, 0.995, alignment)
+    subtract_vector = (
+        np.ones(3, dtype=np.float64) * (1.0 - blend)
+        + WARM_1800K_VECTOR * blend
+    )
+    warm = float(
+        np.min(arr / np.maximum(subtract_vector, 1e-9))
+    ) * gain
     warm = max(0.0, min(255.0, warm))
+    residual = np.clip(arr - warm * subtract_vector, 0.0, 255.0)
     return (
-        int(round(max(0.0, r - warm))),
-        int(round(max(0.0, g - warm))),
-        int(round(max(0.0, b - warm))),
+        int(round(float(residual[0]))),
+        int(round(float(residual[1]))),
+        int(round(float(residual[2]))),
         int(round(warm)),
     )
 
@@ -209,6 +238,11 @@ class Hal:
             self.start()
         else:
             self.stop()
+
+    def set_rig(self, rig: CompiledRig) -> None:
+        """Adopt a recompiled rig without restarting protocol drivers."""
+        self.rig = rig
+        self._last_sent.clear()
 
     def _uses_protocol(self, protocol: str) -> bool:
         return any(
@@ -329,7 +363,7 @@ class Hal:
             if self._hue is not None:
                 if hue_groups[False] and hue_groups[True]:
                     self._snap_splits += 1
-                hue_fps = float(self.settings.hue.get("fps", 30.0) or 30.0)
+                hue_fps = self._hue_output_fps()
                 for snap_flag, records in hue_groups.items():
                     if not records:
                         continue
@@ -360,6 +394,44 @@ class Hal:
             return True
         interval = 1.0 / max(0.1, float(fixture.capabilities.max_fps))
         return (now - last) >= interval - 1e-9
+
+    def seconds_until_due(self, *, now: float | None = None) -> float:
+        """Seconds until the next enabled fixture wants a frame.
+
+        The runtime sleeps on this instead of polling ``output_frame`` from the
+        preview ticker.  Polling quantised a 25 fps fixture to the 30 fps
+        preview grid, which sent frames at an uneven 33/67 ms cadence and made
+        every fade visibly stutter on the lamps.
+        """
+        if not self.enabled:
+            return 0.25
+        now = float(self._clock() if now is None else now)
+        wait: float | None = None
+        for fixture in self.rig.rig.fixtures:
+            output = fixture.output
+            if not output.enabled or output.protocol == "none":
+                continue
+            last = self._last_sent.get(fixture.id)
+            if last is None:
+                return 0.0
+            interval = 1.0 / max(0.1, float(fixture.capabilities.max_fps))
+            due = last + interval - now
+            wait = due if wait is None else min(wait, due)
+        if wait is None:
+            return 0.25
+        return max(0.0, wait)
+
+    def _hue_output_fps(self) -> float:
+        """Smoothing ramp rate that matches the slowest actual Hue fixture."""
+        configured = float(self.settings.hue.get("fps", 30.0) or 30.0)
+        rates = [
+            float(fixture.capabilities.max_fps)
+            for fixture in self.rig.rig.fixtures
+            if fixture.output.enabled
+            and fixture.output.protocol == "hue_z2m"
+            and float(fixture.capabilities.max_fps) > 0.0
+        ]
+        return min([configured, *rates]) if rates else configured
 
     @staticmethod
     def _aggregate(voxels: np.ndarray) -> np.ndarray:
@@ -397,17 +469,28 @@ class Hal:
             stats = getattr(driver, "stats", None)
             return dict(stats) if isinstance(stats, dict) else {}
 
+        drivers = {
+            "hue": driver_stats(self._hue),
+            "ddp": driver_stats(self._ddp),
+            "e131": driver_stats(self._e131),
+        }
+        driver_errors = [
+            f"{name}: {stats.get('last_error')}"
+            for name, stats in drivers.items()
+            if stats.get("last_error")
+        ]
+        effective_error = self.last_error or (driver_errors[0] if driver_errors else None)
+        driver_ready = self._started
+        if self._hue is not None and getattr(self._hue, "connected", True) is False:
+            driver_ready = False
         return {
             "enabled": self.enabled,
-            "started": self._started,
+            "started": driver_ready,
             "tx_operations": self._tx_count,
             "snap_splits": self._snap_splits,
-            "last_error": self.last_error,
-            "drivers": {
-                "hue": driver_stats(self._hue),
-                "ddp": driver_stats(self._ddp),
-                "e131": driver_stats(self._e131),
-            },
+            "last_error": effective_error,
+            "drivers": drivers,
+            "driver_errors": driver_errors,
             "last_sent": dict(self._last_sent),
         }
 

@@ -124,8 +124,21 @@ Track identity colours (only for the top edge + clip tint, never large fills):
 - **Keyframe:** 5 px diamond, amber selected, gray unselected; hold keys are
   square, not diamond.
 - **Clip:** flat body, 1 px outline, top 2 px track colour, name in 11 px;
-  fades drawn as diagonal edge overlays; selected outline is amber.
+  fades drawn as diagonal edge overlays; selected outline is amber. The label
+  is the manual clip name or the preset name; auto names never overwrite a
+  manual one.
 - **Playhead:** 1 px amber line, 7 px triangular head, no glow.
+- **Filter card:** 1 px bordered block in the clip inspector. Header carries
+  enable, name, parameter count, reorder, reset and delete; body exposes every
+  parameter inline. No hidden “advanced” drawer.
+- **Palette strip:** 52×16 px swatch bar, 1 px border, Oklab gradient. Palette
+  rows are 30 px and apply on single click; double click opens the editor.
+- **Context menu:** 24 px rows, optional leading icon, trailing shortcut and
+  checkmark. Nested menus open to the right; they flip left near the screen
+  edge. Copy/cut/paste and blend modes live on the layer menu.
+- **Icon set:** Material Design Icons, filled paths, 12 px default and 14 px in
+  context menus. One language for transport, panels, filters, palettes and
+  menus; no emoji and no mixed stroke weights.
 
 ## Viewport
 
@@ -137,12 +150,28 @@ Track identity colours (only for the top edge + clip tint, never large fills):
   gradients. Keep cone opacity low enough to read fixture positions.
 - Camera presets: Persp, Front, Top, Side. Orbit with LMB, pan with MMB/Shift,
   zoom with wheel. Show a compact axis triad bottom-right.
+- **FX** is a fifth viewport mode: a full-frame front render of the selected
+  (or playhead-active) clip through its preset and filter stack, with no
+  fixture discs, strips, cones or room box. The status line reads
+  `FX FRONT · clip · preset · OHNE FIXTURES`. The render updates at editor
+  speed while scrubbing/playing; it is not a hardware preview.
+- Library thumbnails use the same fixture-free renderer, so presets are judged
+  by their particles, gradients and colours rather than by the rig projection.
 
 ## Interaction rules
 
 - Single click selects; shift-click adds to selection; drag on empty canvas
   marquee-selects.
 - Clip drag/trim is magnetic to the beat grid by default; hold Alt to bypass.
+- Right-click a layer header for copy/cut/paste/duplicate/rename, the blend-mode
+  submenu, mute/solo, clipping, sub-layer and delete. Right-click a clip for the
+  same clipboard actions plus split, preset change and ZCL snap.
+- `Name folgt Effekt` is explicit per track. New tracks start auto; manually
+  renaming a track or clip freezes that name until the user re-enables auto.
+- Filter parameters are edited in place; changing one is one undoable ShowDoc
+  transaction. Reordering the stack changes render order immediately.
+- Applying a palette from the library writes the clip's palette parameter in
+  one transaction; a custom palette can be created from any built-in copy.
 - Space = play/pause, S = split at playhead, M = mute selected track,
   Cmd/Ctrl+Z / Shift+Cmd/Ctrl+Z undo/redo.
 - MCP edits appear as a single timeline transaction with a toast label

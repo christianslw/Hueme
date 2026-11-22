@@ -11,8 +11,8 @@ from __future__ import annotations
 from typing import Any
 
 from hueme_studio.filters import FILTERS
-from hueme_studio.presets import preset_catalog
-from hueme_studio.rig import Rig
+from hueme_studio.presets import LEGACY_PRESETS, preset_catalog
+from hueme_studio.rig import Rig, fixture_incomplete_reasons, hue_proxy_health
 from hueme_studio.showdoc import ShowDoc
 
 ERROR = "error"
@@ -33,12 +33,40 @@ def lint_show(
     """Return ``{ok, errors, warnings, issues}``; ``ok`` means no errors."""
     issues: list[dict[str, str]] = []
     presets = {entry["id"] for entry in preset_catalog()}
+    presets.update(LEGACY_PRESETS)
     groups = {group.id for group in rig.groups}
+    groups.update(fixture.id for fixture in rig.fixtures)
+    groups.update(group.id for group in rig.smart_groups)
     compiled = rig.compile()
     group_sizes = {
         group_id: int(compiled.group_indices(group_id).size)
         for group_id in groups
+        if group_id in compiled.groups
     }
+    proxy_health = hue_proxy_health(rig)
+    fixture_health = fixture_incomplete_reasons(rig)
+    for fixture_id, reasons in fixture_health.items():
+        for reason in reasons:
+            issues.append(
+                _issue(
+                    ERROR,
+                    "hue_fixture_incomplete",
+                    f"fixture '{fixture_id}': {reason}",
+                    f"rig.fixtures.{fixture_id}.output",
+                )
+            )
+    if not proxy_health["ok"]:
+        issues.append(
+            _issue(
+                ERROR,
+                "hue_proxy_plan",
+                (
+                    f"Hue proxy plan incomplete: {proxy_health['assigned_proxies']} "
+                    f"of {proxy_health['required_proxies']} required proxies"
+                ),
+                "rig.proxy_health",
+            )
+        )
 
     if not doc.tracks:
         issues.append(_issue(WARNING, "no_tracks", "show has no tracks", "tracks"))
@@ -131,6 +159,8 @@ def lint_show(
         "errors": errors,
         "warnings": warnings,
         "issues": issues,
+        "proxy_health": proxy_health,
+        "fixtures": fixture_health,
     }
 
 

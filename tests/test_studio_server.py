@@ -31,6 +31,16 @@ def _frame_header(payload: bytes) -> tuple[int, float, int]:
     return count, time_s, flags
 
 
+def _voxel_count(document: dict) -> int:
+    """Rig data is user-editable; derive counts instead of hardcoding a rig."""
+    return sum(
+        int(f["geometry"]["pixels"])
+        if f["geometry"]["type"] == "line"
+        else 1
+        for f in document["fixtures"]
+    )
+
+
 def test_ui_assets_are_revalidated(client):
     for path in ("/studio", "/static/studio.js", "/static/ui.css"):
         response = client.get(path)
@@ -43,12 +53,109 @@ def test_state_snapshot_carries_rig_show_and_catalogs(client):
     assert response.status_code == 200
     state = response.json()
     assert state["rig"]["document"]["id"] == "hueme_loft"
-    assert state["rig"]["compiled"]["voxel_count"] == 190
-    assert state["rig"]["compiled"]["fixture_slices"]["stahltraeger"] == [10, 190]
+    expected = _voxel_count(state["rig"]["document"])
+    assert state["rig"]["compiled"]["voxel_count"] == expected
+    strip = next(
+        f for f in state["rig"]["document"]["fixtures"] if f["id"] == "stahltraeger"
+    )
+    start, stop = state["rig"]["compiled"]["fixture_slices"]["stahltraeger"]
+    assert stop - start == strip["geometry"]["pixels"]
+    assert len(state["rig"]["compiled"]["voxel_fixture_index"]) == expected
+    assert state["rig"]["compiled"]["groups"]["galerie_oben"] == list(range(7))
+    assert set(state["rig"]["compiled"]["groups"]) >= {"smart_hue_all", "boden_01"}
     assert state["show"]["document"]["id"] == "dance_loft_v1"
     assert {p["id"] for p in state["presets"]} >= {"solid", "ma3_wings"}
     assert {f["id"] for f in state["filters"]} >= {"inertia", "beat_gate"}
-    assert state["playback"]["voxel_count"] == 190
+    assert state["playback"]["voxel_count"] == expected
+
+
+def test_preset_and_filter_previews_are_real_frames(client):
+    presets = client.get("/api/presets/previews")
+    filters = client.get("/api/filters/previews")
+    assert presets.status_code == 200
+    assert filters.status_code == 200
+    preset_frames = presets.json()["frames"]
+    filter_frames = filters.json()["frames"]
+    assert {"solid", "ma3_wings", "sidechain_pump"} <= set(preset_frames)
+    assert {"beat_gate", "hue_rotate", "scanline"} <= set(filter_frames)
+    assert all(len(frames) >= 2 for frames in preset_frames.values())
+    for frames in preset_frames.values():
+        assert any(frame for frame in frames), "preset preview needs at least one lit frame"
+        for frame in frames:
+            assert all(len(point) == 3 for point in frame)
+            assert all(0.0 <= point[0] <= 1.0 and 0.0 <= point[1] <= 1.0 for point in frame)
+            assert all(point[2].startswith("#") and len(point[2]) == 7 for point in frame)
+
+
+def test_hardware_toggle_loads_gateway_mqtt_config(client, monkeypatch):
+    from hueme_studio import server as server_module
+
+    captured = {}
+
+    class FakeHal:
+        def __init__(self, rig, settings):
+            captured["settings"] = settings
+            self.enabled = False
+
+        def set_enabled(self, enabled):
+            self.enabled = bool(enabled)
+
+        def set_rig(self, rig):
+            pass
+
+        def snapshot_stats(self):
+            return {"enabled": self.enabled, "started": self.enabled, "tx_operations": 0, "last_error": None}
+
+    monkeypatch.setattr(server_module, "Hal", FakeHal)
+    runtime = client.app.state.studio
+    runtime.hal = None
+    runtime.hal_settings = None
+    response = client.post("/api/hardware", json={"enabled": True})
+    assert response.status_code == 200
+    settings = captured["settings"]
+    assert settings.mqtt.get("host"), "gateway MQTT host must be loaded for the HW toggle"
+    assert settings.hue.get("proxies"), "gateway Hue proxies must be loaded for the HW toggle"
+    assert response.json()["enabled"] is True
+
+
+def test_fixture_selection_transform_bakes_geometry(client):
+    before = client.get("/api/studio/state").json()["rig"]["document"]
+    fixture = next(item for item in before["fixtures"] if item["id"] == "galerie_01")
+    start = list(fixture["geometry"]["pos"])
+    response = client.post(
+        "/api/rig/fixtures/transform",
+        json={
+            "fixture_ids": ["galerie_01", "galerie_02"],
+            "translate": [0.5, -0.25, 0.0],
+            "rotate_axis": "z",
+            "rotate_deg": 0.0,
+            "scale": [1.0, 1.0, 1.0],
+        },
+    )
+    assert response.status_code == 200
+    state = client.get("/api/studio/state").json()
+    after = next(item for item in state["rig"]["document"]["fixtures"] if item["id"] == "galerie_01")
+    assert after["geometry"]["pos"][0] == pytest.approx(start[0] + 0.5)
+    assert after["geometry"]["pos"][1] == pytest.approx(start[1] - 0.25)
+    assert after["transform"]["translate"] == [0.0, 0.0, 0.0]
+    assert state["rig"]["dirty"] is True
+
+    rotated = client.post(
+        "/api/rig/fixtures/transform",
+        json={
+            "fixture_ids": ["galerie_01"],
+            "rotate_axis": "z",
+            "rotate_deg": 90.0,
+            "scale": [1.0, 1.0, 1.0],
+            "pivot": [0.0, 0.0, 0.0],
+        },
+    )
+    assert rotated.status_code == 200
+    invalid = client.post(
+        "/api/rig/fixtures/transform",
+        json={"fixture_ids": ["galerie_01"], "rotate_axis": "w"},
+    )
+    assert invalid.status_code == 400
 
 
 def test_rig_library_crud_and_activation(client):
@@ -102,6 +209,9 @@ def test_fixture_patch_compiles_saves_and_reloads(client, tmp_path):
 
 
 def test_add_fixture_group_assignment_and_delete(client):
+    before = _voxel_count(
+        client.get("/api/studio/state").json()["rig"]["document"]
+    )
     fixture = {
         "id": "test_spot",
         "name": "Test Spot",
@@ -112,7 +222,7 @@ def test_add_fixture_group_assignment_and_delete(client):
     assert added.json()["fixtures"][-1]["id"] == "test_spot"
     assert client.get("/api/studio/state").json()["rig"]["compiled"][
         "voxel_count"
-    ] == 191
+    ] == before + 1
 
     assigned = client.post(
         "/api/rig/groups/galerie_oben/assign",
@@ -182,13 +292,14 @@ def test_transport_seek_blackout_and_frame_encoding(client):
     assert transport["gain"] == pytest.approx(0.5)
 
     runtime = client.app.state.studio
+    expected = runtime.compiled.voxel_count
     count, time_s, flags = _frame_header(runtime.evaluate())
-    assert count == 190
+    assert count == expected
     assert time_s == pytest.approx(10.0)
     assert flags & 2  # blackout bit
 
     client.post("/api/transport", json={"blackout": False, "gain": 1.0})
-    assert client.get("/api/health").json()["voxel_count"] == 190
+    assert client.get("/api/health").json()["voxel_count"] == expected
 
 
 def test_websocket_hello_and_render_frame(client):
@@ -196,13 +307,14 @@ def test_websocket_hello_and_render_frame(client):
         hello = json.loads(ws.receive_text())
         assert hello["type"] == "hello"
         assert hello["state"]["rig"]["document"]["id"] == "hueme_loft"
+        expected = hello["state"]["playback"]["voxel_count"]
 
         count, _time_s, _flags = _frame_header(ws.receive_bytes())
-        assert count == 190
+        assert count == expected
 
         ws.send_text(json.dumps({"type": "render", "time_s": 5.0}))
         count, time_s, _flags = _frame_header(ws.receive_bytes())
-        assert count == 190
+        assert count == expected
         assert time_s == pytest.approx(5.0, abs=0.01)
 
 
@@ -286,6 +398,24 @@ def test_static_studio_and_live_pages(client):
     assert "HUEME" in studio.text
     assert 'id="viewport"' in studio.text
     assert 'id="timeline"' in studio.text
+    for marker in (
+        "PROXIES",
+        "HW OUT",
+        "MA LOCK",
+        "Compose",
+        "Stage",
+        "Datei",
+        "Bearbeiten",
+        "Ebenen",
+        "Filter &amp; Effekte",
+        "Ansicht",
+        "Hilfe",
+        "+ Global",
+        "+ Unterebene",
+        "AI KEYS",
+        "timecode",
+    ):
+        assert marker in studio.text
 
     live = client.get("/live")
     assert live.status_code == 200
@@ -297,4 +427,44 @@ def test_static_studio_and_live_pages(client):
 
     script = client.get("/static/studio.js")
     assert script.status_code == 200
-    assert "StudioClient" in script.text
+    for marker in (
+        "StudioClient",
+        "rangeControl",
+        "stepperWrap",
+        "expressionEditor",
+        "keyframeAtPoint",
+        "AudioContext",
+        "clipped_to_below",
+        "smart_groups",
+        "setIcon",
+    ):
+        assert marker in script.text
+
+
+def test_hardware_toggle_and_health_metadata(client, monkeypatch):
+    from hueme_studio.hal import Hal
+
+    def fake_start(self):
+        self._started = True
+
+    monkeypatch.setattr(Hal, "start", fake_start)
+    state = client.get("/api/studio/state").json()
+    assert state["hardware"] == {
+        "enabled": False,
+        "started": False,
+        "tx_operations": 0,
+        "last_error": None,
+    }
+    assert state["proxy_health"]["ok"] is True
+    assert state["proxy_health"]["required_proxies"] == 2
+    for fixture in state["rig"]["document"]["fixtures"]:
+        assert "incomplete_reasons" in fixture
+
+    enabled = client.post("/api/hardware", json={"enabled": True})
+    assert enabled.status_code == 200
+    assert enabled.json()["enabled"] is True
+    assert client.get("/api/health").json()["hardware"]["enabled"] is True
+
+    disabled = client.post("/api/hardware", json={"enabled": False})
+    assert disabled.status_code == 200
+    assert disabled.json()["enabled"] is False

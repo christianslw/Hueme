@@ -1,0 +1,150 @@
+{
+  "schema_version": 1,
+  "id": "new_show",
+  "name": "deep blue",
+  "duration_s": 176.7503,
+  "match": {
+    "artist": "",
+    "title": "deep blue",
+    "normalized_keys": [
+      "deep blue"
+    ],
+    "ma_item_ids": [],
+    "duration_s": 176.7503
+  },
+  "timing": {
+    "bpm": 130.8,
+    "beat_offset_s": 0.0,
+    "beat_grid_s": 0.458716,
+    "markers": [
+      {
+        "t_s": 0.0,
+        "name": "Intro",
+        "kind": "section",
+        "color": null
+      },
+      {
+        "t_s": 15.7013,
+        "name": "Verse",
+        "kind": "section",
+        "color": null
+      },
+      {
+        "t_s": 32.32,
+        "name": "Build",
+        "kind": "section",
+        "color": null
+      },
+      {
+        "t_s": 47.0933,
+        "name": "Drop",
+        "kind": "drop",
+        "color": null
+      },
+      {
+        "t_s": 89.5573,
+        "name": "Breakdown",
+        "kind": "section",
+        "color": null
+      },
+      {
+        "t_s": 100.6293,
+        "name": "Build",
+        "kind": "section",
+        "color": null
+      },
+      {
+        "t_s": 119.0933,
+        "name": "Drop",
+        "kind": "drop",
+        "color": null
+      },
+      {
+        "t_s": 148.5867,
+        "name": "Outro",
+        "kind": "section",
+        "color": null
+      }
+    ]
+  },
+  "tracks": [
+    {
+      "id": "base",
+      "name": "Base Field",
+      "name_auto": false,
+      "target_group": "all",
+      "blend_mode": "normal",
+      "opacity": 1.0,
+      "muted": false,
+      "solo": false,
+      "kind": "layer",
+      "parent_id": null,
+      "clipped_to_below": false,
+      "height_px": 77,
+      "clips": [
+        {
+          "id": "clip_1",
+          "start_s": 0.0,
+          "end_s": 132.110208,
+          "fade_in_s": 0.0,
+          "fade_out_s": 0.0,
+          "preset": "noise_plasma",
+          "opacity": 1.0,
+          "params": {
+            "palette": "synth",
+            "scale": 3.2,
+            "speed": 0.16,
+            "warp": 0.35,
+            "contrast": 0.9,
+            "brightness": 1
+          },
+          "expressions": {
+            "speed": "energy"
+          },
+          "keyframes": [],
+          "spatial_mask": {
+            "kind": "none",
+            "axis": "x",
+            "position": 0.5,
+            "width": 0.25,
+            "center": [
+              0.5,
+              0.5,
+              0.5
+            ],
+            "radius": 0.3,
+            "box_min": [
+              0.0,
+              0.0,
+              0.0
+            ],
+            "box_max": [
+              1.0,
+              1.0,
+              1.0
+            ],
+            "modulo": 2,
+            "remainder": 0,
+            "softness": 0.08,
+            "invert": false
+          },
+          "filters": [
+            {
+              "type": "audio_mod",
+              "enabled": true,
+              "params": {
+                "depth": 1,
+                "source": "kick"
+              }
+            }
+          ],
+          "snap_zcl": false,
+          "name": "Shockwave 3D",
+          "color": null
+        }
+      ]
+    }
+  ],
+  "notes": "",
+  "created_at": null
+}

@@ -34,6 +34,9 @@ SMOOTHING_FULLSCALE_US = 2_560_000
 ZCL_SNAP_SMOOTHING = 0x0080  # ~5 ms: hard snap for transients and cue cuts
 GAMUT = ((0.7347, 0.2653), (0.1704, 0.7099), (0.0366, 0.0856))
 
+DDP_TYPE_RGB24 = 0x0B   # DDP spec: RGB, 8 bit/channel
+DDP_TYPE_RGBW32 = 0x1B  # DDP spec: RGBW, 8 bit/channel (WLED reads 4ch only for this type)
+
 E131_PORT = 5568
 ACN_PID = b"ASC-E1.17\x00\x00\x00"
 HUEME_CID = uuid.uuid5(uuid.NAMESPACE_DNS, "hueme.lighting.local").bytes
@@ -148,8 +151,14 @@ def light_balance_msg(value: int = 0xFE) -> dict:
     }
 
 
-def smoothing_for_fps(fps: float) -> int:
-    us = 1_000_000.0 / max(1.0, float(fps))
+def smoothing_for_fps(fps: float, headroom: float = 1.0) -> int:
+    """ZCL trailing transition in 1/65536 of 2.56 s.
+
+    ``headroom`` > 1 lets the ramp overlap the next frame slightly.  Zigbee and
+    MQTT delivery jitter can add tens of milliseconds; a ramp of exactly one
+    frame period then visibly holds between updates.
+    """
+    us = 1_000_000.0 * max(0.0, float(headroom)) / max(1.0, float(fps))
     return max(0, min(0xFFFF, int(us * 0x10000 / SMOOTHING_FULLSCALE_US)))
 
 
@@ -169,7 +178,7 @@ def build_ddp_packet(
     offset_bytes: int = 0,
     seq: int = 1,
     push: bool = True,
-    dtype: int = 0x01,
+    dtype: int = DDP_TYPE_RGB24,
 ) -> bytes:
     flags1 = 0x41 if push else 0x40  # DDP v1 + push flag
     flags2 = seq & 0x0F
@@ -461,17 +470,24 @@ class HueZ2MDriver:
         max_bri = int(self.hue_cfg.get("max_brightness", 2047))
         bri_mode = self.hue_cfg.get("brightness_mode", "max")
         sm_cfg = self.hue_cfg.get("smoothing", "auto")
+        try:
+            headroom = float(self.hue_cfg.get("smoothing_headroom", 1.5))
+        except (TypeError, ValueError):
+            headroom = 1.5
         if sm_cfg == "auto" or sm_cfg is None or sm_cfg == "":
-            trailing_smoothing = smoothing_for_fps(fps)
+            trailing_smoothing = smoothing_for_fps(fps, headroom)
         else:
             try:
                 trailing_smoothing = int(str(sm_cfg), 0) if isinstance(sm_cfg, str) else int(sm_cfg)
             except (TypeError, ValueError):
                 # User typed something that is not a number: fall back instead of killing the render loop.
-                trailing_smoothing = smoothing_for_fps(fps)
+                trailing_smoothing = smoothing_for_fps(fps, headroom)
         smoothing = ZCL_SNAP_SMOOTHING if snap else trailing_smoothing
 
-        # Build 7-byte records
+        # Build 7-byte records. Keep the proven consolidation: one small proxy
+        # broadcast at a time. Per-proxy parallel frames at 25 fps saturated the
+        # Zigbee coordinator and took every lamp offline; stability beats wishful
+        # routing here.
         raw_recs = []
         proxies_in_order = list(self.hue_cfg.get("proxies") or [])
         for name, addr, (r, g, b), grp_proxy in fixture_records:
@@ -571,16 +587,26 @@ class DdpOutputDriver:
         # DDP supports RGB (type 1) and RGBW (type 3). The 4-channel path is
         # used by SK6812 RGB+1800K strips; existing 3-tuple callers are
         # byte-for-byte unchanged.
-        channels = len(pixels[0]) if pixels else int(self.cfg.get("channels", 3))
+        # HAL passes a numpy array of float voxel values, not a list of ints.
+        # ``if pixels`` and ``px[0] & 0xFF`` both fail on that (ambiguous truth
+        # value, and float bitwise-and). Cast explicitly on the way to bytes.
+        channels = len(pixels[0]) if len(pixels) > 0 else int(self.cfg.get("channels", 3))
         channels = 4 if channels == 4 else 3
-        dtype = 0x03 if channels == 4 else 0x01
+        dtype = DDP_TYPE_RGBW32 if channels == 4 else DDP_TYPE_RGB24
 
         raw = bytearray()
         for px in pixels:
             if channels == 4:
-                raw.extend((px[0] & 0xFF, px[1] & 0xFF, px[2] & 0xFF, px[3] & 0xFF))
+                raw.extend(
+                    (
+                        int(px[0]) & 0xFF,
+                        int(px[1]) & 0xFF,
+                        int(px[2]) & 0xFF,
+                        int(px[3]) & 0xFF,
+                    )
+                )
             else:
-                raw.extend((px[0] & 0xFF, px[1] & 0xFF, px[2] & 0xFF))
+                raw.extend((int(px[0]) & 0xFF, int(px[1]) & 0xFF, int(px[2]) & 0xFF))
 
         max_chunk = 1440 - (1440 % channels)  # multiple of pixel width
         total = len(raw)

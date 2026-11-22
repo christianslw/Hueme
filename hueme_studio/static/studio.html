@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="de">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -8,40 +8,112 @@
   <link rel="stylesheet" href="/static/ui.css">
 </head>
 <body>
-<div class="studio">
+<div class="studio" id="studio-root">
 
-  <header class="menubar">
+  <header class="menubar topbar">
     <div class="brand">HUEME <span>STUDIO</span></div>
-    <div class="menubar-group">
+
+    <nav class="main-menu" id="main-menu" aria-label="Application menu">
+      <div class="menu" data-menu="file">
+        <button class="menu-button" type="button">Datei</button>
+        <div class="menu-drop">
+          <button type="button" data-command="new-show">Neue Show</button>
+          <button type="button" data-command="load-audio">Audio importieren</button>
+          <button type="button" data-command="snapshot">Snapshot speichern</button>
+          <button type="button" data-command="live-deck">Live Deck</button>
+          <button type="button" data-command="system-restart">Studio neu starten</button>
+        </div>
+      </div>
+      <div class="menu" data-menu="edit">
+        <button class="menu-button" type="button">Bearbeiten</button>
+        <div class="menu-drop">
+          <button type="button" data-command="undo">Rückgängig</button>
+          <button type="button" data-command="redo">Wiederholen</button>
+          <button type="button" data-command="split">Clip teilen</button>
+          <button type="button" data-command="delete-clip">Clip löschen</button>
+          <button type="button" data-command="add-clip">Clip hinzufügen</button>
+        </div>
+      </div>
+      <div class="menu" data-menu="layers">
+        <button class="menu-button" type="button">Ebenen</button>
+        <div class="menu-drop">
+          <button type="button" data-command="add-layer">Lampenebene</button>
+          <button type="button" data-command="add-global">Globale Ebene</button>
+          <button type="button" data-command="add-sub">Unterebene</button>
+          <button type="button" data-command="toggle-clip">Clipping-Maske umschalten</button>
+          <button type="button" data-command="toggle-mute">Ebene mute</button>
+        </div>
+      </div>
+      <div class="menu" data-menu="filters">
+        <button class="menu-button" type="button">Filter &amp; Effekte</button>
+        <div class="menu-drop">
+          <button type="button" data-command="focus-filters">Filter-Bibliothek</button>
+          <button type="button" data-command="clear-filters">Filter am Clip löschen</button>
+          <button type="button" data-command="auto-keys">AI Rhythm Keyframes</button>
+        </div>
+      </div>
+      <div class="menu" data-menu="view">
+        <button class="menu-button" type="button">Ansicht</button>
+        <div class="menu-drop">
+          <button type="button" data-command="camera-persp">Perspektive</button>
+          <button type="button" data-command="camera-front">Front</button>
+          <button type="button" data-command="camera-top">Top</button>
+          <button type="button" data-command="camera-side">Seite</button>
+          <button type="button" data-command="fit-show">Show einpassen</button>
+          <button type="button" data-command="camera-fit">Raum einpassen</button>
+        </div>
+      </div>
+      <div class="menu" data-menu="help">
+        <button class="menu-button" type="button">Hilfe</button>
+        <div class="menu-drop">
+          <button type="button" data-command="shortcuts">Tastenkürzel</button>
+          <button type="button" data-command="sync-restart">Sendspin neu starten</button>
+          <button type="button" data-command="ma-pairing">Sendspin Pairing-Token</button>
+          <button type="button" data-command="about">Über Hueme Studio</button>
+        </div>
+      </div>
+    </nav>
+
+    <div class="menubar-group show-picker">
       <span class="menubar-label">Show</span>
-      <select id="show-select" class="select" aria-label="Active show" style="width:180px"></select>
+      <select id="show-select" class="select" aria-label="Active show"></select>
     </div>
-    <div class="menubar-group">
-      <button id="btn-to-start" class="button icon-button" type="button" title="Go to start">|&lt;</button>
-      <button id="btn-play" class="button primary" type="button" title="Play or pause">PLAY</button>
-      <button id="btn-to-end" class="button icon-button" type="button" title="Go to end">&gt;|</button>
-      <button id="btn-loop" class="button" type="button" title="Loop playback">LOOP</button>
-      <span id="timecode" class="mono timecode">00:00.000</span>
+
+    <div class="workspace-switch" role="tablist" aria-label="Workspace">
+      <button type="button" class="active" data-workspace="compose" role="tab" aria-selected="true">Compose</button>
+      <button type="button" data-workspace="stage" role="tab" aria-selected="false">Stage</button>
     </div>
+
     <div class="spacer"></div>
-    <div class="menubar-group">
-      <button id="sync-status" class="button" type="button" title="Music Assistant sync">MA --</button>
-      <span id="link-status" class="menubar-label">OFFLINE</span>
-      <a class="button" href="/live" title="Open the live deck">LIVE DECK</a>
-      <button id="btn-mcp" class="button" type="button" title="Open the MCP log">MCP</button>
+
+    <div class="menubar-group topbar-status">
+      <span id="proxy-badge" class="badge proxy-badge" title="Hue proxy health">PROXIES --</span>
+      <button id="hw-toggle" class="button small toggle-button" type="button" title="Hardware output" aria-pressed="false">HW OUT</button>
+      <button id="ma-lock" class="button small toggle-button" type="button" title="Music Assistant sync lock" aria-pressed="false">MA LOCK</button>
+      <button id="ma-pair" class="button small toggle-button hidden" type="button" title="Sendspin pairing token for Music Assistant">PAIR</button>
+      <button id="ma-restart" class="button small toggle-button hidden" type="button" title="Sendspin-Dienst neu starten">MA RESTART</button>
+      <div class="history-pair" aria-label="Undo and redo history">
+        <button id="undo" class="button small icon-button" type="button" title="Undo (Ctrl+Z)"></button>
+        <span id="undo-count" class="mono history-count">0</span>
+        <button id="redo" class="button small icon-button" type="button" title="Redo (Ctrl+Shift+Z)"></button>
+        <span id="redo-count" class="mono history-count">0</span>
+      </div>
+      <button id="btn-mcp" class="button small" type="button" title="Open MCP drawer">MCP</button>
+      <a class="button small" href="/live" title="Open the live deck">LIVE DECK</a>
     </div>
   </header>
 
+  <!-- LEFT: selection settings + rig settings -->
   <aside class="left-panel">
-    <section class="section open" id="section-presets">
-      <button class="section-head" type="button">Presets</button>
-      <div class="section-body">
-        <div id="preset-list" class="row-list"></div>
-      </div>
-    </section>
+    <div class="inspector-tabs">
+      <button class="inspector-tab active" type="button" data-tab="clip">Clip</button>
+      <button class="inspector-tab" type="button" data-tab="fixture">Fixture</button>
+      <button class="inspector-tab" type="button" data-tab="show">Show</button>
+    </div>
+    <div id="inspector-body" class="inspector-body"></div>
 
     <section class="section open" id="section-rig">
-      <button class="section-head" type="button">Rig Manager</button>
+      <button class="section-head" type="button">Rig &amp; Output</button>
       <div class="section-body">
         <div class="section-actions">
           <select id="rig-select" class="select" aria-label="Rig preset" style="flex:1;min-width:100px"></select>
@@ -54,81 +126,120 @@
           <button id="rig-clone" class="button small" type="button">Clone</button>
           <button id="rig-delete" class="button small danger" type="button">Delete</button>
         </div>
+        <div id="hardware-status" class="mono muted hardware-status">HW OUT OFF</div>
 
         <div class="list-subhead">
           Fixtures
           <span id="fixture-count" class="mono muted" style="margin-left:auto"></span>
         </div>
-        <div id="fixture-list" class="row-list"></div>
+        <div id="fixture-list" class="rig-tree"></div>
         <div class="section-actions" style="margin-top:4px">
           <button id="add-point" class="button small" type="button">Add Point</button>
           <button id="add-line" class="button small" type="button">Add Line</button>
         </div>
 
         <div class="list-subhead">
-          Groups
+          Ordner / Smart-Gruppen
           <button id="group-add" class="button small" type="button" style="margin-left:auto">New Group</button>
         </div>
-        <div id="group-list" class="row-list"></div>
+        <div id="group-list" class="rig-tree"></div>
         <div id="group-editor" class="hidden"></div>
-      </div>
-    </section>
-
-    <section class="section open" id="section-filters">
-      <button class="section-head" type="button">Filter Library</button>
-      <div class="section-body">
-        <div id="filter-list" class="row-list"></div>
       </div>
     </section>
   </aside>
 
+  <div class="splitter split-v" id="split-left" role="separator" aria-orientation="vertical" title="Settings-Breite ziehen"></div>
+
   <main class="center-panel">
     <canvas id="viewport" class="viewport" tabindex="0" aria-label="3D rig viewport"></canvas>
+    <canvas id="fx-preview" class="fx-preview hidden" aria-label="Fixture-free effect preview"></canvas>
     <div class="viewport-tools">
       <button class="button" type="button" data-camera="persp">Persp</button>
       <button class="button" type="button" data-camera="front">Front</button>
       <button class="button" type="button" data-camera="top">Top</button>
       <button class="button" type="button" data-camera="side">Side</button>
       <button class="button" type="button" id="camera-fit">Fit</button>
+      <button class="button" type="button" id="fx-toggle" title="Effect-Vorschau ohne Fixtures">FX</button>
     </div>
     <div id="viewport-status" class="viewport-status"></div>
-    <div class="viewport-hint">Alt+drag orbit &middot; MMB/Shift pan &middot; wheel zoom &middot; drag empty to marquee &middot; Shift+drag fixture for Z</div>
+    <div class="viewport-hint">G Move &middot; R Rotate &middot; S Scale &middot; X/Y/Z Achse &middot; Shift fein &middot; Ctrl Snap &middot; Alt Einzel-Pivot &middot; Numpad 1/3/7 ortho &middot; 5 persp/ortho &middot; 9 opposite &middot; Achsen-Gizmo oben rechts</div>
+    <div id="transform-hud" class="transform-hud hidden" aria-live="polite"></div>
   </main>
 
-  <aside class="right-panel">
-    <div class="inspector-tabs">
-      <button class="inspector-tab active" type="button" data-tab="clip">Clip</button>
-      <button class="inspector-tab" type="button" data-tab="fixture">Fixture</button>
+  <div class="splitter split-v" id="split-right" role="separator" aria-orientation="vertical" title="Library-Breite ziehen"></div>
+
+  <!-- RIGHT: combined searchable preset + effect library -->
+  <aside class="right-panel library-panel">
+    <div class="library-head">
+      <input id="library-search" class="input" type="search" placeholder="Presets &amp; Effekte suchen…" aria-label="Search presets and effects" spellcheck="false">
+      <span id="library-count" class="mono muted library-count"></span>
     </div>
-    <div id="inspector-body" class="inspector-body"></div>
+    <div class="library-scroll">
+      <section class="section open" id="section-presets">
+        <button class="section-head" type="button">Presets</button>
+        <div class="section-body">
+          <div id="preset-list" class="row-list preset-list"></div>
+        </div>
+      </section>
+      <section class="section open" id="section-filters">
+        <button class="section-head" type="button">Effekte &amp; Filter</button>
+        <div class="section-body">
+          <div id="filter-list" class="row-list filter-list"></div>
+        </div>
+      </section>
+      <section class="section open" id="section-palettes">
+        <button class="section-head" type="button">Paletten</button>
+        <div class="section-body">
+          <div class="section-actions">
+            <button id="palette-new" class="button small" type="button">New Palette</button>
+            <span class="mono muted" style="margin-left:auto">swatches</span>
+          </div>
+          <div id="palette-list" class="row-list palette-list"></div>
+        </div>
+      </section>
+    </div>
+    <div class="library-hint">Klick = anwenden &middot; Drag = auf Track/Clip &middot; Rechtsklick = Menü</div>
   </aside>
 
+  <div class="splitter split-h" id="split-timeline" role="separator" aria-orientation="horizontal" title="Timeline-Höhe ziehen"></div>
+
   <section class="timeline">
-    <div class="timeline-toolbar">
-      <span class="label">Timeline</span>
-      <button id="undo" class="button small" type="button" title="Undo show edit">Undo</button>
-      <button id="redo" class="button small" type="button" title="Redo show edit">Redo</button>
-      <button id="split" class="button small" type="button" title="Split clip at playhead">Split</button>
-      <button id="mute" class="button small" type="button" title="Mute selected track">Mute</button>
-      <button id="add-clip" class="button small" type="button" title="Add a clip at the playhead">Add Clip</button>
-      <button id="blueprint-load" class="button small" type="button" title="Attach an AudioBlueprint from a 16-bit WAV">Audio</button>
-      <input id="blueprint-file" class="hidden" type="file" accept=".wav,audio/wav">
-      <span id="blueprint-status" class="mono muted" style="margin-left:4px"></span>
+    <div class="transport" aria-label="Transport">
+      <button id="btn-to-start" class="button icon-button" type="button" title="Go to start" aria-label="Go to start"></button>
+      <button id="btn-play" class="button primary icon-button play-button" type="button" title="Play or pause" aria-label="Play"></button>
+      <button id="btn-to-end" class="button icon-button" type="button" title="Go to end" aria-label="Go to end"></button>
+      <button id="btn-loop" class="button icon-button" type="button" title="Loop playback" aria-label="Loop"></button>
+      <button id="timecode" class="mono timecode timecode-button" type="button" title="Switch time / frames / bars">00:00.000</button>
+      <span id="link-status" class="menubar-label">OFFLINE</span>
+      <span id="history-label" class="mono muted history-label"></span>
+      <div class="spacer"></div>
+      <button id="add-track-global" class="button small" type="button" title="Add global layer above all">+ Global</button>
+      <button id="add-track-sub" class="button small" type="button" title="Add indented sub-layer">+ Unterebene</button>
+      <button id="split" class="button small icon-button" type="button" title="Split clip at playhead" aria-label="Split clip"></button>
+      <button id="mute" class="button small icon-button" type="button" title="Mute selected track" aria-label="Mute track"></button>
+      <button id="add-clip" class="button small icon-button" type="button" title="Add clip at playhead" aria-label="Add clip"></button>
+      <button id="auto-keys" class="button small" type="button" title="Generate rhythm keyframes from the ML analysis">AI KEYS</button>
+      <button id="blueprint-load" class="button small" type="button" title="Attach audio (WAV, MP3, FLAC, M4A, MP4, OGG)">Audio</button>
+      <input id="blueprint-file" class="hidden" type="file" accept=".wav,.mp3,.flac,.m4a,.mp4,.ogg,audio/*,video/mp4">
+      <button id="sync-markers" class="button small" type="button" title="Dauer, BPM und Marker aus dem Audio neu synchronisieren">Sync Markers</button>
+      <span id="blueprint-status" class="mono muted blueprint-status"></span>
       <span class="label" style="margin-left:8px">Vol</span>
       <input id="audio-volume" class="slider" type="range" min="0" max="1" step="0.01" value="0.8" style="width:64px" aria-label="Audio preview volume">
-      <span id="history-label" class="mono muted" style="margin-left:4px"></span>
-      <div class="spacer"></div>
-      <span class="label">Grid</span>
-      <select id="grid-select" class="select" style="width:72px" aria-label="Grid division">
+      <span class="label" style="margin-left:8px">Grid</span>
+      <select id="grid-select" class="select" style="width:70px" aria-label="Grid division">
         <option value="1/1">1/1</option>
         <option value="1/2">1/2</option>
         <option value="1/4" selected>1/4</option>
         <option value="1/8">1/8</option>
         <option value="1/16">1/16</option>
       </select>
-      <button id="zoom-out" class="button small icon-button" type="button" title="Zoom out">-</button>
-      <button id="zoom-in" class="button small icon-button" type="button" title="Zoom in">+</button>
+      <button id="zoom-out" class="button small icon-button" type="button" title="Zoom out" aria-label="Zoom out"></button>
+      <button id="zoom-in" class="button small icon-button" type="button" title="Zoom in" aria-label="Zoom in"></button>
       <button id="zoom-fit" class="button small" type="button" title="Fit show">Fit</button>
+    </div>
+    <div class="timeline-toolbar">
+      <span class="label">Timeline</span>
+      <span class="mono muted timeline-hint">Alt+Klick Header = Clipping &middot; Alt+Wheel = Spurhöhe &middot; Rechtsklick = Menü</span>
     </div>
     <canvas id="timeline" class="timeline-canvas" tabindex="0" aria-label="Show timeline"></canvas>
   </section>
@@ -138,7 +249,7 @@
   <header>
     MCP JSON-RPC
     <span id="mcp-state" class="mono">HTTP</span>
-    <button id="mcp-close" class="button small" type="button">Close</button>
+    <button id="mcp-close" class="button small icon-button" type="button" aria-label="Close MCP drawer"></button>
   </header>
   <div id="mcp-telemetry" class="mcp-telemetry"></div>
   <div class="mcp-filter-row">

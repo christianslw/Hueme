@@ -49,7 +49,13 @@ decides *when* to sample.
 | GET | `/api/health` | status, clients, voxel count |
 | GET | `/api/studio/state` | rig + compiled voxels + show + catalogs + playback |
 | GET | `/api/presets` | stateless preset catalog |
+| GET | `/api/presets/{id}/preview.png` | fixture-free front-view effect thumbnail |
 | GET | `/api/filters` | filter catalog |
+| GET | `/api/filters/{id}/preview.png` | filter applied to a test gradient |
+| POST | `/api/preview/effect` | render one clip's preset + filters at a timestamp |
+| GET | `/api/palettes` | built-in + custom palette library |
+| POST | `/api/palettes` | create or update a custom palette |
+| DELETE | `/api/palettes/{id}` | delete a custom palette |
 | GET | `/api/rigs` | preset list + active id |
 | GET | `/api/rigs/{id}` | preset document from disk |
 | POST | `/api/rigs` | create preset (`name`, optional `preset_id`) |
@@ -94,6 +100,44 @@ Validation errors return `400` with readable detail; missing fixtures/groups/
 shows return `404`. There is no authentication: bind to localhost or put the
 server behind a trusted reverse proxy.
 
+## Palettes
+
+`config/palettes.json` is a global user library, not show data. Seven built-in
+cosine palettes ship with the app; custom palettes are 2–16 discrete stops and
+interpolate in Oklab. Built-ins cannot be overwritten or deleted — saving one
+creates a copy. `POST /api/palettes` accepts:
+
+```json
+{"id": "optional-existing-custom-id", "name": "Warm Room", "colors": [[255, 90, 20], [120, 20, 90]]}
+```
+
+The store writes atomically and updates the in-process registry immediately.
+Palette changes invalidate preview PNG caches and ride the normal `palettes`
+invalidation event.
+
+## Fixture-free previews
+
+`GET /api/presets/{id}/preview.png` and `GET /api/filters/{id}/preview.png`
+return small PNGs rendered on a flat front plane through the real preset and
+filter code. They are library thumbnails, not hardware frames.
+
+`POST /api/preview/effect` renders the selected clip at a timestamp:
+
+```json
+{
+  "clip": {"id": "c1", "start_s": 0, "end_s": 10, "preset": "shockwave_3d", "params": {}},
+  "t": 4.2,
+  "timing": {"bpm": 128},
+  "width": 96,
+  "height": 54
+}
+```
+
+The response is `image/png` with `Cache-Control: no-store`. Preview renders are
+serialized through one lock because spatial filters are O(n²). Filter previews
+default to 48×27 and the FX viewport uses 48×27 when the clip has filters,
+128×72 otherwise. `GET /api/studio/state` includes `palettes`.
+
 ## MCP
 
 `hueme_studio/mcp.py` implements the small stable MCP surface without the SDK:
@@ -109,7 +153,8 @@ python3 -m hueme_studio.mcp --stdio --url http://127.0.0.1:8090/mcp
 
 Tools: `studio_state`, `rig_get`, `show_get`, `show_patch`, `show_commit`,
 `show_undo`, `show_redo`, `show_snapshot`, `show_lint`, `blueprint_get`,
-`blueprint_extract`, `transport_set`. `show_patch` deep-merges a partial
+`blueprint_extract`, `palette_list`, `palette_save`, `palette_delete`,
+`transport_set`. `show_patch` deep-merges a partial
 ShowDoc (arrays replace, objects merge); every write tool becomes exactly one
 undoable `ShowStore.commit` and publishes the same invalidation event as REST.
 `GET /mcp` is 405 by design; there is no SSE stream or server-initiated

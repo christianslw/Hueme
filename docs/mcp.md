@@ -34,6 +34,9 @@ python3 -m hueme_studio.mcp --stdio
 | `show_lint` | `show_id?` | rig/blueprint pre-flight report |
 | `blueprint_get` | `show_id?` | attached AudioBlueprint |
 | `blueprint_extract` | `path`, `show_id?` | analyse local WAV and attach |
+| `palette_list` | — | built-in and custom palettes with colour stops |
+| `palette_save` | `name`, `colors`, `id?` | create/update a custom palette |
+| `palette_delete` | `id` | delete a custom palette |
 | `transport_set` | playback fields | play/pause/seek/loop/gain/blackout |
 
 `show_patch` merges objects recursively and replaces arrays wholesale. It is

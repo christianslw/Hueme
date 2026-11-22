@@ -1,0 +1,21 @@
+# Optional allin1 structure/beat analyzer sidecar.
+# The Studio reaches it through ANALYZER_URL=http://analyzer:8700.
+FROM python:3.11-slim
+
+ENV PYTHONUNBUFFERED=1 \
+    PIP_NO_CACHE_DIR=1 \
+    TORCH_HOME=/models
+
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends ffmpeg libsndfile1 \
+    && rm -rf /var/lib/apt/lists/*
+
+# CPU build keeps the image usable on the 8700G host without a CUDA runtime.
+RUN pip install --index-url https://download.pytorch.org/whl/cpu torch torchaudio
+RUN pip install allin1 fastapi "uvicorn[standard]" soundfile librosa
+
+WORKDIR /app
+COPY hueme_studio/analyzer_service.py /app/analyzer_service.py
+
+EXPOSE 8700
+CMD ["uvicorn", "analyzer_service:app", "--host", "0.0.0.0", "--port", "8700"]

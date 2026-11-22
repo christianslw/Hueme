@@ -7,3 +7,10 @@ config/blueprints/
 config/hueme.lock
 gateway_config.json.bak
 testdata/
+config/sendspin_identity.json
+config/sendspin_pairings.json
+*.log
+DANCE*.mp4
+
+# Reference clones and third-party samples
+reference/

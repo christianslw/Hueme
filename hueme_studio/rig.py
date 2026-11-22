@@ -195,12 +195,29 @@ class Fixture(Model):
     output: FixtureOutput = Field(default_factory=FixtureOutput)
     tags: list[str] = Field(default_factory=list)
     notes: str = ""
+    folder_id: str | None = None
 
     @property
     def voxel_count(self) -> int:
         if isinstance(self.geometry, LineGeometry):
             return int(self.geometry.pixels)
         return 1
+
+
+class Folder(Model):
+    """Collapsible grouping node for the rig manager tree."""
+
+    id: str = Field(pattern=r"^[A-Za-z0-9][A-Za-z0-9_.-]*$")
+    name: str = Field(min_length=1)
+    collapsed: bool = False
+
+
+class SmartGroup(Model):
+    """Virtual selection group (#) that never changes fixture output routing."""
+
+    id: str = Field(pattern=r"^[A-Za-z0-9][A-Za-z0-9_.-]*$")
+    name: str = Field(min_length=1)
+    fixtures: list[str] = Field(default_factory=list)
 
 
 class Group(Model):
@@ -237,6 +254,8 @@ class Rig(Model):
     room: Room = Field(default_factory=Room)
     fixtures: list[Fixture] = Field(default_factory=list)
     groups: list[Group] = Field(default_factory=list)
+    folders: list[Folder] = Field(default_factory=list)
+    smart_groups: list[SmartGroup] = Field(default_factory=list)
 
     @model_validator(mode="after")
     def _check_ids(self) -> "Rig":
@@ -246,12 +265,33 @@ class Rig(Model):
         group_ids = [g.id for g in self.groups]
         if len(group_ids) != len(set(group_ids)):
             raise ValueError("group ids must be unique")
+        folder_ids = [f.id for f in self.folders]
+        if len(folder_ids) != len(set(folder_ids)):
+            raise ValueError("folder ids must be unique")
+        smart_ids = [g.id for g in self.smart_groups]
+        if len(smart_ids) != len(set(smart_ids)):
+            raise ValueError("smart group ids must be unique")
+        if set(group_ids) & set(smart_ids):
+            raise ValueError("smart group ids must not collide with groups")
         known = set(fixture_ids)
         for group in self.groups:
             missing = [fid for fid in group.fixtures if fid not in known]
             if missing:
                 raise ValueError(
                     f"group '{group.id}' references unknown fixtures: {missing}"
+                )
+        for group in self.smart_groups:
+            missing = [fid for fid in group.fixtures if fid not in known]
+            if missing:
+                raise ValueError(
+                    f"smart group '{group.id}' references unknown fixtures: {missing}"
+                )
+        known_folders = set(folder_ids)
+        for fixture in self.fixtures:
+            if fixture.folder_id and fixture.folder_id not in known_folders:
+                raise ValueError(
+                    f"fixture '{fixture.id}' references unknown folder "
+                    f"'{fixture.folder_id}'"
                 )
         return self
 
@@ -292,6 +332,14 @@ class Rig(Model):
                     continue
             groups.append(group)
         payload["groups"] = groups
+        smart_groups = []
+        for group in payload.get("smart_groups", []):
+            group["fixtures"] = [
+                fid for fid in group.get("fixtures", []) if fid != fixture_id
+            ]
+            if group["fixtures"]:
+                smart_groups.append(group)
+        payload["smart_groups"] = smart_groups
         return Rig.model_validate(payload)
 
     def with_group(self, group: Group) -> "Rig":
@@ -511,8 +559,27 @@ def compile_rig(rig: Rig) -> CompiledRig:
             continue
         groups[group.id] = np.unique(idx)
 
+    for group in rig.smart_groups:
+        parts = [
+            np.arange(
+                fixture_slices[fid].start, fixture_slices[fid].stop, dtype=np.int32
+            )
+            for fid in group.fixtures
+        ]
+        groups[group.id] = (
+            np.unique(np.concatenate(parts)) if parts else np.zeros((0,), dtype=np.int32)
+        )
+
     # "all" is always available, even for hand-written rigs that omit it.
     groups.setdefault("all", np.arange(all_positions.shape[0], dtype=np.int32))
+
+    # ShowDoc tracks may target a single fixture id directly.  Adding these as
+    # implicit groups keeps one lookup path for presets, filters, snap and lint.
+    for fixture in rig.fixtures:
+        slc = fixture_slices[fixture.id]
+        groups.setdefault(
+            fixture.id, np.arange(slc.start, slc.stop, dtype=np.int32)
+        )
 
     return CompiledRig(
         rig=rig,
@@ -526,6 +593,93 @@ def compile_rig(rig: Rig) -> CompiledRig:
         voxel_local_index=vlocal,
         groups=groups,
     )
+
+
+def _valid_hue_address(address: str | int | None) -> bool:
+    if isinstance(address, bool):
+        return False
+    if isinstance(address, int):
+        return 0 < address <= 0xFFFF
+    if not isinstance(address, str):
+        return False
+    text = address.strip()
+    if not text.lower().startswith("0x"):
+        return False
+    digits = text[2:]
+    if len(digits) != 4:
+        return False
+    try:
+        value = int(digits, 16)
+    except ValueError:
+        return False
+    return 0 < value <= 0xFFFF
+
+
+def hue_proxy_health(rig: Rig, max_per_proxy: int = 10) -> dict[str, Any]:
+    """Validate Hue short addresses, proxy assignment and proxy fan-out."""
+    hue_fixtures = [
+        fixture
+        for fixture in rig.fixtures
+        if fixture.output.enabled and fixture.output.protocol == "hue_z2m"
+    ]
+    per_proxy: dict[str, list[str]] = {}
+    incomplete: dict[str, list[str]] = {}
+    for fixture in hue_fixtures:
+        reasons = incomplete.setdefault(fixture.id, [])
+        if not _valid_hue_address(fixture.output.address):
+            reasons.append("missing or invalid 16-bit Hue address (0xXXXX)")
+        proxy = str(fixture.output.proxy or "").strip()
+        if not proxy:
+            reasons.append("no Hue proxy assigned")
+        else:
+            per_proxy.setdefault(proxy, []).append(fixture.id)
+    for proxy, fixture_ids in per_proxy.items():
+        if len(fixture_ids) > max_per_proxy:
+            for fixture_id in fixture_ids:
+                incomplete.setdefault(fixture_id, []).append(
+                    f"proxy '{proxy}' exceeds {max_per_proxy} Hue bulbs"
+                )
+    required = math.ceil(len(hue_fixtures) / max(1, max_per_proxy)) if hue_fixtures else 0
+    assigned = len(per_proxy)
+    return {
+        "hue_count": len(hue_fixtures),
+        "required_proxies": required,
+        "assigned_proxies": assigned,
+        "required": required,
+        "assigned": assigned,
+        "max_fixtures_per_proxy": int(max_per_proxy),
+        "ok": assigned >= required
+        and all(len(ids) <= max_per_proxy for ids in per_proxy.values())
+        and not any(incomplete.values()),
+        "proxies": {
+            proxy: {"fixtures": list(ids), "count": len(ids)}
+            for proxy, ids in sorted(per_proxy.items())
+        },
+        "fixtures": {fid: list(reasons) for fid, reasons in incomplete.items()},
+        "incomplete_reasons": {fid: list(reasons) for fid, reasons in incomplete.items()},
+    }
+
+
+def fixture_incomplete_reasons(rig: Rig, max_per_proxy: int = 10) -> dict[str, list[str]]:
+    """Per-fixture validation messages used by the rig manager and inspector."""
+    reasons = {
+        fixture.id: [] for fixture in rig.fixtures
+    }
+    for fixture in rig.fixtures:
+        if fixture.output.protocol != "hue_z2m" or not fixture.output.enabled:
+            continue
+        if not _valid_hue_address(fixture.output.address):
+            reasons[fixture.id].append(
+                "missing or invalid 16-bit Hue address (0xXXXX)"
+            )
+        if not str(fixture.output.proxy or "").strip():
+            reasons[fixture.id].append("no Hue proxy assigned")
+    health = hue_proxy_health(rig, max_per_proxy)
+    for fixture_id, extra in health["incomplete_reasons"].items():
+        reasons.setdefault(fixture_id, []).extend(extra)
+    for fixture_id, messages in reasons.items():
+        reasons[fixture_id] = list(dict.fromkeys(messages))
+    return reasons
 
 
 def load_rig(path: str | os.PathLike[str]) -> Rig:
@@ -804,6 +958,7 @@ __all__ = [
     "Fixture",
     "FixtureOutput",
     "FixtureTransform",
+    "Folder",
     "Geometry",
     "Group",
     "LineGeometry",
@@ -813,7 +968,10 @@ __all__ = [
     "RigPresetEntry",
     "RigPresetIndex",
     "Room",
+    "SmartGroup",
     "compile_rig",
+    "fixture_incomplete_reasons",
+    "hue_proxy_health",
     "load_active_rig",
     "load_rig",
     "save_rig",

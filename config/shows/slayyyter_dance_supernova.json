@@ -1,0 +1,5639 @@
+{
+  "schema_version": 1,
+  "id": "slayyyter_dance_supernova",
+  "name": "SLAYYYTER — DANCE… (Supernova Live)",
+  "duration_s": 287.1147,
+  "match": {
+    "artist": "Slayyyter",
+    "title": "Dance...",
+    "normalized_keys": [
+      "slayyyter|dance..."
+    ],
+    "ma_item_ids": [],
+    "duration_s": 287.1147
+  },
+  "timing": {
+    "bpm": 112.4,
+    "beat_offset_s": 0.2206,
+    "beat_grid_s": 0.533807829,
+    "markers": [
+      {
+        "t_s": 0.0,
+        "name": "Cold Open",
+        "kind": "section",
+        "color": "#5b4cff"
+      },
+      {
+        "t_s": 17.0819,
+        "name": "First Light",
+        "kind": "section",
+        "color": "#9b4dff"
+      },
+      {
+        "t_s": 34.1637,
+        "name": "Bloom",
+        "kind": "section",
+        "color": "#ff6eaa"
+      },
+      {
+        "t_s": 54.9152,
+        "name": "Verse One",
+        "kind": "section",
+        "color": "#ff2452"
+      },
+      {
+        "t_s": 71.9974,
+        "name": "Mirrorball",
+        "kind": "section",
+        "color": "#7fd8ff"
+      },
+      {
+        "t_s": 89.0795,
+        "name": "Pre-Chorus",
+        "kind": "section",
+        "color": "#2f6bff"
+      },
+      {
+        "t_s": 103.77,
+        "name": "Verse Two",
+        "kind": "section",
+        "color": "#ff7818"
+      },
+      {
+        "t_s": 120.8522,
+        "name": "Heat",
+        "kind": "section",
+        "color": "#ff1c37"
+      },
+      {
+        "t_s": 137.9343,
+        "name": "Snap",
+        "kind": "cue",
+        "color": "#ffffff"
+      },
+      {
+        "t_s": 142.0016,
+        "name": "Build",
+        "kind": "section",
+        "color": "#ff8c38"
+      },
+      {
+        "t_s": 159.0838,
+        "name": "Countdown",
+        "kind": "section",
+        "color": "#ff5020"
+      },
+      {
+        "t_s": 169.6,
+        "name": "Blackout",
+        "kind": "cue",
+        "color": "#000000"
+      },
+      {
+        "t_s": 173.8594,
+        "name": "DROP — SUPERNOVA",
+        "kind": "drop",
+        "color": "#ff2452"
+      },
+      {
+        "t_s": 190.9415,
+        "name": "Runway",
+        "kind": "section",
+        "color": "#00cdff"
+      },
+      {
+        "t_s": 207.8302,
+        "name": "Afterglow",
+        "kind": "section",
+        "color": "#bce8ff"
+      },
+      {
+        "t_s": 224.9123,
+        "name": "Float",
+        "kind": "section",
+        "color": "#6c4dff"
+      },
+      {
+        "t_s": 241.9945,
+        "name": "Void",
+        "kind": "section",
+        "color": "#3c4696"
+      },
+      {
+        "t_s": 259.0766,
+        "name": "Return",
+        "kind": "section",
+        "color": "#ec1898"
+      },
+      {
+        "t_s": 276.1587,
+        "name": "Last Call",
+        "kind": "section",
+        "color": "#ff823c"
+      },
+      {
+        "t_s": 287.1147,
+        "name": "End",
+        "kind": "custom",
+        "color": "#000000"
+      }
+    ]
+  },
+  "tracks": [
+    {
+      "id": "room_field",
+      "name": "Room Field",
+      "target_group": "all",
+      "blend_mode": "normal",
+      "opacity": 0.8,
+      "muted": false,
+      "solo": false,
+      "kind": "layer",
+      "parent_id": null,
+      "clipped_to_below": false,
+      "height_px": 72,
+      "clips": [
+        {
+          "id": "room_cold",
+          "start_s": 0.0,
+          "end_s": 17.0819,
+          "fade_in_s": 6.0,
+          "fade_out_s": 0.0,
+          "preset": "solid",
+          "opacity": 1.0,
+          "params": {
+            "color": [
+              16,
+              12,
+              44
+            ],
+            "brightness": 0.22
+          },
+          "expressions": {},
+          "keyframes": [
+            {
+              "t_s": 0.0,
+              "param": "brightness",
+              "value": 0.04,
+              "easing": "ease_out"
+            },
+            {
+              "t_s": 14.0,
+              "param": "brightness",
+              "value": 0.3,
+              "easing": "ease_out"
+            }
+          ],
+          "spatial_mask": {
+            "kind": "none",
+            "axis": "x",
+            "position": 0.5,
+            "width": 0.25,
+            "center": [
+              0.5,
+              0.5,
+              0.5
+            ],
+            "radius": 0.3,
+            "box_min": [
+              0.0,
+              0.0,
+              0.0
+            ],
+            "box_max": [
+              1.0,
+              1.0,
+              1.0
+            ],
+            "modulo": 2,
+            "remainder": 0,
+            "softness": 0.08,
+            "invert": false
+          },
+          "filters": [],
+          "snap_zcl": true,
+          "name": "Cold open — indigo hush",
+          "color": "#5b4cff"
+        },
+        {
+          "id": "room_aurora",
+          "start_s": 17.0819,
+          "end_s": 34.1637,
+          "fade_in_s": 2.0,
+          "fade_out_s": 1.0,
+          "preset": "gradient_3d",
+          "opacity": 1.0,
+          "params": {
+            "mode": "spherical",
+            "color_a": [
+              6,
+              12,
+              46
+            ],
+            "color_b": [
+              84,
+              26,
+              150
+            ],
+            "color_c": [
+              255,
+              120,
+              180
+            ],
+            "angle": 30,
+            "drift": 0.4,
+            "speed": 0.07,
+            "brightness": 0.46
+          },
+          "expressions": {
+            "brightness": "val * (0.9 + 0.1 * sin(beatPhase * TAU))"
+          },
+          "keyframes": [],
+          "spatial_mask": {
+            "kind": "none",
+            "axis": "x",
+            "position": 0.5,
+            "width": 0.25,
+            "center": [
+              0.5,
+              0.5,
+              0.5
+            ],
+            "radius": 0.3,
+            "box_min": [
+              0.0,
+              0.0,
+              0.0
+            ],
+            "box_max": [
+              1.0,
+              1.0,
+              1.0
+            ],
+            "modulo": 2,
+            "remainder": 0,
+            "softness": 0.08,
+            "invert": false
+          },
+          "filters": [],
+          "snap_zcl": true,
+          "name": "First light — violet sphere",
+          "color": "#9b4dff"
+        },
+        {
+          "id": "room_bloom",
+          "start_s": 34.1637,
+          "end_s": 51.2456,
+          "fade_in_s": 0.0,
+          "fade_out_s": 0.0,
+          "preset": "turrell_horizon",
+          "opacity": 1.0,
+          "params": {
+            "sky_color": [
+              18,
+              18,
+              72
+            ],
+            "seam_color": [
+              255,
+              110,
+              170
+            ],
+            "earth_color": [
+              38,
+              8,
+              58
+            ],
+            "brightness": 0.5,
+            "drift_speed": 0.1,
+            "angle": 100,
+            "seam_width": 0.32,
+            "contrast": 0.72,
+            "audio_mod": 0.16
+          },
+          "expressions": {},
+          "keyframes": [
+            {
+              "t_s": 0.0,
+              "param": "brightness",
+              "value": 0.34,
+              "easing": "ease_out"
+            },
+            {
+              "t_s": 12.0,
+              "param": "brightness",
+              "value": 0.56,
+              "easing": "ease_in_out"
+            }
+          ],
+          "spatial_mask": {
+            "kind": "none",
+            "axis": "x",
+            "position": 0.5,
+            "width": 0.25,
+            "center": [
+              0.5,
+              0.5,
+              0.5
+            ],
+            "radius": 0.3,
+            "box_min": [
+              0.0,
+              0.0,
+              0.0
+            ],
+            "box_max": [
+              1.0,
+              1.0,
+              1.0
+            ],
+            "modulo": 2,
+            "remainder": 0,
+            "softness": 0.08,
+            "invert": false
+          },
+          "filters": [],
+          "snap_zcl": true,
+          "name": "Bloom — horizon seam",
+          "color": "#ff6eaa"
+        },
+        {
+          "id": "room_lift",
+          "start_s": 51.2456,
+          "end_s": 54.9152,
+          "fade_in_s": 0.3,
+          "fade_out_s": 0.0,
+          "preset": "gradient_3d",
+          "opacity": 1.0,
+          "params": {
+            "mode": "radial",
+            "color_a": [
+              3,
+              3,
+              8
+            ],
+            "color_b": [
+              255,
+              36,
+              82
+            ],
+            "color_c": [
+              255,
+              220,
+              240
+            ],
+            "angle": 0,
+            "drift": 0.2,
+            "speed": 0.5,
+            "brightness": 0.55
+          },
+          "expressions": {},
+          "keyframes": [
+            {
+              "t_s": 0.0,
+              "param": "brightness",
+              "value": 0.35,
+              "easing": "ease_in"
+            },
+            {
+              "t_s": 3.4,
+              "param": "brightness",
+              "value": 0.72,
+              "easing": "ease_in"
+            },
+            {
+              "t_s": 0.0,
+              "param": "angle",
+              "value": 0.0,
+              "easing": "ease_in"
+            },
+            {
+              "t_s": 3.4,
+              "param": "angle",
+              "value": 100.0,
+              "easing": "ease_in"
+            }
+          ],
+          "spatial_mask": {
+            "kind": "none",
+            "axis": "x",
+            "position": 0.5,
+            "width": 0.25,
+            "center": [
+              0.5,
+              0.5,
+              0.5
+            ],
+            "radius": 0.3,
+            "box_min": [
+              0.0,
+              0.0,
+              0.0
+            ],
+            "box_max": [
+              1.0,
+              1.0,
+              1.0
+            ],
+            "modulo": 2,
+            "remainder": 0,
+            "softness": 0.08,
+            "invert": false
+          },
+          "filters": [],
+          "snap_zcl": true,
+          "name": "Lift — rose riser",
+          "color": "#ff2452"
+        },
+        {
+          "id": "room_verse",
+          "start_s": 54.9152,
+          "end_s": 71.9974,
+          "fade_in_s": 0.0,
+          "fade_out_s": 0.0,
+          "preset": "turrell_horizon",
+          "opacity": 1.0,
+          "params": {
+            "sky_color": [
+              32,
+              7,
+              44
+            ],
+            "seam_color": [
+              255,
+              36,
+              82
+            ],
+            "earth_color": [
+              104,
+              8,
+              46
+            ],
+            "brightness": 0.6,
+            "drift_speed": 0.08,
+            "angle": 115,
+            "seam_width": 0.26,
+            "contrast": 0.82,
+            "audio_mod": 0.24
+          },
+          "expressions": {},
+          "keyframes": [],
+          "spatial_mask": {
+            "kind": "none",
+            "axis": "x",
+            "position": 0.5,
+            "width": 0.25,
+            "center": [
+              0.5,
+              0.5,
+              0.5
+            ],
+            "radius": 0.3,
+            "box_min": [
+              0.0,
+              0.0,
+              0.0
+            ],
+            "box_max": [
+              1.0,
+              1.0,
+              1.0
+            ],
+            "modulo": 2,
+            "remainder": 0,
+            "softness": 0.08,
+            "invert": false
+          },
+          "filters": [],
+          "snap_zcl": true,
+          "name": "Verse one — pink horizon",
+          "color": "#ff2452"
+        },
+        {
+          "id": "room_mirror",
+          "start_s": 71.9974,
+          "end_s": 89.0795,
+          "fade_in_s": 0.0,
+          "fade_out_s": 0.0,
+          "preset": "gradient_3d",
+          "opacity": 1.0,
+          "params": {
+            "mode": "spherical",
+            "color_a": [
+              6,
+              18,
+              48
+            ],
+            "color_b": [
+              0,
+              205,
+              255
+            ],
+            "color_c": [
+              255,
+              246,
+              232
+            ],
+            "angle": 40,
+            "drift": 0.5,
+            "speed": 0.09,
+            "brightness": 0.5
+          },
+          "expressions": {},
+          "keyframes": [
+            {
+              "t_s": 0.0,
+              "param": "angle",
+              "value": 30.0,
+              "easing": "linear"
+            },
+            {
+              "t_s": 17.0,
+              "param": "angle",
+              "value": 165.0,
+              "easing": "linear"
+            }
+          ],
+          "spatial_mask": {
+            "kind": "none",
+            "axis": "x",
+            "position": 0.5,
+            "width": 0.25,
+            "center": [
+              0.5,
+              0.5,
+              0.5
+            ],
+            "radius": 0.3,
+            "box_min": [
+              0.0,
+              0.0,
+              0.0
+            ],
+            "box_max": [
+              1.0,
+              1.0,
+              1.0
+            ],
+            "modulo": 2,
+            "remainder": 0,
+            "softness": 0.08,
+            "invert": false
+          },
+          "filters": [],
+          "snap_zcl": true,
+          "name": "Mirrorball — chrome sphere",
+          "color": "#00cdff"
+        },
+        {
+          "id": "room_pre",
+          "start_s": 89.0795,
+          "end_s": 103.77,
+          "fade_in_s": 0.0,
+          "fade_out_s": 0.0,
+          "preset": "noise_plasma",
+          "opacity": 1.0,
+          "params": {
+            "palette": "moonlight",
+            "scale": 4.6,
+            "speed": 0.28,
+            "warp": 0.42,
+            "contrast": 0.86,
+            "brightness": 0.54
+          },
+          "expressions": {},
+          "keyframes": [],
+          "spatial_mask": {
+            "kind": "none",
+            "axis": "x",
+            "position": 0.5,
+            "width": 0.25,
+            "center": [
+              0.5,
+              0.5,
+              0.5
+            ],
+            "radius": 0.3,
+            "box_min": [
+              0.0,
+              0.0,
+              0.0
+            ],
+            "box_max": [
+              1.0,
+              1.0,
+              1.0
+            ],
+            "modulo": 2,
+            "remainder": 0,
+            "softness": 0.08,
+            "invert": false
+          },
+          "filters": [
+            {
+              "type": "audio_mod",
+              "enabled": true,
+              "params": {
+                "source": "kick",
+                "depth": 0.2,
+                "mode": "brightness"
+              }
+            }
+          ],
+          "snap_zcl": true,
+          "name": "Pre-chorus — deep sea",
+          "color": "#2f6bff"
+        },
+        {
+          "id": "room_verse2",
+          "start_s": 103.77,
+          "end_s": 120.8522,
+          "fade_in_s": 0.0,
+          "fade_out_s": 0.0,
+          "preset": "turrell_horizon",
+          "opacity": 1.0,
+          "params": {
+            "sky_color": [
+              42,
+              5,
+              32
+            ],
+            "seam_color": [
+              255,
+              120,
+              24
+            ],
+            "earth_color": [
+              76,
+              5,
+              36
+            ],
+            "brightness": 0.58,
+            "drift_speed": 0.09,
+            "angle": 125,
+            "seam_width": 0.24,
+            "contrast": 0.8,
+            "audio_mod": 0.28
+          },
+          "expressions": {},
+          "keyframes": [],
+          "spatial_mask": {
+            "kind": "none",
+            "axis": "x",
+            "position": 0.5,
+            "width": 0.25,
+            "center": [
+              0.5,
+              0.5,
+              0.5
+            ],
+            "radius": 0.3,
+            "box_min": [
+              0.0,
+              0.0,
+              0.0
+            ],
+            "box_max": [
+              1.0,
+              1.0,
+              1.0
+            ],
+            "modulo": 2,
+            "remainder": 0,
+            "softness": 0.08,
+            "invert": false
+          },
+          "filters": [],
+          "snap_zcl": true,
+          "name": "Verse two — amber heat",
+          "color": "#ff7818"
+        },
+        {
+          "id": "room_heat",
+          "start_s": 120.8522,
+          "end_s": 137.9343,
+          "fade_in_s": 0.0,
+          "fade_out_s": 0.0,
+          "preset": "caustic_abyss",
+          "opacity": 1.0,
+          "params": {
+            "palette": "ember",
+            "caustic_tint": [
+              255,
+              190,
+              140
+            ],
+            "brightness": 0.6,
+            "speed": 0.45,
+            "scale": 2.2,
+            "focus": 2.7,
+            "shadow_floor": 0.07,
+            "audio_mod": 0.32
+          },
+          "expressions": {},
+          "keyframes": [],
+          "spatial_mask": {
+            "kind": "none",
+            "axis": "x",
+            "position": 0.5,
+            "width": 0.25,
+            "center": [
+              0.5,
+              0.5,
+              0.5
+            ],
+            "radius": 0.3,
+            "box_min": [
+              0.0,
+              0.0,
+              0.0
+            ],
+            "box_max": [
+              1.0,
+              1.0,
+              1.0
+            ],
+            "modulo": 2,
+            "remainder": 0,
+            "softness": 0.08,
+            "invert": false
+          },
+          "filters": [
+            {
+              "type": "color_grade",
+              "enabled": true,
+              "params": {
+                "hue_shift": -6,
+                "saturation": 1.25,
+                "contrast": 1.12,
+                "lift": 0.01
+              }
+            }
+          ],
+          "snap_zcl": true,
+          "name": "Heat — caustic lenses",
+          "color": "#ffbe8c"
+        },
+        {
+          "id": "room_snap",
+          "start_s": 137.9343,
+          "end_s": 142.0016,
+          "fade_in_s": 0.2,
+          "fade_out_s": 0.0,
+          "preset": "gradient_3d",
+          "opacity": 1.0,
+          "params": {
+            "mode": "radial",
+            "color_a": [
+              3,
+              3,
+              8
+            ],
+            "color_b": [
+              255,
+              246,
+              232
+            ],
+            "color_c": [
+              255,
+              36,
+              82
+            ],
+            "angle": 0,
+            "drift": 0.1,
+            "speed": 0.8,
+            "brightness": 0.45
+          },
+          "expressions": {},
+          "keyframes": [
+            {
+              "t_s": 0.0,
+              "param": "brightness",
+              "value": 0.25,
+              "easing": "ease_in"
+            },
+            {
+              "t_s": 3.8,
+              "param": "brightness",
+              "value": 0.92,
+              "easing": "ease_in"
+            }
+          ],
+          "spatial_mask": {
+            "kind": "none",
+            "axis": "x",
+            "position": 0.5,
+            "width": 0.25,
+            "center": [
+              0.5,
+              0.5,
+              0.5
+            ],
+            "radius": 0.3,
+            "box_min": [
+              0.0,
+              0.0,
+              0.0
+            ],
+            "box_max": [
+              1.0,
+              1.0,
+              1.0
+            ],
+            "modulo": 2,
+            "remainder": 0,
+            "softness": 0.08,
+            "invert": false
+          },
+          "filters": [],
+          "snap_zcl": true,
+          "name": "Snap — white cut",
+          "color": "#fff6e8"
+        },
+        {
+          "id": "room_build",
+          "start_s": 142.0016,
+          "end_s": 159.0838,
+          "fade_in_s": 0.0,
+          "fade_out_s": 0.0,
+          "preset": "noise_plasma",
+          "opacity": 1.0,
+          "params": {
+            "palette": "sunset",
+            "scale": 6.2,
+            "speed": 0.38,
+            "warp": 0.62,
+            "contrast": 0.92,
+            "brightness": 0.55
+          },
+          "expressions": {},
+          "keyframes": [
+            {
+              "t_s": 0.0,
+              "param": "brightness",
+              "value": 0.4,
+              "easing": "ease_in"
+            },
+            {
+              "t_s": 16.5,
+              "param": "brightness",
+              "value": 0.8,
+              "easing": "ease_in"
+            }
+          ],
+          "spatial_mask": {
+            "kind": "none",
+            "axis": "x",
+            "position": 0.5,
+            "width": 0.25,
+            "center": [
+              0.5,
+              0.5,
+              0.5
+            ],
+            "radius": 0.3,
+            "box_min": [
+              0.0,
+              0.0,
+              0.0
+            ],
+            "box_max": [
+              1.0,
+              1.0,
+              1.0
+            ],
+            "modulo": 2,
+            "remainder": 0,
+            "softness": 0.08,
+            "invert": false
+          },
+          "filters": [
+            {
+              "type": "color_grade",
+              "enabled": true,
+              "params": {
+                "hue_shift": -10,
+                "saturation": 1.15,
+                "contrast": 1.08,
+                "lift": 0
+              }
+            }
+          ],
+          "snap_zcl": true,
+          "name": "Build — plasma storm",
+          "color": "#ff8c38"
+        },
+        {
+          "id": "room_countdown",
+          "start_s": 159.0838,
+          "end_s": 169.6,
+          "fade_in_s": 0.0,
+          "fade_out_s": 0.0,
+          "preset": "caustic_abyss",
+          "opacity": 1.0,
+          "params": {
+            "palette": "ember",
+            "caustic_tint": [
+              255,
+              120,
+              80
+            ],
+            "brightness": 0.4,
+            "speed": 0.7,
+            "scale": 2.8,
+            "focus": 3.2,
+            "shadow_floor": 0.04,
+            "audio_mod": 0.3
+          },
+          "expressions": {},
+          "keyframes": [],
+          "spatial_mask": {
+            "kind": "none",
+            "axis": "x",
+            "position": 0.5,
+            "width": 0.25,
+            "center": [
+              0.5,
+              0.5,
+              0.5
+            ],
+            "radius": 0.3,
+            "box_min": [
+              0.0,
+              0.0,
+              0.0
+            ],
+            "box_max": [
+              1.0,
+              1.0,
+              1.0
+            ],
+            "modulo": 2,
+            "remainder": 0,
+            "softness": 0.08,
+            "invert": false
+          },
+          "filters": [
+            {
+              "type": "audio_mod",
+              "enabled": true,
+              "params": {
+                "source": "snare",
+                "depth": 0.35,
+                "mode": "brightness"
+              }
+            }
+          ],
+          "snap_zcl": true,
+          "name": "Countdown — red pressure",
+          "color": "#ff5020"
+        },
+        {
+          "id": "room_black",
+          "start_s": 169.6,
+          "end_s": 173.55,
+          "fade_in_s": 0.0,
+          "fade_out_s": 0.0,
+          "preset": "solid",
+          "opacity": 1.0,
+          "params": {
+            "color": [
+              0,
+              0,
+              0
+            ],
+            "brightness": 0
+          },
+          "expressions": {},
+          "keyframes": [],
+          "spatial_mask": {
+            "kind": "none",
+            "axis": "x",
+            "position": 0.5,
+            "width": 0.25,
+            "center": [
+              0.5,
+              0.5,
+              0.5
+            ],
+            "radius": 0.3,
+            "box_min": [
+              0.0,
+              0.0,
+              0.0
+            ],
+            "box_max": [
+              1.0,
+              1.0,
+              1.0
+            ],
+            "modulo": 2,
+            "remainder": 0,
+            "softness": 0.08,
+            "invert": false
+          },
+          "filters": [],
+          "snap_zcl": true,
+          "name": "Blackout",
+          "color": "#000000"
+        },
+        {
+          "id": "room_drop",
+          "start_s": 173.8594,
+          "end_s": 190.9415,
+          "fade_in_s": 0.0,
+          "fade_out_s": 0.0,
+          "preset": "caustic_abyss",
+          "opacity": 1.0,
+          "params": {
+            "palette": "aurora",
+            "caustic_tint": [
+              255,
+              150,
+              220
+            ],
+            "brightness": 1,
+            "speed": 0.75,
+            "scale": 2.8,
+            "focus": 3.4,
+            "shadow_floor": 0.03,
+            "audio_mod": 0.38
+          },
+          "expressions": {},
+          "keyframes": [
+            {
+              "t_s": 0.0,
+              "param": "brightness",
+              "value": 1.0,
+              "easing": "ease_out"
+            },
+            {
+              "t_s": 17.0,
+              "param": "brightness",
+              "value": 0.82,
+              "easing": "ease_in_out"
+            }
+          ],
+          "spatial_mask": {
+            "kind": "none",
+            "axis": "x",
+            "position": 0.5,
+            "width": 0.25,
+            "center": [
+              0.5,
+              0.5,
+              0.5
+            ],
+            "radius": 0.3,
+            "box_min": [
+              0.0,
+              0.0,
+              0.0
+            ],
+            "box_max": [
+              1.0,
+              1.0,
+              1.0
+            ],
+            "modulo": 2,
+            "remainder": 0,
+            "softness": 0.08,
+            "invert": false
+          },
+          "filters": [
+            {
+              "type": "color_grade",
+              "enabled": true,
+              "params": {
+                "hue_shift": 4,
+                "saturation": 1.35,
+                "contrast": 1.15,
+                "lift": 0.03
+              }
+            },
+            {
+              "type": "mirror_symmetry",
+              "enabled": true,
+              "params": {
+                "axis": "x",
+                "mix": 0.3
+              }
+            }
+          ],
+          "snap_zcl": true,
+          "name": "DROP — supernova room",
+          "color": "#ff96dc"
+        },
+        {
+          "id": "room_drop2",
+          "start_s": 190.9415,
+          "end_s": 207.8302,
+          "fade_in_s": 0.0,
+          "fade_out_s": 0.0,
+          "preset": "pattern_bands",
+          "opacity": 1.0,
+          "params": {
+            "axis": "y",
+            "palette": "acid",
+            "bands": 10,
+            "speed": 0.45,
+            "contrast": 0.9,
+            "brightness": 0.78
+          },
+          "expressions": {},
+          "keyframes": [],
+          "spatial_mask": {
+            "kind": "none",
+            "axis": "x",
+            "position": 0.5,
+            "width": 0.25,
+            "center": [
+              0.5,
+              0.5,
+              0.5
+            ],
+            "radius": 0.3,
+            "box_min": [
+              0.0,
+              0.0,
+              0.0
+            ],
+            "box_max": [
+              1.0,
+              1.0,
+              1.0
+            ],
+            "modulo": 2,
+            "remainder": 0,
+            "softness": 0.08,
+            "invert": false
+          },
+          "filters": [
+            {
+              "type": "audio_mod",
+              "enabled": true,
+              "params": {
+                "source": "kick",
+                "depth": 0.25,
+                "mode": "brightness"
+              }
+            },
+            {
+              "type": "color_grade",
+              "enabled": true,
+              "params": {
+                "hue_shift": 8,
+                "saturation": 1.2,
+                "contrast": 1.08,
+                "lift": 0
+              }
+            }
+          ],
+          "snap_zcl": true,
+          "name": "Drop II — acid runway",
+          "color": "#a8ff4d"
+        },
+        {
+          "id": "room_after",
+          "start_s": 207.8302,
+          "end_s": 224.9123,
+          "fade_in_s": 1.5,
+          "fade_out_s": 0.0,
+          "preset": "turrell_horizon",
+          "opacity": 1.0,
+          "params": {
+            "sky_color": [
+              8,
+              16,
+              44
+            ],
+            "seam_color": [
+              188,
+              232,
+              255
+            ],
+            "earth_color": [
+              8,
+              6,
+              28
+            ],
+            "brightness": 0.55,
+            "drift_speed": 0.06,
+            "angle": 70,
+            "seam_width": 0.3,
+            "contrast": 0.75,
+            "audio_mod": 0.12
+          },
+          "expressions": {},
+          "keyframes": [
+            {
+              "t_s": 0.0,
+              "param": "brightness",
+              "value": 0.68,
+              "easing": "ease_out"
+            },
+            {
+              "t_s": 16.5,
+              "param": "brightness",
+              "value": 0.46,
+              "easing": "ease_in_out"
+            }
+          ],
+          "spatial_mask": {
+            "kind": "none",
+            "axis": "x",
+            "position": 0.5,
+            "width": 0.25,
+            "center": [
+              0.5,
+              0.5,
+              0.5
+            ],
+            "radius": 0.3,
+            "box_min": [
+              0.0,
+              0.0,
+              0.0
+            ],
+            "box_max": [
+              1.0,
+              1.0,
+              1.0
+            ],
+            "modulo": 2,
+            "remainder": 0,
+            "softness": 0.08,
+            "invert": false
+          },
+          "filters": [],
+          "snap_zcl": true,
+          "name": "Afterglow — ice horizon",
+          "color": "#bce8ff"
+        },
+        {
+          "id": "room_float",
+          "start_s": 224.9123,
+          "end_s": 241.9945,
+          "fade_in_s": 0.0,
+          "fade_out_s": 0.0,
+          "preset": "gradient_3d",
+          "opacity": 1.0,
+          "params": {
+            "mode": "spherical",
+            "color_a": [
+              6,
+              16,
+              48
+            ],
+            "color_b": [
+              84,
+              26,
+              150
+            ],
+            "color_c": [
+              188,
+              232,
+              255
+            ],
+            "angle": 55,
+            "drift": 0.5,
+            "speed": 0.05,
+            "brightness": 0.42
+          },
+          "expressions": {},
+          "keyframes": [],
+          "spatial_mask": {
+            "kind": "none",
+            "axis": "x",
+            "position": 0.5,
+            "width": 0.25,
+            "center": [
+              0.5,
+              0.5,
+              0.5
+            ],
+            "radius": 0.3,
+            "box_min": [
+              0.0,
+              0.0,
+              0.0
+            ],
+            "box_max": [
+              1.0,
+              1.0,
+              1.0
+            ],
+            "modulo": 2,
+            "remainder": 0,
+            "softness": 0.08,
+            "invert": false
+          },
+          "filters": [],
+          "snap_zcl": true,
+          "name": "Float — blue hour",
+          "color": "#6c4dff"
+        },
+        {
+          "id": "room_void",
+          "start_s": 241.9945,
+          "end_s": 259.0766,
+          "fade_in_s": 3.0,
+          "fade_out_s": 0.0,
+          "preset": "turrell_horizon",
+          "opacity": 1.0,
+          "params": {
+            "sky_color": [
+              4,
+              6,
+              18
+            ],
+            "seam_color": [
+              60,
+              70,
+              150
+            ],
+            "earth_color": [
+              2,
+              2,
+              8
+            ],
+            "brightness": 0.2,
+            "drift_speed": 0.04,
+            "angle": 85,
+            "seam_width": 0.18,
+            "contrast": 0.5,
+            "audio_mod": 0.08
+          },
+          "expressions": {},
+          "keyframes": [
+            {
+              "t_s": 0.0,
+              "param": "brightness",
+              "value": 0.26,
+              "easing": "ease_in_out"
+            },
+            {
+              "t_s": 16.0,
+              "param": "brightness",
+              "value": 0.14,
+              "easing": "ease_in_out"
+            }
+          ],
+          "spatial_mask": {
+            "kind": "none",
+            "axis": "x",
+            "position": 0.5,
+            "width": 0.25,
+            "center": [
+              0.5,
+              0.5,
+              0.5
+            ],
+            "radius": 0.3,
+            "box_min": [
+              0.0,
+              0.0,
+              0.0
+            ],
+            "box_max": [
+              1.0,
+              1.0,
+              1.0
+            ],
+            "modulo": 2,
+            "remainder": 0,
+            "softness": 0.08,
+            "invert": false
+          },
+          "filters": [],
+          "snap_zcl": true,
+          "name": "Void — near dark",
+          "color": "#3c4696"
+        },
+        {
+          "id": "room_return",
+          "start_s": 259.0766,
+          "end_s": 276.1587,
+          "fade_in_s": 2.0,
+          "fade_out_s": 0.0,
+          "preset": "pulse_breathe",
+          "opacity": 1.0,
+          "params": {
+            "color": [
+              255,
+              36,
+              82
+            ],
+            "accent_color": [
+              0,
+              205,
+              255
+            ],
+            "axis": "z",
+            "rate_hz": 0.22,
+            "depth": 0.5,
+            "spatial_offset": 0.4,
+            "brightness": 0.48
+          },
+          "expressions": {},
+          "keyframes": [],
+          "spatial_mask": {
+            "kind": "none",
+            "axis": "x",
+            "position": 0.5,
+            "width": 0.25,
+            "center": [
+              0.5,
+              0.5,
+              0.5
+            ],
+            "radius": 0.3,
+            "box_min": [
+              0.0,
+              0.0,
+              0.0
+            ],
+            "box_max": [
+              1.0,
+              1.0,
+              1.0
+            ],
+            "modulo": 2,
+            "remainder": 0,
+            "softness": 0.08,
+            "invert": false
+          },
+          "filters": [],
+          "snap_zcl": true,
+          "name": "Return — heartbeat",
+          "color": "#ff2452"
+        },
+        {
+          "id": "room_outro",
+          "start_s": 276.1587,
+          "end_s": 286.1,
+          "fade_in_s": 0.0,
+          "fade_out_s": 8.0,
+          "preset": "turrell_horizon",
+          "opacity": 1.0,
+          "params": {
+            "sky_color": [
+              10,
+              8,
+              30
+            ],
+            "seam_color": [
+              255,
+              130,
+              60
+            ],
+            "earth_color": [
+              4,
+              2,
+              8
+            ],
+            "brightness": 0.48,
+            "drift_speed": 0.05,
+            "angle": 60,
+            "seam_width": 0.32,
+            "contrast": 0.7,
+            "audio_mod": 0.08
+          },
+          "expressions": {},
+          "keyframes": [
+            {
+              "t_s": 0.0,
+              "param": "brightness",
+              "value": 0.5,
+              "easing": "ease_in_out"
+            },
+            {
+              "t_s": 9.6,
+              "param": "brightness",
+              "value": 0.16,
+              "easing": "ease_in_out"
+            }
+          ],
+          "spatial_mask": {
+            "kind": "none",
+            "axis": "x",
+            "position": 0.5,
+            "width": 0.25,
+            "center": [
+              0.5,
+              0.5,
+              0.5
+            ],
+            "radius": 0.3,
+            "box_min": [
+              0.0,
+              0.0,
+              0.0
+            ],
+            "box_max": [
+              1.0,
+              1.0,
+              1.0
+            ],
+            "modulo": 2,
+            "remainder": 0,
+            "softness": 0.08,
+            "invert": false
+          },
+          "filters": [],
+          "snap_zcl": true,
+          "name": "Last call — amber fade",
+          "color": "#ff823c"
+        }
+      ]
+    },
+    {
+      "id": "gallery_main",
+      "name": "Gallery · Main Beams",
+      "target_group": "galerie_oben",
+      "blend_mode": "add",
+      "opacity": 1.0,
+      "muted": false,
+      "solo": false,
+      "kind": "layer",
+      "parent_id": null,
+      "clipped_to_below": false,
+      "height_px": 96,
+      "clips": [
+        {
+          "id": "gal_intro1",
+          "start_s": 0.0,
+          "end_s": 17.0819,
+          "fade_in_s": 4.0,
+          "fade_out_s": 0.0,
+          "preset": "chase_scanner",
+          "opacity": 1.0,
+          "params": {
+            "axis": "x",
+            "direction": "pingpong",
+            "color": [
+              188,
+              232,
+              255
+            ],
+            "tail_color": [
+              0,
+              120,
+              255
+            ],
+            "bg_color": [
+              3,
+              3,
+              8
+            ],
+            "width": 0.09,
+            "speed": 0.1,
+            "bg_level": 0.005,
+            "brightness": 0.55
+          },
+          "expressions": {},
+          "keyframes": [],
+          "spatial_mask": {
+            "kind": "none",
+            "axis": "x",
+            "position": 0.5,
+            "width": 0.25,
+            "center": [
+              0.5,
+              0.5,
+              0.5
+            ],
+            "radius": 0.3,
+            "box_min": [
+              0.0,
+              0.0,
+              0.0
+            ],
+            "box_max": [
+              1.0,
+              1.0,
+              1.0
+            ],
+            "modulo": 2,
+            "remainder": 0,
+            "softness": 0.08,
+            "invert": false
+          },
+          "filters": [
+            {
+              "type": "beat_gate",
+              "enabled": true,
+              "params": {
+                "division": "1/2",
+                "duty": 0.7,
+                "floor": 0.1,
+                "softness": 0.08
+              }
+            }
+          ],
+          "snap_zcl": true,
+          "name": "Cold sweep",
+          "color": "#bce8ff"
+        },
+        {
+          "id": "gal_intro2",
+          "start_s": 17.0819,
+          "end_s": 34.1637,
+          "fade_in_s": 0.0,
+          "fade_out_s": 0.0,
+          "preset": "ma3_wings",
+          "opacity": 1.0,
+          "params": {
+            "wing_style": "outside_in",
+            "color": [
+              236,
+              24,
+              152
+            ],
+            "color2": [
+              0,
+              205,
+              255
+            ],
+            "bg_color": [
+              4,
+              4,
+              14
+            ],
+            "brightness": 0.72,
+            "gate_time": 0.65,
+            "bg_level": 0.02
+          },
+          "expressions": {
+            "brightness": "val * (0.9 + 0.1 * sin(beat * TAU / 8))"
+          },
+          "keyframes": [],
+          "spatial_mask": {
+            "kind": "none",
+            "axis": "x",
+            "position": 0.5,
+            "width": 0.25,
+            "center": [
+              0.5,
+              0.5,
+              0.5
+            ],
+            "radius": 0.3,
+            "box_min": [
+              0.0,
+              0.0,
+              0.0
+            ],
+            "box_max": [
+              1.0,
+              1.0,
+              1.0
+            ],
+            "modulo": 2,
+            "remainder": 0,
+            "softness": 0.08,
+            "invert": false
+          },
+          "filters": [
+            {
+              "type": "beat_gate",
+              "enabled": true,
+              "params": {
+                "division": "1/2",
+                "duty": 0.55,
+                "floor": 0.08,
+                "softness": 0.05
+              }
+            }
+          ],
+          "snap_zcl": true,
+          "name": "Wings open",
+          "color": "#ec1898"
+        },
+        {
+          "id": "gal_bloom",
+          "start_s": 34.1637,
+          "end_s": 51.2456,
+          "fade_in_s": 0.0,
+          "fade_out_s": 0.0,
+          "preset": "ma3_wings",
+          "opacity": 1.0,
+          "params": {
+            "wing_style": "auto_phrase",
+            "color": [
+              255,
+              36,
+              82
+            ],
+            "color2": [
+              255,
+              188,
+              76
+            ],
+            "bg_color": [
+              8,
+              4,
+              18
+            ],
+            "brightness": 0.85,
+            "gate_time": 0.55,
+            "bg_level": 0.025
+          },
+          "expressions": {},
+          "keyframes": [
+            {
+              "t_s": 0.0,
+              "param": "brightness",
+              "value": 0.62,
+              "easing": "ease_out"
+            },
+            {
+              "t_s": 15.0,
+              "param": "brightness",
+              "value": 0.9,
+              "easing": "ease_in_out"
+            }
+          ],
+          "spatial_mask": {
+            "kind": "none",
+            "axis": "x",
+            "position": 0.5,
+            "width": 0.25,
+            "center": [
+              0.5,
+              0.5,
+              0.5
+            ],
+            "radius": 0.3,
+            "box_min": [
+              0.0,
+              0.0,
+              0.0
+            ],
+            "box_max": [
+              1.0,
+              1.0,
+              1.0
+            ],
+            "modulo": 2,
+            "remainder": 0,
+            "softness": 0.08,
+            "invert": false
+          },
+          "filters": [
+            {
+              "type": "audio_mod",
+              "enabled": true,
+              "params": {
+                "source": "snare",
+                "depth": 0.25,
+                "mode": "brightness"
+              }
+            }
+          ],
+          "snap_zcl": true,
+          "name": "Bloom wings",
+          "color": "#ff2452"
+        },
+        {
+          "id": "gal_lift",
+          "start_s": 51.2456,
+          "end_s": 54.9152,
+          "fade_in_s": 0.2,
+          "fade_out_s": 0.2,
+          "preset": "strobe_blinder",
+          "opacity": 1.0,
+          "params": {
+            "division": "1/4",
+            "color": [
+              255,
+              246,
+              232
+            ],
+            "bg_color": [
+              6,
+              2,
+              10
+            ],
+            "duty": 0.24,
+            "softness": 0.03,
+            "floor": 0.05,
+            "brightness": 0.65
+          },
+          "expressions": {},
+          "keyframes": [],
+          "spatial_mask": {
+            "kind": "none",
+            "axis": "x",
+            "position": 0.5,
+            "width": 0.25,
+            "center": [
+              0.5,
+              0.5,
+              0.5
+            ],
+            "radius": 0.3,
+            "box_min": [
+              0.0,
+              0.0,
+              0.0
+            ],
+            "box_max": [
+              1.0,
+              1.0,
+              1.0
+            ],
+            "modulo": 2,
+            "remainder": 0,
+            "softness": 0.08,
+            "invert": false
+          },
+          "filters": [],
+          "snap_zcl": true,
+          "name": "Lift shutter",
+          "color": "#fff6e8"
+        },
+        {
+          "id": "gal_verse",
+          "start_s": 54.9152,
+          "end_s": 71.9974,
+          "fade_in_s": 0.0,
+          "fade_out_s": 0.0,
+          "preset": "ma3_wings",
+          "opacity": 1.0,
+          "params": {
+            "wing_style": "auto_phrase",
+            "color": [
+              255,
+              36,
+              82
+            ],
+            "color2": [
+              0,
+              205,
+              255
+            ],
+            "bg_color": [
+              10,
+              3,
+              24
+            ],
+            "brightness": 0.95,
+            "gate_time": 0.55,
+            "bg_level": 0.03
+          },
+          "expressions": {},
+          "keyframes": [
+            {
+              "t_s": 0.0,
+              "param": "brightness",
+              "value": 0.78,
+              "easing": "ease_out"
+            },
+            {
+              "t_s": 12.0,
+              "param": "brightness",
+              "value": 1.0,
+              "easing": "ease_in_out"
+            }
+          ],
+          "spatial_mask": {
+            "kind": "none",
+            "axis": "x",
+            "position": 0.5,
+            "width": 0.25,
+            "center": [
+              0.5,
+              0.5,
+              0.5
+            ],
+            "radius": 0.3,
+            "box_min": [
+              0.0,
+              0.0,
+              0.0
+            ],
+            "box_max": [
+              1.0,
+              1.0,
+              1.0
+            ],
+            "modulo": 2,
+            "remainder": 0,
+            "softness": 0.08,
+            "invert": false
+          },
+          "filters": [
+            {
+              "type": "audio_mod",
+              "enabled": true,
+              "params": {
+                "source": "kick",
+                "depth": 0.3,
+                "mode": "brightness"
+              }
+            },
+            {
+              "type": "mirror_symmetry",
+              "enabled": true,
+              "params": {
+                "axis": "x",
+                "mix": 0.2
+              }
+            }
+          ],
+          "snap_zcl": true,
+          "name": "Verse wings",
+          "color": "#ff2452"
+        },
+        {
+          "id": "gal_mirror",
+          "start_s": 71.9974,
+          "end_s": 89.0795,
+          "fade_in_s": 0.0,
+          "fade_out_s": 0.0,
+          "preset": "pattern_bands",
+          "opacity": 1.0,
+          "params": {
+            "axis": "x",
+            "palette": "ice",
+            "bands": 8,
+            "speed": 0.22,
+            "contrast": 0.9,
+            "brightness": 0.78
+          },
+          "expressions": {},
+          "keyframes": [],
+          "spatial_mask": {
+            "kind": "none",
+            "axis": "x",
+            "position": 0.5,
+            "width": 0.25,
+            "center": [
+              0.5,
+              0.5,
+              0.5
+            ],
+            "radius": 0.3,
+            "box_min": [
+              0.0,
+              0.0,
+              0.0
+            ],
+            "box_max": [
+              1.0,
+              1.0,
+              1.0
+            ],
+            "modulo": 2,
+            "remainder": 0,
+            "softness": 0.08,
+            "invert": false
+          },
+          "filters": [
+            {
+              "type": "spatial_blur",
+              "enabled": true,
+              "params": {
+                "radius_m": 0.28,
+                "mix": 0.35
+              }
+            },
+            {
+              "type": "beat_gate",
+              "enabled": true,
+              "params": {
+                "division": "1/4",
+                "duty": 0.75,
+                "floor": 0.12,
+                "softness": 0.05
+              }
+            }
+          ],
+          "snap_zcl": true,
+          "name": "Mirrorball bands",
+          "color": "#7fd8ff"
+        },
+        {
+          "id": "gal_pre",
+          "start_s": 89.0795,
+          "end_s": 103.77,
+          "fade_in_s": 0.0,
+          "fade_out_s": 0.0,
+          "preset": "chase_scanner",
+          "opacity": 1.0,
+          "params": {
+            "axis": "x",
+            "direction": "pingpong",
+            "color": [
+              255,
+              246,
+              232
+            ],
+            "tail_color": [
+              255,
+              36,
+              82
+            ],
+            "bg_color": [
+              6,
+              2,
+              10
+            ],
+            "width": 0.12,
+            "speed": 0.45,
+            "bg_level": 0.02,
+            "brightness": 0.9
+          },
+          "expressions": {},
+          "keyframes": [
+            {
+              "t_s": 0.0,
+              "param": "speed",
+              "value": 0.22,
+              "easing": "ease_in"
+            },
+            {
+              "t_s": 14.0,
+              "param": "speed",
+              "value": 0.65,
+              "easing": "ease_in"
+            }
+          ],
+          "spatial_mask": {
+            "kind": "none",
+            "axis": "x",
+            "position": 0.5,
+            "width": 0.25,
+            "center": [
+              0.5,
+              0.5,
+              0.5
+            ],
+            "radius": 0.3,
+            "box_min": [
+              0.0,
+              0.0,
+              0.0
+            ],
+            "box_max": [
+              1.0,
+              1.0,
+              1.0
+            ],
+            "modulo": 2,
+            "remainder": 0,
+            "softness": 0.08,
+            "invert": false
+          },
+          "filters": [
+            {
+              "type": "audio_mod",
+              "enabled": true,
+              "params": {
+                "source": "hat",
+                "depth": 0.25,
+                "mode": "brightness"
+              }
+            }
+          ],
+          "snap_zcl": true,
+          "name": "Pre — white chase",
+          "color": "#fff6e8"
+        },
+        {
+          "id": "gal_verse2",
+          "start_s": 103.77,
+          "end_s": 120.8522,
+          "fade_in_s": 0.0,
+          "fade_out_s": 0.0,
+          "preset": "ma3_wings",
+          "opacity": 1.0,
+          "params": {
+            "wing_style": "frame_lock",
+            "color": [
+              255,
+              120,
+              24
+            ],
+            "color2": [
+              236,
+              24,
+              152
+            ],
+            "bg_color": [
+              8,
+              4,
+              12
+            ],
+            "brightness": 0.92,
+            "gate_time": 0.5,
+            "bg_level": 0.03
+          },
+          "expressions": {},
+          "keyframes": [],
+          "spatial_mask": {
+            "kind": "none",
+            "axis": "x",
+            "position": 0.5,
+            "width": 0.25,
+            "center": [
+              0.5,
+              0.5,
+              0.5
+            ],
+            "radius": 0.3,
+            "box_min": [
+              0.0,
+              0.0,
+              0.0
+            ],
+            "box_max": [
+              1.0,
+              1.0,
+              1.0
+            ],
+            "modulo": 2,
+            "remainder": 0,
+            "softness": 0.08,
+            "invert": false
+          },
+          "filters": [
+            {
+              "type": "audio_mod",
+              "enabled": true,
+              "params": {
+                "source": "kick",
+                "depth": 0.32,
+                "mode": "brightness"
+              }
+            }
+          ],
+          "snap_zcl": true,
+          "name": "Verse two — frame lock",
+          "color": "#ff7818"
+        },
+        {
+          "id": "gal_heat",
+          "start_s": 120.8522,
+          "end_s": 137.9343,
+          "fade_in_s": 0.0,
+          "fade_out_s": 0.0,
+          "preset": "ma3_wings",
+          "opacity": 1.0,
+          "params": {
+            "wing_style": "inside_out",
+            "color": [
+              255,
+              28,
+              55
+            ],
+            "color2": [
+              255,
+              188,
+              76
+            ],
+            "bg_color": [
+              10,
+              2,
+              8
+            ],
+            "brightness": 0.95,
+            "gate_time": 0.6,
+            "bg_level": 0.025
+          },
+          "expressions": {},
+          "keyframes": [],
+          "spatial_mask": {
+            "kind": "none",
+            "axis": "x",
+            "position": 0.5,
+            "width": 0.25,
+            "center": [
+              0.5,
+              0.5,
+              0.5
+            ],
+            "radius": 0.3,
+            "box_min": [
+              0.0,
+              0.0,
+              0.0
+            ],
+            "box_max": [
+              1.0,
+              1.0,
+              1.0
+            ],
+            "modulo": 2,
+            "remainder": 0,
+            "softness": 0.08,
+            "invert": false
+          },
+          "filters": [
+            {
+              "type": "beat_gate",
+              "enabled": true,
+              "params": {
+                "division": "1/8",
+                "duty": 0.5,
+                "floor": 0.06,
+                "softness": 0.03
+              }
+            },
+            {
+              "type": "color_grade",
+              "enabled": true,
+              "params": {
+                "hue_shift": 0,
+                "saturation": 1.2,
+                "contrast": 1.08,
+                "lift": 0
+              }
+            }
+          ],
+          "snap_zcl": true,
+          "name": "Heat — inside out",
+          "color": "#ff1c37"
+        },
+        {
+          "id": "gal_snap",
+          "start_s": 137.9343,
+          "end_s": 142.0016,
+          "fade_in_s": 0.1,
+          "fade_out_s": 0.0,
+          "preset": "chase_scanner",
+          "opacity": 1.0,
+          "params": {
+            "axis": "x",
+            "direction": "pingpong",
+            "color": [
+              255,
+              246,
+              232
+            ],
+            "tail_color": [
+              255,
+              36,
+              82
+            ],
+            "bg_color": [
+              6,
+              2,
+              8
+            ],
+            "width": 0.08,
+            "speed": 0.5,
+            "bg_level": 0.02,
+            "brightness": 1
+          },
+          "expressions": {},
+          "keyframes": [
+            {
+              "t_s": 0.0,
+              "param": "speed",
+              "value": 0.45,
+              "easing": "ease_in"
+            },
+            {
+              "t_s": 4.0,
+              "param": "speed",
+              "value": 1.7,
+              "easing": "ease_in"
+            }
+          ],
+          "spatial_mask": {
+            "kind": "none",
+            "axis": "x",
+            "position": 0.5,
+            "width": 0.25,
+            "center": [
+              0.5,
+              0.5,
+              0.5
+            ],
+            "radius": 0.3,
+            "box_min": [
+              0.0,
+              0.0,
+              0.0
+            ],
+            "box_max": [
+              1.0,
+              1.0,
+              1.0
+            ],
+            "modulo": 2,
+            "remainder": 0,
+            "softness": 0.08,
+            "invert": false
+          },
+          "filters": [],
+          "snap_zcl": true,
+          "name": "Snap chase",
+          "color": "#ffffff"
+        },
+        {
+          "id": "gal_build",
+          "start_s": 142.0016,
+          "end_s": 159.0838,
+          "fade_in_s": 0.0,
+          "fade_out_s": 0.0,
+          "preset": "ma3_wings",
+          "opacity": 1.0,
+          "params": {
+            "wing_style": "outside_in",
+            "color": [
+              255,
+              28,
+              55
+            ],
+            "color2": [
+              255,
+              246,
+              232
+            ],
+            "bg_color": [
+              6,
+              2,
+              10
+            ],
+            "brightness": 0.95,
+            "gate_time": 0.6,
+            "bg_level": 0.02
+          },
+          "expressions": {},
+          "keyframes": [
+            {
+              "t_s": 0.0,
+              "param": "brightness",
+              "value": 0.7,
+              "easing": "ease_in"
+            },
+            {
+              "t_s": 16.0,
+              "param": "brightness",
+              "value": 1.0,
+              "easing": "ease_in"
+            }
+          ],
+          "spatial_mask": {
+            "kind": "none",
+            "axis": "x",
+            "position": 0.5,
+            "width": 0.25,
+            "center": [
+              0.5,
+              0.5,
+              0.5
+            ],
+            "radius": 0.3,
+            "box_min": [
+              0.0,
+              0.0,
+              0.0
+            ],
+            "box_max": [
+              1.0,
+              1.0,
+              1.0
+            ],
+            "modulo": 2,
+            "remainder": 0,
+            "softness": 0.08,
+            "invert": false
+          },
+          "filters": [
+            {
+              "type": "beat_gate",
+              "enabled": true,
+              "params": {
+                "division": "1/8",
+                "duty": 0.4,
+                "floor": 0.03,
+                "softness": 0.02
+              }
+            }
+          ],
+          "snap_zcl": true,
+          "name": "Build wings",
+          "color": "#ff1c37"
+        },
+        {
+          "id": "gal_countdown",
+          "start_s": 159.0838,
+          "end_s": 169.6,
+          "fade_in_s": 0.0,
+          "fade_out_s": 0.0,
+          "preset": "strobe_blinder",
+          "opacity": 1.0,
+          "params": {
+            "division": "1/8",
+            "color": [
+              255,
+              246,
+              232
+            ],
+            "bg_color": [
+              4,
+              2,
+              8
+            ],
+            "duty": 0.1,
+            "softness": 0.02,
+            "floor": 0.02,
+            "brightness": 0.6
+          },
+          "expressions": {},
+          "keyframes": [
+            {
+              "t_s": 0.0,
+              "param": "duty",
+              "value": 0.08,
+              "easing": "ease_in"
+            },
+            {
+              "t_s": 10.0,
+              "param": "duty",
+              "value": 0.34,
+              "easing": "ease_in"
+            },
+            {
+              "t_s": 0.0,
+              "param": "brightness",
+              "value": 0.5,
+              "easing": "ease_in"
+            },
+            {
+              "t_s": 10.0,
+              "param": "brightness",
+              "value": 1.0,
+              "easing": "ease_in"
+            }
+          ],
+          "spatial_mask": {
+            "kind": "none",
+            "axis": "x",
+            "position": 0.5,
+            "width": 0.25,
+            "center": [
+              0.5,
+              0.5,
+              0.5
+            ],
+            "radius": 0.3,
+            "box_min": [
+              0.0,
+              0.0,
+              0.0
+            ],
+            "box_max": [
+              1.0,
+              1.0,
+              1.0
+            ],
+            "modulo": 2,
+            "remainder": 0,
+            "softness": 0.08,
+            "invert": false
+          },
+          "filters": [],
+          "snap_zcl": true,
+          "name": "Countdown strobe",
+          "color": "#ffffff"
+        },
+        {
+          "id": "gal_drop1",
+          "start_s": 173.8594,
+          "end_s": 190.9415,
+          "fade_in_s": 0.0,
+          "fade_out_s": 0.0,
+          "preset": "ma3_wings",
+          "opacity": 1.0,
+          "params": {
+            "wing_style": "auto_phrase",
+            "color": [
+              255,
+              246,
+              232
+            ],
+            "color2": [
+              255,
+              36,
+              82
+            ],
+            "bg_color": [
+              10,
+              0,
+              12
+            ],
+            "brightness": 1,
+            "gate_time": 0.55,
+            "bg_level": 0.02
+          },
+          "expressions": {},
+          "keyframes": [
+            {
+              "t_s": 0.0,
+              "param": "color",
+              "value": [
+                255.0,
+                246.0,
+                232.0
+              ],
+              "easing": "linear"
+            },
+            {
+              "t_s": 2.5,
+              "param": "color",
+              "value": [
+                255.0,
+                36.0,
+                82.0
+              ],
+              "easing": "linear"
+            },
+            {
+              "t_s": 8.0,
+              "param": "color",
+              "value": [
+                236.0,
+                24.0,
+                152.0
+              ],
+              "easing": "linear"
+            },
+            {
+              "t_s": 15.0,
+              "param": "color",
+              "value": [
+                0.0,
+                205.0,
+                255.0
+              ],
+              "easing": "linear"
+            }
+          ],
+          "spatial_mask": {
+            "kind": "none",
+            "axis": "x",
+            "position": 0.5,
+            "width": 0.25,
+            "center": [
+              0.5,
+              0.5,
+              0.5
+            ],
+            "radius": 0.3,
+            "box_min": [
+              0.0,
+              0.0,
+              0.0
+            ],
+            "box_max": [
+              1.0,
+              1.0,
+              1.0
+            ],
+            "modulo": 2,
+            "remainder": 0,
+            "softness": 0.08,
+            "invert": false
+          },
+          "filters": [
+            {
+              "type": "mirror_symmetry",
+              "enabled": true,
+              "params": {
+                "axis": "x",
+                "mix": 0.45
+              }
+            },
+            {
+              "type": "audio_mod",
+              "enabled": true,
+              "params": {
+                "source": "kick",
+                "depth": 0.22,
+                "mode": "brightness"
+              }
+            }
+          ],
+          "snap_zcl": true,
+          "name": "DROP — supernova wings",
+          "color": "#ff2452"
+        },
+        {
+          "id": "gal_drop2",
+          "start_s": 190.9415,
+          "end_s": 207.8302,
+          "fade_in_s": 0.0,
+          "fade_out_s": 0.0,
+          "preset": "chase_scanner",
+          "opacity": 1.0,
+          "params": {
+            "axis": "x",
+            "direction": "pingpong",
+            "color": [
+              0,
+              205,
+              255
+            ],
+            "tail_color": [
+              255,
+              36,
+              82
+            ],
+            "bg_color": [
+              4,
+              2,
+              12
+            ],
+            "width": 0.1,
+            "speed": 0.75,
+            "bg_level": 0.03,
+            "brightness": 0.95
+          },
+          "expressions": {},
+          "keyframes": [
+            {
+              "t_s": 0.0,
+              "param": "speed",
+              "value": 0.4,
+              "easing": "ease_in"
+            },
+            {
+              "t_s": 16.0,
+              "param": "speed",
+              "value": 0.95,
+              "easing": "ease_in_out"
+            }
+          ],
+          "spatial_mask": {
+            "kind": "none",
+            "axis": "x",
+            "position": 0.5,
+            "width": 0.25,
+            "center": [
+              0.5,
+              0.5,
+              0.5
+            ],
+            "radius": 0.3,
+            "box_min": [
+              0.0,
+              0.0,
+              0.0
+            ],
+            "box_max": [
+              1.0,
+              1.0,
+              1.0
+            ],
+            "modulo": 2,
+            "remainder": 0,
+            "softness": 0.08,
+            "invert": false
+          },
+          "filters": [
+            {
+              "type": "mirror_symmetry",
+              "enabled": true,
+              "params": {
+                "axis": "x",
+                "mix": 0.3
+              }
+            },
+            {
+              "type": "audio_mod",
+              "enabled": true,
+              "params": {
+                "source": "snare",
+                "depth": 0.3,
+                "mode": "brightness"
+              }
+            }
+          ],
+          "snap_zcl": true,
+          "name": "Drop II — runway chase",
+          "color": "#00cdff"
+        },
+        {
+          "id": "gal_after",
+          "start_s": 207.8302,
+          "end_s": 224.9123,
+          "fade_in_s": 0.0,
+          "fade_out_s": 0.0,
+          "preset": "ma3_wings",
+          "opacity": 1.0,
+          "params": {
+            "wing_style": "bounce_wing",
+            "color": [
+              188,
+              232,
+              255
+            ],
+            "color2": [
+              255,
+              36,
+              82
+            ],
+            "bg_color": [
+              6,
+              4,
+              16
+            ],
+            "brightness": 0.8,
+            "gate_time": 0.7,
+            "bg_level": 0.03
+          },
+          "expressions": {},
+          "keyframes": [
+            {
+              "t_s": 0.0,
+              "param": "brightness",
+              "value": 0.9,
+              "easing": "ease_out"
+            },
+            {
+              "t_s": 16.0,
+              "param": "brightness",
+              "value": 0.55,
+              "easing": "ease_in_out"
+            }
+          ],
+          "spatial_mask": {
+            "kind": "none",
+            "axis": "x",
+            "position": 0.5,
+            "width": 0.25,
+            "center": [
+              0.5,
+              0.5,
+              0.5
+            ],
+            "radius": 0.3,
+            "box_min": [
+              0.0,
+              0.0,
+              0.0
+            ],
+            "box_max": [
+              1.0,
+              1.0,
+              1.0
+            ],
+            "modulo": 2,
+            "remainder": 0,
+            "softness": 0.08,
+            "invert": false
+          },
+          "filters": [
+            {
+              "type": "beat_gate",
+              "enabled": true,
+              "params": {
+                "division": "1/2",
+                "duty": 0.8,
+                "floor": 0.14,
+                "softness": 0.06
+              }
+            }
+          ],
+          "snap_zcl": true,
+          "name": "Afterglow wings",
+          "color": "#bce8ff"
+        },
+        {
+          "id": "gal_float",
+          "start_s": 224.9123,
+          "end_s": 241.9945,
+          "fade_in_s": 2.0,
+          "fade_out_s": 0.0,
+          "preset": "sparkle_twinkle",
+          "opacity": 1.0,
+          "params": {
+            "color": [
+              255,
+              232,
+              194
+            ],
+            "bg_color": [
+              6,
+              10,
+              24
+            ],
+            "speed": 1.5,
+            "density": 0.5,
+            "brightness": 0.55
+          },
+          "expressions": {},
+          "keyframes": [],
+          "spatial_mask": {
+            "kind": "none",
+            "axis": "x",
+            "position": 0.5,
+            "width": 0.25,
+            "center": [
+              0.5,
+              0.5,
+              0.5
+            ],
+            "radius": 0.3,
+            "box_min": [
+              0.0,
+              0.0,
+              0.0
+            ],
+            "box_max": [
+              1.0,
+              1.0,
+              1.0
+            ],
+            "modulo": 2,
+            "remainder": 0,
+            "softness": 0.08,
+            "invert": false
+          },
+          "filters": [
+            {
+              "type": "spatial_blur",
+              "enabled": true,
+              "params": {
+                "radius_m": 0.2,
+                "mix": 0.3
+              }
+            }
+          ],
+          "snap_zcl": true,
+          "name": "Float — chrome dust",
+          "color": "#ffe8c2"
+        },
+        {
+          "id": "gal_void",
+          "start_s": 241.9945,
+          "end_s": 259.0766,
+          "fade_in_s": 4.0,
+          "fade_out_s": 0.0,
+          "preset": "chase_scanner",
+          "opacity": 1.0,
+          "params": {
+            "axis": "x",
+            "direction": "pingpong",
+            "color": [
+              60,
+              90,
+              180
+            ],
+            "tail_color": [
+              10,
+              20,
+              60
+            ],
+            "bg_color": [
+              2,
+              2,
+              8
+            ],
+            "width": 0.05,
+            "speed": 0.12,
+            "bg_level": 0.005,
+            "brightness": 0.35
+          },
+          "expressions": {},
+          "keyframes": [],
+          "spatial_mask": {
+            "kind": "none",
+            "axis": "x",
+            "position": 0.5,
+            "width": 0.25,
+            "center": [
+              0.5,
+              0.5,
+              0.5
+            ],
+            "radius": 0.3,
+            "box_min": [
+              0.0,
+              0.0,
+              0.0
+            ],
+            "box_max": [
+              1.0,
+              1.0,
+              1.0
+            ],
+            "modulo": 2,
+            "remainder": 0,
+            "softness": 0.08,
+            "invert": false
+          },
+          "filters": [
+            {
+              "type": "inertia",
+              "enabled": true,
+              "params": {
+                "mix": 0.5,
+                "tau_s": 0.5
+              }
+            }
+          ],
+          "snap_zcl": true,
+          "name": "Void — distant sweep",
+          "color": "#3c5ab4"
+        },
+        {
+          "id": "gal_return",
+          "start_s": 259.0766,
+          "end_s": 276.1587,
+          "fade_in_s": 0.0,
+          "fade_out_s": 0.0,
+          "preset": "ma3_wings",
+          "opacity": 1.0,
+          "params": {
+            "wing_style": "auto_phrase",
+            "color": [
+              255,
+              36,
+              82
+            ],
+            "color2": [
+              255,
+              188,
+              76
+            ],
+            "bg_color": [
+              8,
+              4,
+              18
+            ],
+            "brightness": 0.85,
+            "gate_time": 0.6,
+            "bg_level": 0.03
+          },
+          "expressions": {},
+          "keyframes": [
+            {
+              "t_s": 0.0,
+              "param": "brightness",
+              "value": 0.5,
+              "easing": "ease_in"
+            },
+            {
+              "t_s": 15.0,
+              "param": "brightness",
+              "value": 0.9,
+              "easing": "ease_in_out"
+            }
+          ],
+          "spatial_mask": {
+            "kind": "none",
+            "axis": "x",
+            "position": 0.5,
+            "width": 0.25,
+            "center": [
+              0.5,
+              0.5,
+              0.5
+            ],
+            "radius": 0.3,
+            "box_min": [
+              0.0,
+              0.0,
+              0.0
+            ],
+            "box_max": [
+              1.0,
+              1.0,
+              1.0
+            ],
+            "modulo": 2,
+            "remainder": 0,
+            "softness": 0.08,
+            "invert": false
+          },
+          "filters": [
+            {
+              "type": "audio_mod",
+              "enabled": true,
+              "params": {
+                "source": "kick",
+                "depth": 0.25,
+                "mode": "brightness"
+              }
+            }
+          ],
+          "snap_zcl": true,
+          "name": "Return wings",
+          "color": "#ff2452"
+        },
+        {
+          "id": "gal_outro",
+          "start_s": 276.1587,
+          "end_s": 287.1147,
+          "fade_in_s": 0.0,
+          "fade_out_s": 0.0,
+          "preset": "ma3_wings",
+          "opacity": 1.0,
+          "params": {
+            "wing_style": "frame_lock",
+            "color": [
+              255,
+              120,
+              24
+            ],
+            "color2": [
+              80,
+              20,
+              40
+            ],
+            "bg_color": [
+              4,
+              2,
+              8
+            ],
+            "brightness": 0.6,
+            "gate_time": 0.8,
+            "bg_level": 0.02
+          },
+          "expressions": {},
+          "keyframes": [
+            {
+              "t_s": 0.0,
+              "param": "brightness",
+              "value": 0.7,
+              "easing": "ease_out"
+            },
+            {
+              "t_s": 10.5,
+              "param": "brightness",
+              "value": 0.04,
+              "easing": "ease_in_out"
+            }
+          ],
+          "spatial_mask": {
+            "kind": "none",
+            "axis": "x",
+            "position": 0.5,
+            "width": 0.25,
+            "center": [
+              0.5,
+              0.5,
+              0.5
+            ],
+            "radius": 0.3,
+            "box_min": [
+              0.0,
+              0.0,
+              0.0
+            ],
+            "box_max": [
+              1.0,
+              1.0,
+              1.0
+            ],
+            "modulo": 2,
+            "remainder": 0,
+            "softness": 0.08,
+            "invert": false
+          },
+          "filters": [],
+          "snap_zcl": true,
+          "name": "Last call — amber wings",
+          "color": "#ff7818"
+        }
+      ]
+    },
+    {
+      "id": "lower_accents",
+      "name": "Lower · Accents",
+      "target_group": "decke_unten",
+      "blend_mode": "max",
+      "opacity": 0.95,
+      "muted": false,
+      "solo": false,
+      "kind": "layer",
+      "parent_id": null,
+      "clipped_to_below": false,
+      "height_px": 54,
+      "clips": [
+        {
+          "id": "low_intro",
+          "start_s": 0.0,
+          "end_s": 17.0819,
+          "fade_in_s": 6.0,
+          "fade_out_s": 0.0,
+          "preset": "pulse_breathe",
+          "opacity": 1.0,
+          "params": {
+            "color": [
+              0,
+              120,
+              255
+            ],
+            "accent_color": [
+              188,
+              232,
+              255
+            ],
+            "axis": "z",
+            "rate_hz": 0.2,
+            "depth": 0.5,
+            "spatial_offset": 0.5,
+            "brightness": 0.28
+          },
+          "expressions": {},
+          "keyframes": [],
+          "spatial_mask": {
+            "kind": "parity",
+            "axis": "x",
+            "position": 0.5,
+            "width": 0.25,
+            "center": [
+              0.5,
+              0.5,
+              0.5
+            ],
+            "radius": 0.3,
+            "box_min": [
+              0.0,
+              0.0,
+              0.0
+            ],
+            "box_max": [
+              1.0,
+              1.0,
+              1.0
+            ],
+            "modulo": 2,
+            "remainder": 0,
+            "softness": 0.08,
+            "invert": false
+          },
+          "filters": [],
+          "snap_zcl": true,
+          "name": "Cold uplight",
+          "color": "#0078ff"
+        },
+        {
+          "id": "low_verse",
+          "start_s": 54.9152,
+          "end_s": 71.9974,
+          "fade_in_s": 0.0,
+          "fade_out_s": 0.0,
+          "preset": "pulse_breathe",
+          "opacity": 1.0,
+          "params": {
+            "color": [
+              255,
+              36,
+              82
+            ],
+            "accent_color": [
+              0,
+              205,
+              255
+            ],
+            "axis": "z",
+            "rate_hz": 0.32,
+            "depth": 0.6,
+            "spatial_offset": 0.45,
+            "brightness": 0.45
+          },
+          "expressions": {},
+          "keyframes": [],
+          "spatial_mask": {
+            "kind": "none",
+            "axis": "x",
+            "position": 0.5,
+            "width": 0.25,
+            "center": [
+              0.5,
+              0.5,
+              0.5
+            ],
+            "radius": 0.3,
+            "box_min": [
+              0.0,
+              0.0,
+              0.0
+            ],
+            "box_max": [
+              1.0,
+              1.0,
+              1.0
+            ],
+            "modulo": 2,
+            "remainder": 0,
+            "softness": 0.08,
+            "invert": false
+          },
+          "filters": [
+            {
+              "type": "audio_mod",
+              "enabled": true,
+              "params": {
+                "source": "kick",
+                "depth": 0.2,
+                "mode": "brightness"
+              }
+            }
+          ],
+          "snap_zcl": true,
+          "name": "Verse breathers",
+          "color": "#ff2452"
+        },
+        {
+          "id": "low_pre",
+          "start_s": 89.0795,
+          "end_s": 103.77,
+          "fade_in_s": 0.0,
+          "fade_out_s": 0.0,
+          "preset": "strobe_blinder",
+          "opacity": 1.0,
+          "params": {
+            "division": "1/4",
+            "color": [
+              255,
+              188,
+              76
+            ],
+            "bg_color": [
+              4,
+              2,
+              8
+            ],
+            "duty": 0.22,
+            "softness": 0.04,
+            "floor": 0.03,
+            "brightness": 0.55
+          },
+          "expressions": {},
+          "keyframes": [],
+          "spatial_mask": {
+            "kind": "none",
+            "axis": "x",
+            "position": 0.5,
+            "width": 0.25,
+            "center": [
+              0.5,
+              0.5,
+              0.5
+            ],
+            "radius": 0.3,
+            "box_min": [
+              0.0,
+              0.0,
+              0.0
+            ],
+            "box_max": [
+              1.0,
+              1.0,
+              1.0
+            ],
+            "modulo": 2,
+            "remainder": 0,
+            "softness": 0.08,
+            "invert": false
+          },
+          "filters": [],
+          "snap_zcl": true,
+          "name": "Pre shutter",
+          "color": "#ffbc4c"
+        },
+        {
+          "id": "low_heat",
+          "start_s": 120.8522,
+          "end_s": 137.9343,
+          "fade_in_s": 0.0,
+          "fade_out_s": 0.0,
+          "preset": "solid",
+          "opacity": 1.0,
+          "params": {
+            "color": [
+              255,
+              36,
+              82
+            ],
+            "brightness": 0.55
+          },
+          "expressions": {},
+          "keyframes": [],
+          "spatial_mask": {
+            "kind": "parity",
+            "axis": "x",
+            "position": 0.5,
+            "width": 0.25,
+            "center": [
+              0.5,
+              0.5,
+              0.5
+            ],
+            "radius": 0.3,
+            "box_min": [
+              0.0,
+              0.0,
+              0.0
+            ],
+            "box_max": [
+              1.0,
+              1.0,
+              1.0
+            ],
+            "modulo": 2,
+            "remainder": 1,
+            "softness": 0.08,
+            "invert": false
+          },
+          "filters": [
+            {
+              "type": "beat_gate",
+              "enabled": true,
+              "params": {
+                "division": "1/4",
+                "duty": 0.55,
+                "floor": 0.05,
+                "softness": 0.03
+              }
+            }
+          ],
+          "snap_zcl": true,
+          "name": "Heat wash",
+          "color": "#ff2452"
+        },
+        {
+          "id": "low_snap",
+          "start_s": 137.9343,
+          "end_s": 142.0016,
+          "fade_in_s": 0.05,
+          "fade_out_s": 0.0,
+          "preset": "solid",
+          "opacity": 1.0,
+          "params": {
+            "color": [
+              255,
+              246,
+              232
+            ],
+            "brightness": 1
+          },
+          "expressions": {},
+          "keyframes": [
+            {
+              "t_s": 0.0,
+              "param": "brightness",
+              "value": 1.0,
+              "easing": "ease_out"
+            },
+            {
+              "t_s": 3.9,
+              "param": "brightness",
+              "value": 0.15,
+              "easing": "ease_in_out"
+            }
+          ],
+          "spatial_mask": {
+            "kind": "none",
+            "axis": "x",
+            "position": 0.5,
+            "width": 0.25,
+            "center": [
+              0.5,
+              0.5,
+              0.5
+            ],
+            "radius": 0.3,
+            "box_min": [
+              0.0,
+              0.0,
+              0.0
+            ],
+            "box_max": [
+              1.0,
+              1.0,
+              1.0
+            ],
+            "modulo": 2,
+            "remainder": 0,
+            "softness": 0.08,
+            "invert": false
+          },
+          "filters": [],
+          "snap_zcl": true,
+          "name": "Snap pop",
+          "color": "#ffffff"
+        },
+        {
+          "id": "low_build",
+          "start_s": 142.0016,
+          "end_s": 159.0838,
+          "fade_in_s": 0.0,
+          "fade_out_s": 0.0,
+          "preset": "strobe_blinder",
+          "opacity": 1.0,
+          "params": {
+            "division": "1/8",
+            "color": [
+              255,
+              246,
+              232
+            ],
+            "bg_color": [
+              4,
+              2,
+              8
+            ],
+            "duty": 0.12,
+            "softness": 0.02,
+            "floor": 0.02,
+            "brightness": 0.7
+          },
+          "expressions": {},
+          "keyframes": [
+            {
+              "t_s": 0.0,
+              "param": "duty",
+              "value": 0.08,
+              "easing": "ease_in"
+            },
+            {
+              "t_s": 16.0,
+              "param": "duty",
+              "value": 0.26,
+              "easing": "ease_in"
+            }
+          ],
+          "spatial_mask": {
+            "kind": "none",
+            "axis": "x",
+            "position": 0.5,
+            "width": 0.25,
+            "center": [
+              0.5,
+              0.5,
+              0.5
+            ],
+            "radius": 0.3,
+            "box_min": [
+              0.0,
+              0.0,
+              0.0
+            ],
+            "box_max": [
+              1.0,
+              1.0,
+              1.0
+            ],
+            "modulo": 2,
+            "remainder": 0,
+            "softness": 0.08,
+            "invert": false
+          },
+          "filters": [],
+          "snap_zcl": true,
+          "name": "Build shutter",
+          "color": "#ffffff"
+        },
+        {
+          "id": "low_countdown",
+          "start_s": 159.0838,
+          "end_s": 169.6,
+          "fade_in_s": 0.0,
+          "fade_out_s": 0.0,
+          "preset": "strobe_blinder",
+          "opacity": 1.0,
+          "params": {
+            "division": "1/16",
+            "color": [
+              255,
+              246,
+              232
+            ],
+            "bg_color": [
+              4,
+              2,
+              8
+            ],
+            "duty": 0.06,
+            "softness": 0.015,
+            "floor": 0.02,
+            "brightness": 0.8
+          },
+          "expressions": {},
+          "keyframes": [
+            {
+              "t_s": 0.0,
+              "param": "duty",
+              "value": 0.05,
+              "easing": "ease_in"
+            },
+            {
+              "t_s": 10.0,
+              "param": "duty",
+              "value": 0.22,
+              "easing": "ease_in"
+            },
+            {
+              "t_s": 0.0,
+              "param": "brightness",
+              "value": 0.5,
+              "easing": "ease_in"
+            },
+            {
+              "t_s": 10.0,
+              "param": "brightness",
+              "value": 1.0,
+              "easing": "ease_in"
+            }
+          ],
+          "spatial_mask": {
+            "kind": "none",
+            "axis": "x",
+            "position": 0.5,
+            "width": 0.25,
+            "center": [
+              0.5,
+              0.5,
+              0.5
+            ],
+            "radius": 0.3,
+            "box_min": [
+              0.0,
+              0.0,
+              0.0
+            ],
+            "box_max": [
+              1.0,
+              1.0,
+              1.0
+            ],
+            "modulo": 2,
+            "remainder": 0,
+            "softness": 0.08,
+            "invert": false
+          },
+          "filters": [],
+          "snap_zcl": true,
+          "name": "Countdown 16ths",
+          "color": "#ffffff"
+        },
+        {
+          "id": "low_flash",
+          "start_s": 173.55,
+          "end_s": 173.8594,
+          "fade_in_s": 0.0,
+          "fade_out_s": 0.0,
+          "preset": "solid",
+          "opacity": 1.0,
+          "params": {
+            "color": [
+              255,
+              246,
+              232
+            ],
+            "brightness": 1
+          },
+          "expressions": {},
+          "keyframes": [],
+          "spatial_mask": {
+            "kind": "none",
+            "axis": "x",
+            "position": 0.5,
+            "width": 0.25,
+            "center": [
+              0.5,
+              0.5,
+              0.5
+            ],
+            "radius": 0.3,
+            "box_min": [
+              0.0,
+              0.0,
+              0.0
+            ],
+            "box_max": [
+              1.0,
+              1.0,
+              1.0
+            ],
+            "modulo": 2,
+            "remainder": 0,
+            "softness": 0.08,
+            "invert": false
+          },
+          "filters": [],
+          "snap_zcl": true,
+          "name": "Pre-drop flash",
+          "color": "#ffffff"
+        },
+        {
+          "id": "low_drop1",
+          "start_s": 173.8594,
+          "end_s": 190.9415,
+          "fade_in_s": 0.0,
+          "fade_out_s": 0.0,
+          "preset": "shockwave_3d",
+          "opacity": 1.0,
+          "params": {
+            "center": [
+              0.5,
+              0.5,
+              0.6
+            ],
+            "color": [
+              255,
+              36,
+              82
+            ],
+            "core_color": [
+              255,
+              246,
+              232
+            ],
+            "bg_color": [
+              6,
+              0,
+              8
+            ],
+            "speed": 0.45,
+            "width": 0.1,
+            "brightness": 1
+          },
+          "expressions": {},
+          "keyframes": [
+            {
+              "t_s": 0.0,
+              "param": "speed",
+              "value": 0.3,
+              "easing": "ease_in"
+            },
+            {
+              "t_s": 16.0,
+              "param": "speed",
+              "value": 0.65,
+              "easing": "ease_out"
+            }
+          ],
+          "spatial_mask": {
+            "kind": "none",
+            "axis": "x",
+            "position": 0.5,
+            "width": 0.25,
+            "center": [
+              0.5,
+              0.5,
+              0.5
+            ],
+            "radius": 0.3,
+            "box_min": [
+              0.0,
+              0.0,
+              0.0
+            ],
+            "box_max": [
+              1.0,
+              1.0,
+              1.0
+            ],
+            "modulo": 2,
+            "remainder": 0,
+            "softness": 0.08,
+            "invert": false
+          },
+          "filters": [
+            {
+              "type": "mirror_symmetry",
+              "enabled": true,
+              "params": {
+                "axis": "x",
+                "mix": 0.5
+              }
+            },
+            {
+              "type": "audio_mod",
+              "enabled": true,
+              "params": {
+                "source": "kick",
+                "depth": 0.3,
+                "mode": "brightness"
+              }
+            }
+          ],
+          "snap_zcl": true,
+          "name": "DROP shockwave",
+          "color": "#ff2452"
+        },
+        {
+          "id": "low_drop2",
+          "start_s": 190.9415,
+          "end_s": 207.8302,
+          "fade_in_s": 0.0,
+          "fade_out_s": 0.0,
+          "preset": "strobe_blinder",
+          "opacity": 1.0,
+          "params": {
+            "division": "1/4",
+            "color": [
+              0,
+              205,
+              255
+            ],
+            "bg_color": [
+              2,
+              6,
+              12
+            ],
+            "duty": 0.3,
+            "softness": 0.03,
+            "floor": 0.05,
+            "brightness": 0.8
+          },
+          "expressions": {},
+          "keyframes": [],
+          "spatial_mask": {
+            "kind": "none",
+            "axis": "x",
+            "position": 0.5,
+            "width": 0.25,
+            "center": [
+              0.5,
+              0.5,
+              0.5
+            ],
+            "radius": 0.3,
+            "box_min": [
+              0.0,
+              0.0,
+              0.0
+            ],
+            "box_max": [
+              1.0,
+              1.0,
+              1.0
+            ],
+            "modulo": 2,
+            "remainder": 0,
+            "softness": 0.08,
+            "invert": false
+          },
+          "filters": [
+            {
+              "type": "audio_mod",
+              "enabled": true,
+              "params": {
+                "source": "snare",
+                "depth": 0.3,
+                "mode": "brightness"
+              }
+            }
+          ],
+          "snap_zcl": true,
+          "name": "Drop II shutters",
+          "color": "#00cdff"
+        },
+        {
+          "id": "low_after",
+          "start_s": 207.8302,
+          "end_s": 224.9123,
+          "fade_in_s": 2.0,
+          "fade_out_s": 0.0,
+          "preset": "pulse_breathe",
+          "opacity": 1.0,
+          "params": {
+            "color": [
+              255,
+              120,
+              24
+            ],
+            "accent_color": [
+              255,
+              188,
+              76
+            ],
+            "axis": "z",
+            "rate_hz": 0.15,
+            "depth": 0.4,
+            "spatial_offset": 0.4,
+            "brightness": 0.35
+          },
+          "expressions": {},
+          "keyframes": [],
+          "spatial_mask": {
+            "kind": "none",
+            "axis": "x",
+            "position": 0.5,
+            "width": 0.25,
+            "center": [
+              0.5,
+              0.5,
+              0.5
+            ],
+            "radius": 0.3,
+            "box_min": [
+              0.0,
+              0.0,
+              0.0
+            ],
+            "box_max": [
+              1.0,
+              1.0,
+              1.0
+            ],
+            "modulo": 2,
+            "remainder": 0,
+            "softness": 0.08,
+            "invert": false
+          },
+          "filters": [],
+          "snap_zcl": true,
+          "name": "Afterglow breathers",
+          "color": "#ff7818"
+        },
+        {
+          "id": "low_void",
+          "start_s": 241.9945,
+          "end_s": 259.0766,
+          "fade_in_s": 5.0,
+          "fade_out_s": 0.0,
+          "preset": "solid",
+          "opacity": 1.0,
+          "params": {
+            "color": [
+              40,
+              30,
+              90
+            ],
+            "brightness": 0.18
+          },
+          "expressions": {},
+          "keyframes": [],
+          "spatial_mask": {
+            "kind": "none",
+            "axis": "x",
+            "position": 0.5,
+            "width": 0.25,
+            "center": [
+              0.5,
+              0.5,
+              0.5
+            ],
+            "radius": 0.3,
+            "box_min": [
+              0.0,
+              0.0,
+              0.0
+            ],
+            "box_max": [
+              1.0,
+              1.0,
+              1.0
+            ],
+            "modulo": 2,
+            "remainder": 0,
+            "softness": 0.08,
+            "invert": false
+          },
+          "filters": [],
+          "snap_zcl": true,
+          "name": "Void hush",
+          "color": "#281e5a"
+        },
+        {
+          "id": "low_return",
+          "start_s": 259.0766,
+          "end_s": 276.1587,
+          "fade_in_s": 0.0,
+          "fade_out_s": 0.0,
+          "preset": "pulse_breathe",
+          "opacity": 1.0,
+          "params": {
+            "color": [
+              236,
+              24,
+              152
+            ],
+            "accent_color": [
+              0,
+              205,
+              255
+            ],
+            "axis": "z",
+            "rate_hz": 0.25,
+            "depth": 0.5,
+            "spatial_offset": 0.45,
+            "brightness": 0.45
+          },
+          "expressions": {},
+          "keyframes": [],
+          "spatial_mask": {
+            "kind": "none",
+            "axis": "x",
+            "position": 0.5,
+            "width": 0.25,
+            "center": [
+              0.5,
+              0.5,
+              0.5
+            ],
+            "radius": 0.3,
+            "box_min": [
+              0.0,
+              0.0,
+              0.0
+            ],
+            "box_max": [
+              1.0,
+              1.0,
+              1.0
+            ],
+            "modulo": 2,
+            "remainder": 0,
+            "softness": 0.08,
+            "invert": false
+          },
+          "filters": [
+            {
+              "type": "audio_mod",
+              "enabled": true,
+              "params": {
+                "source": "kick",
+                "depth": 0.2,
+                "mode": "brightness"
+              }
+            }
+          ],
+          "snap_zcl": true,
+          "name": "Return breathers",
+          "color": "#ec1898"
+        },
+        {
+          "id": "low_outro",
+          "start_s": 276.1587,
+          "end_s": 287.1147,
+          "fade_in_s": 0.0,
+          "fade_out_s": 2.0,
+          "preset": "solid",
+          "opacity": 1.0,
+          "params": {
+            "color": [
+              255,
+              120,
+              24
+            ],
+            "brightness": 0.3
+          },
+          "expressions": {},
+          "keyframes": [
+            {
+              "t_s": 0.0,
+              "param": "brightness",
+              "value": 0.35,
+              "easing": "ease_in_out"
+            },
+            {
+              "t_s": 10.0,
+              "param": "brightness",
+              "value": 0.03,
+              "easing": "ease_in_out"
+            }
+          ],
+          "spatial_mask": {
+            "kind": "none",
+            "axis": "x",
+            "position": 0.5,
+            "width": 0.25,
+            "center": [
+              0.5,
+              0.5,
+              0.5
+            ],
+            "radius": 0.3,
+            "box_min": [
+              0.0,
+              0.0,
+              0.0
+            ],
+            "box_max": [
+              1.0,
+              1.0,
+              1.0
+            ],
+            "modulo": 2,
+            "remainder": 0,
+            "softness": 0.08,
+            "invert": false
+          },
+          "filters": [],
+          "snap_zcl": true,
+          "name": "Last call amber",
+          "color": "#ff7818"
+        }
+      ]
+    },
+    {
+      "id": "steel_strip",
+      "name": "Steel · Filament",
+      "target_group": "stahltraeger",
+      "blend_mode": "add",
+      "opacity": 0.95,
+      "muted": false,
+      "solo": false,
+      "kind": "layer",
+      "parent_id": null,
+      "clipped_to_below": false,
+      "height_px": 42,
+      "clips": [
+        {
+          "id": "steel_intro",
+          "start_s": 0.0,
+          "end_s": 17.0819,
+          "fade_in_s": 4.0,
+          "fade_out_s": 0.0,
+          "preset": "blackbody_forge",
+          "opacity": 1.0,
+          "params": {
+            "base_kelvin": 1800,
+            "peak_kelvin": 2600,
+            "brightness": 0.5,
+            "diffusion": 0.5,
+            "cooling": 1.6,
+            "indigo_shadow": true,
+            "axis": "x"
+          },
+          "expressions": {},
+          "keyframes": [],
+          "spatial_mask": {
+            "kind": "none",
+            "axis": "x",
+            "position": 0.5,
+            "width": 0.25,
+            "center": [
+              0.5,
+              0.5,
+              0.5
+            ],
+            "radius": 0.3,
+            "box_min": [
+              0.0,
+              0.0,
+              0.0
+            ],
+            "box_max": [
+              1.0,
+              1.0,
+              1.0
+            ],
+            "modulo": 2,
+            "remainder": 0,
+            "softness": 0.08,
+            "invert": false
+          },
+          "filters": [
+            {
+              "type": "dim2warm",
+              "enabled": true,
+              "params": {
+                "amount": 0.8,
+                "curve": 1.4,
+                "warm_color": [
+                  255,
+                  112,
+                  22
+                ]
+              }
+            }
+          ],
+          "snap_zcl": true,
+          "name": "Filament lit",
+          "color": "#ff8c24"
+        },
+        {
+          "id": "steel_warm",
+          "start_s": 17.0819,
+          "end_s": 54.9152,
+          "fade_in_s": 0.0,
+          "fade_out_s": 0.0,
+          "preset": "blackbody_forge",
+          "opacity": 1.0,
+          "params": {
+            "base_kelvin": 1900,
+            "peak_kelvin": 3200,
+            "brightness": 0.75,
+            "diffusion": 0.55,
+            "cooling": 1.2,
+            "indigo_shadow": true,
+            "axis": "x"
+          },
+          "expressions": {},
+          "keyframes": [
+            {
+              "t_s": 0.0,
+              "param": "brightness",
+              "value": 0.5,
+              "easing": "ease_out"
+            },
+            {
+              "t_s": 30.0,
+              "param": "brightness",
+              "value": 0.85,
+              "easing": "ease_in_out"
+            }
+          ],
+          "spatial_mask": {
+            "kind": "none",
+            "axis": "x",
+            "position": 0.5,
+            "width": 0.25,
+            "center": [
+              0.5,
+              0.5,
+              0.5
+            ],
+            "radius": 0.3,
+            "box_min": [
+              0.0,
+              0.0,
+              0.0
+            ],
+            "box_max": [
+              1.0,
+              1.0,
+              1.0
+            ],
+            "modulo": 2,
+            "remainder": 0,
+            "softness": 0.08,
+            "invert": false
+          },
+          "filters": [
+            {
+              "type": "dim2warm",
+              "enabled": true,
+              "params": {
+                "amount": 0.7,
+                "curve": 1.3,
+                "warm_color": [
+                  255,
+                  115,
+                  24
+                ]
+              }
+            },
+            {
+              "type": "inertia",
+              "enabled": true,
+              "params": {
+                "mix": 0.4,
+                "tau_s": 0.4
+              }
+            }
+          ],
+          "snap_zcl": true,
+          "name": "Warm strip rise",
+          "color": "#ff9a38"
+        },
+        {
+          "id": "steel_verse",
+          "start_s": 54.9152,
+          "end_s": 103.77,
+          "fade_in_s": 0.0,
+          "fade_out_s": 0.0,
+          "preset": "caustic_abyss",
+          "opacity": 1.0,
+          "params": {
+            "palette": "ember",
+            "caustic_tint": [
+              255,
+              190,
+              120
+            ],
+            "brightness": 0.6,
+            "speed": 0.2,
+            "scale": 1.4,
+            "focus": 2.6,
+            "shadow_floor": 0.05,
+            "audio_mod": 0.15
+          },
+          "expressions": {},
+          "keyframes": [],
+          "spatial_mask": {
+            "kind": "none",
+            "axis": "x",
+            "position": 0.5,
+            "width": 0.25,
+            "center": [
+              0.5,
+              0.5,
+              0.5
+            ],
+            "radius": 0.3,
+            "box_min": [
+              0.0,
+              0.0,
+              0.0
+            ],
+            "box_max": [
+              1.0,
+              1.0,
+              1.0
+            ],
+            "modulo": 2,
+            "remainder": 0,
+            "softness": 0.08,
+            "invert": false
+          },
+          "filters": [
+            {
+              "type": "spatial_blur",
+              "enabled": true,
+              "params": {
+                "radius_m": 0.2,
+                "mix": 0.2
+              }
+            }
+          ],
+          "snap_zcl": true,
+          "name": "Ember caustics",
+          "color": "#ffbe78"
+        },
+        {
+          "id": "steel_heat",
+          "start_s": 103.77,
+          "end_s": 142.0016,
+          "fade_in_s": 0.0,
+          "fade_out_s": 0.0,
+          "preset": "chase_scanner",
+          "opacity": 1.0,
+          "params": {
+            "axis": "x",
+            "direction": "pingpong",
+            "color": [
+              255,
+              188,
+              76
+            ],
+            "tail_color": [
+              255,
+              36,
+              82
+            ],
+            "bg_color": [
+              8,
+              2,
+              4
+            ],
+            "width": 0.08,
+            "speed": 0.35,
+            "bg_level": 0.02,
+            "brightness": 0.9
+          },
+          "expressions": {},
+          "keyframes": [],
+          "spatial_mask": {
+            "kind": "none",
+            "axis": "x",
+            "position": 0.5,
+            "width": 0.25,
+            "center": [
+              0.5,
+              0.5,
+              0.5
+            ],
+            "radius": 0.3,
+            "box_min": [
+              0.0,
+              0.0,
+              0.0
+            ],
+            "box_max": [
+              1.0,
+              1.0,
+              1.0
+            ],
+            "modulo": 2,
+            "remainder": 0,
+            "softness": 0.08,
+            "invert": false
+          },
+          "filters": [
+            {
+              "type": "beat_gate",
+              "enabled": true,
+              "params": {
+                "division": "1/4",
+                "duty": 0.65,
+                "floor": 0.06,
+                "softness": 0.04
+              }
+            }
+          ],
+          "snap_zcl": true,
+          "name": "Filament chase",
+          "color": "#ffbc4c"
+        },
+        {
+          "id": "steel_build",
+          "start_s": 142.0016,
+          "end_s": 169.6,
+          "fade_in_s": 0.0,
+          "fade_out_s": 0.0,
+          "preset": "blackbody_forge",
+          "opacity": 1.0,
+          "params": {
+            "base_kelvin": 2000,
+            "peak_kelvin": 4200,
+            "brightness": 0.85,
+            "diffusion": 0.4,
+            "cooling": 0.9,
+            "indigo_shadow": false,
+            "axis": "x"
+          },
+          "expressions": {},
+          "keyframes": [
+            {
+              "t_s": 0.0,
+              "param": "brightness",
+              "value": 0.5,
+              "easing": "ease_in"
+            },
+            {
+              "t_s": 26.0,
+              "param": "brightness",
+              "value": 1.0,
+              "easing": "ease_in"
+            },
+            {
+              "t_s": 0.0,
+              "param": "peak_kelvin",
+              "value": 3000.0,
+              "easing": "ease_in"
+            },
+            {
+              "t_s": 26.0,
+              "param": "peak_kelvin",
+              "value": 5000.0,
+              "easing": "ease_in"
+            }
+          ],
+          "spatial_mask": {
+            "kind": "none",
+            "axis": "x",
+            "position": 0.5,
+            "width": 0.25,
+            "center": [
+              0.5,
+              0.5,
+              0.5
+            ],
+            "radius": 0.3,
+            "box_min": [
+              0.0,
+              0.0,
+              0.0
+            ],
+            "box_max": [
+              1.0,
+              1.0,
+              1.0
+            ],
+            "modulo": 2,
+            "remainder": 0,
+            "softness": 0.08,
+            "invert": false
+          },
+          "filters": [
+            {
+              "type": "audio_mod",
+              "enabled": true,
+              "params": {
+                "source": "snare",
+                "depth": 0.3,
+                "mode": "brightness"
+              }
+            }
+          ],
+          "snap_zcl": true,
+          "name": "Forge build",
+          "color": "#ffb04c"
+        },
+        {
+          "id": "steel_black",
+          "start_s": 169.6,
+          "end_s": 173.55,
+          "fade_in_s": 0.0,
+          "fade_out_s": 0.0,
+          "preset": "solid",
+          "opacity": 1.0,
+          "params": {
+            "color": [
+              0,
+              0,
+              0
+            ],
+            "brightness": 0
+          },
+          "expressions": {},
+          "keyframes": [],
+          "spatial_mask": {
+            "kind": "none",
+            "axis": "x",
+            "position": 0.5,
+            "width": 0.25,
+            "center": [
+              0.5,
+              0.5,
+              0.5
+            ],
+            "radius": 0.3,
+            "box_min": [
+              0.0,
+              0.0,
+              0.0
+            ],
+            "box_max": [
+              1.0,
+              1.0,
+              1.0
+            ],
+            "modulo": 2,
+            "remainder": 0,
+            "softness": 0.08,
+            "invert": false
+          },
+          "filters": [],
+          "snap_zcl": true,
+          "name": "Blackout",
+          "color": "#000000"
+        },
+        {
+          "id": "steel_drop",
+          "start_s": 173.8594,
+          "end_s": 207.8302,
+          "fade_in_s": 0.0,
+          "fade_out_s": 0.0,
+          "preset": "caustic_abyss",
+          "opacity": 1.0,
+          "params": {
+            "palette": "acid",
+            "caustic_tint": [
+              220,
+              255,
+              200
+            ],
+            "brightness": 0.95,
+            "speed": 0.6,
+            "scale": 2.2,
+            "focus": 3,
+            "shadow_floor": 0.03,
+            "audio_mod": 0.4
+          },
+          "expressions": {},
+          "keyframes": [],
+          "spatial_mask": {
+            "kind": "none",
+            "axis": "x",
+            "position": 0.5,
+            "width": 0.25,
+            "center": [
+              0.5,
+              0.5,
+              0.5
+            ],
+            "radius": 0.3,
+            "box_min": [
+              0.0,
+              0.0,
+              0.0
+            ],
+            "box_max": [
+              1.0,
+              1.0,
+              1.0
+            ],
+            "modulo": 2,
+            "remainder": 0,
+            "softness": 0.08,
+            "invert": false
+          },
+          "filters": [
+            {
+              "type": "color_grade",
+              "enabled": true,
+              "params": {
+                "hue_shift": 0,
+                "saturation": 1.3,
+                "contrast": 1.1,
+                "lift": 0
+              }
+            },
+            {
+              "type": "mirror_symmetry",
+              "enabled": true,
+              "params": {
+                "axis": "x",
+                "mix": 0.25
+              }
+            }
+          ],
+          "snap_zcl": true,
+          "name": "DROP caustic strip",
+          "color": "#dcffc8"
+        },
+        {
+          "id": "steel_after",
+          "start_s": 207.8302,
+          "end_s": 241.9945,
+          "fade_in_s": 2.0,
+          "fade_out_s": 0.0,
+          "preset": "blackbody_forge",
+          "opacity": 1.0,
+          "params": {
+            "base_kelvin": 1850,
+            "peak_kelvin": 3000,
+            "brightness": 0.7,
+            "diffusion": 0.6,
+            "cooling": 1.4,
+            "indigo_shadow": true,
+            "axis": "x"
+          },
+          "expressions": {},
+          "keyframes": [],
+          "spatial_mask": {
+            "kind": "none",
+            "axis": "x",
+            "position": 0.5,
+            "width": 0.25,
+            "center": [
+              0.5,
+              0.5,
+              0.5
+            ],
+            "radius": 0.3,
+            "box_min": [
+              0.0,
+              0.0,
+              0.0
+            ],
+            "box_max": [
+              1.0,
+              1.0,
+              1.0
+            ],
+            "modulo": 2,
+            "remainder": 0,
+            "softness": 0.08,
+            "invert": false
+          },
+          "filters": [
+            {
+              "type": "dim2warm",
+              "enabled": true,
+              "params": {
+                "amount": 0.85,
+                "curve": 1.4,
+                "warm_color": [
+                  255,
+                  110,
+                  20
+                ]
+              }
+            },
+            {
+              "type": "inertia",
+              "enabled": true,
+              "params": {
+                "mix": 0.6,
+                "tau_s": 0.5
+              }
+            }
+          ],
+          "snap_zcl": true,
+          "name": "Afterglow filament",
+          "color": "#ff8c24"
+        },
+        {
+          "id": "steel_void",
+          "start_s": 241.9945,
+          "end_s": 259.0766,
+          "fade_in_s": 3.0,
+          "fade_out_s": 0.0,
+          "preset": "blackbody_forge",
+          "opacity": 1.0,
+          "params": {
+            "base_kelvin": 1750,
+            "peak_kelvin": 2200,
+            "brightness": 0.35,
+            "diffusion": 0.8,
+            "cooling": 2,
+            "indigo_shadow": true,
+            "axis": "x"
+          },
+          "expressions": {},
+          "keyframes": [],
+          "spatial_mask": {
+            "kind": "none",
+            "axis": "x",
+            "position": 0.5,
+            "width": 0.25,
+            "center": [
+              0.5,
+              0.5,
+              0.5
+            ],
+            "radius": 0.3,
+            "box_min": [
+              0.0,
+              0.0,
+              0.0
+            ],
+            "box_max": [
+              1.0,
+              1.0,
+              1.0
+            ],
+            "modulo": 2,
+            "remainder": 0,
+            "softness": 0.08,
+            "invert": false
+          },
+          "filters": [
+            {
+              "type": "dim2warm",
+              "enabled": true,
+              "params": {
+                "amount": 0.9,
+                "curve": 1.5,
+                "warm_color": [
+                  255,
+                  105,
+                  18
+                ]
+              }
+            }
+          ],
+          "snap_zcl": true,
+          "name": "Void filament",
+          "color": "#c86a1c"
+        },
+        {
+          "id": "steel_return",
+          "start_s": 259.0766,
+          "end_s": 276.1587,
+          "fade_in_s": 0.0,
+          "fade_out_s": 0.0,
+          "preset": "chase_scanner",
+          "opacity": 1.0,
+          "params": {
+            "axis": "x",
+            "direction": "pingpong",
+            "color": [
+              255,
+              120,
+              24
+            ],
+            "tail_color": [
+              236,
+              24,
+              152
+            ],
+            "bg_color": [
+              6,
+              2,
+              4
+            ],
+            "width": 0.12,
+            "speed": 0.2,
+            "bg_level": 0.02,
+            "brightness": 0.6
+          },
+          "expressions": {},
+          "keyframes": [],
+          "spatial_mask": {
+            "kind": "none",
+            "axis": "x",
+            "position": 0.5,
+            "width": 0.25,
+            "center": [
+              0.5,
+              0.5,
+              0.5
+            ],
+            "radius": 0.3,
+            "box_min": [
+              0.0,
+              0.0,
+              0.0
+            ],
+            "box_max": [
+              1.0,
+              1.0,
+              1.0
+            ],
+            "modulo": 2,
+            "remainder": 0,
+            "softness": 0.08,
+            "invert": false
+          },
+          "filters": [
+            {
+              "type": "beat_gate",
+              "enabled": true,
+              "params": {
+                "division": "1/4",
+                "duty": 0.6,
+                "floor": 0.06,
+                "softness": 0.04
+              }
+            }
+          ],
+          "snap_zcl": true,
+          "name": "Return sweep",
+          "color": "#ff7818"
+        },
+        {
+          "id": "steel_outro",
+          "start_s": 276.1587,
+          "end_s": 287.1147,
+          "fade_in_s": 0.0,
+          "fade_out_s": 3.0,
+          "preset": "blackbody_forge",
+          "opacity": 1.0,
+          "params": {
+            "base_kelvin": 1800,
+            "peak_kelvin": 2600,
+            "brightness": 0.55,
+            "diffusion": 0.65,
+            "cooling": 1.8,
+            "indigo_shadow": true,
+            "axis": "x"
+          },
+          "expressions": {},
+          "keyframes": [
+            {
+              "t_s": 0.0,
+              "param": "brightness",
+              "value": 0.6,
+              "easing": "ease_in_out"
+            },
+            {
+              "t_s": 10.5,
+              "param": "brightness",
+              "value": 0.04,
+              "easing": "ease_in_out"
+            }
+          ],
+          "spatial_mask": {
+            "kind": "none",
+            "axis": "x",
+            "position": 0.5,
+            "width": 0.25,
+            "center": [
+              0.5,
+              0.5,
+              0.5
+            ],
+            "radius": 0.3,
+            "box_min": [
+              0.0,
+              0.0,
+              0.0
+            ],
+            "box_max": [
+              1.0,
+              1.0,
+              1.0
+            ],
+            "modulo": 2,
+            "remainder": 0,
+            "softness": 0.08,
+            "invert": false
+          },
+          "filters": [
+            {
+              "type": "dim2warm",
+              "enabled": true,
+              "params": {
+                "amount": 0.85,
+                "curve": 1.5,
+                "warm_color": [
+                  255,
+                  110,
+                  20
+                ]
+              }
+            }
+          ],
+          "snap_zcl": true,
+          "name": "Last filament",
+          "color": "#ff8c24"
+        }
+      ]
+    },
+    {
+      "id": "floor_roots",
+      "name": "Floor · Uplights",
+      "target_group": "bodenstrahler",
+      "blend_mode": "add",
+      "opacity": 0.9,
+      "muted": false,
+      "solo": false,
+      "kind": "layer",
+      "parent_id": null,
+      "clipped_to_below": false,
+      "height_px": 42,
+      "clips": [
+        {
+          "id": "floor_intro",
+          "start_s": 0.0,
+          "end_s": 17.0819,
+          "fade_in_s": 6.0,
+          "fade_out_s": 0.0,
+          "preset": "solid",
+          "opacity": 1.0,
+          "params": {
+            "color": [
+              0,
+              90,
+              220
+            ],
+            "brightness": 0.18
+          },
+          "expressions": {},
+          "keyframes": [],
+          "spatial_mask": {
+            "kind": "none",
+            "axis": "x",
+            "position": 0.5,
+            "width": 0.25,
+            "center": [
+              0.5,
+              0.5,
+              0.5
+            ],
+            "radius": 0.3,
+            "box_min": [
+              0.0,
+              0.0,
+              0.0
+            ],
+            "box_max": [
+              1.0,
+              1.0,
+              1.0
+            ],
+            "modulo": 2,
+            "remainder": 0,
+            "softness": 0.08,
+            "invert": false
+          },
+          "filters": [],
+          "snap_zcl": true,
+          "name": "Cold roots",
+          "color": "#005adc"
+        },
+        {
+          "id": "floor_verse",
+          "start_s": 54.9152,
+          "end_s": 89.0795,
+          "fade_in_s": 0.0,
+          "fade_out_s": 0.0,
+          "preset": "pulse_breathe",
+          "opacity": 1.0,
+          "params": {
+            "color": [
+              255,
+              36,
+              82
+            ],
+            "accent_color": [
+              0,
+              205,
+              255
+            ],
+            "axis": "z",
+            "rate_hz": 0.3,
+            "depth": 0.6,
+            "spatial_offset": 0.5,
+            "brightness": 0.5
+          },
+          "expressions": {},
+          "keyframes": [],
+          "spatial_mask": {
+            "kind": "none",
+            "axis": "x",
+            "position": 0.5,
+            "width": 0.25,
+            "center": [
+              0.5,
+              0.5,
+              0.5
+            ],
+            "radius": 0.3,
+            "box_min": [
+              0.0,
+              0.0,
+              0.0
+            ],
+            "box_max": [
+              1.0,
+              1.0,
+              1.0
+            ],
+            "modulo": 2,
+            "remainder": 0,
+            "softness": 0.08,
+            "invert": false
+          },
+          "filters": [
+            {
+              "type": "audio_mod",
+              "enabled": true,
+              "params": {
+                "source": "kick",
+                "depth": 0.25,
+                "mode": "brightness"
+              }
+            }
+          ],
+          "snap_zcl": true,
+          "name": "Pink roots",
+          "color": "#ff2452"
+        },
+        {
+          "id": "floor_heat",
+          "start_s": 120.8522,
+          "end_s": 142.0016,
+          "fade_in_s": 0.0,
+          "fade_out_s": 0.0,
+          "preset": "solid",
+          "opacity": 1.0,
+          "params": {
+            "color": [
+              255,
+              120,
+              24
+            ],
+            "brightness": 0.45
+          },
+          "expressions": {},
+          "keyframes": [],
+          "spatial_mask": {
+            "kind": "none",
+            "axis": "x",
+            "position": 0.5,
+            "width": 0.25,
+            "center": [
+              0.5,
+              0.5,
+              0.5
+            ],
+            "radius": 0.3,
+            "box_min": [
+              0.0,
+              0.0,
+              0.0
+            ],
+            "box_max": [
+              1.0,
+              1.0,
+              1.0
+            ],
+            "modulo": 2,
+            "remainder": 0,
+            "softness": 0.08,
+            "invert": false
+          },
+          "filters": [
+            {
+              "type": "beat_gate",
+              "enabled": true,
+              "params": {
+                "division": "1/4",
+                "duty": 0.6,
+                "floor": 0.05,
+                "softness": 0.03
+              }
+            }
+          ],
+          "snap_zcl": true,
+          "name": "Amber roots",
+          "color": "#ff7818"
+        },
+        {
+          "id": "floor_build",
+          "start_s": 142.0016,
+          "end_s": 169.6,
+          "fade_in_s": 0.0,
+          "fade_out_s": 0.0,
+          "preset": "strobe_blinder",
+          "opacity": 1.0,
+          "params": {
+            "division": "1/8",
+            "color": [
+              255,
+              246,
+              232
+            ],
+            "bg_color": [
+              4,
+              2,
+              8
+            ],
+            "duty": 0.2,
+            "softness": 0.02,
+            "floor": 0.03,
+            "brightness": 0.8
+          },
+          "expressions": {},
+          "keyframes": [
+            {
+              "t_s": 0.0,
+              "param": "duty",
+              "value": 0.1,
+              "easing": "ease_in"
+            },
+            {
+              "t_s": 26.0,
+              "param": "duty",
+              "value": 0.35,
+              "easing": "ease_in"
+            }
+          ],
+          "spatial_mask": {
+            "kind": "none",
+            "axis": "x",
+            "position": 0.5,
+            "width": 0.25,
+            "center": [
+              0.5,
+              0.5,
+              0.5
+            ],
+            "radius": 0.3,
+            "box_min": [
+              0.0,
+              0.0,
+              0.0
+            ],
+            "box_max": [
+              1.0,
+              1.0,
+              1.0
+            ],
+            "modulo": 2,
+            "remainder": 0,
+            "softness": 0.08,
+            "invert": false
+          },
+          "filters": [],
+          "snap_zcl": true,
+          "name": "Build roots",
+          "color": "#ffffff"
+        },
+        {
+          "id": "floor_drop",
+          "start_s": 173.8594,
+          "end_s": 190.9415,
+          "fade_in_s": 0.0,
+          "fade_out_s": 0.0,
+          "preset": "pulse_breathe",
+          "opacity": 1.0,
+          "params": {
+            "color": [
+              255,
+              36,
+              82
+            ],
+            "accent_color": [
+              255,
+              246,
+              232
+            ],
+            "axis": "z",
+            "rate_hz": 0.8,
+            "depth": 0.8,
+            "spatial_offset": 0.4,
+            "brightness": 1
+          },
+          "expressions": {},
+          "keyframes": [],
+          "spatial_mask": {
+            "kind": "none",
+            "axis": "x",
+            "position": 0.5,
+            "width": 0.25,
+            "center": [
+              0.5,
+              0.5,
+              0.5
+            ],
+            "radius": 0.3,
+            "box_min": [
+              0.0,
+              0.0,
+              0.0
+            ],
+            "box_max": [
+              1.0,
+              1.0,
+              1.0
+            ],
+            "modulo": 2,
+            "remainder": 0,
+            "softness": 0.08,
+            "invert": false
+          },
+          "filters": [
+            {
+              "type": "audio_mod",
+              "enabled": true,
+              "params": {
+                "source": "kick",
+                "depth": 0.4,
+                "mode": "brightness"
+              }
+            },
+            {
+              "type": "color_grade",
+              "enabled": true,
+              "params": {
+                "hue_shift": 0,
+                "saturation": 1.3,
+                "contrast": 1.1,
+                "lift": 0
+              }
+            }
+          ],
+          "snap_zcl": true,
+          "name": "DROP roots",
+          "color": "#ff2452"
+        },
+        {
+          "id": "floor_drop2",
+          "start_s": 190.9415,
+          "end_s": 207.8302,
+          "fade_in_s": 0.0,
+          "fade_out_s": 0.0,
+          "preset": "chase_scanner",
+          "opacity": 1.0,
+          "params": {
+            "axis": "x",
+            "direction": "pingpong",
+            "color": [
+              0,
+              205,
+              255
+            ],
+            "tail_color": [
+              255,
+              36,
+              82
+            ],
+            "bg_color": [
+              2,
+              4,
+              10
+            ],
+            "width": 0.15,
+            "speed": 0.5,
+            "bg_level": 0.01,
+            "brightness": 0.9
+          },
+          "expressions": {},
+          "keyframes": [],
+          "spatial_mask": {
+            "kind": "none",
+            "axis": "x",
+            "position": 0.5,
+            "width": 0.25,
+            "center": [
+              0.5,
+              0.5,
+              0.5
+            ],
+            "radius": 0.3,
+            "box_min": [
+              0.0,
+              0.0,
+              0.0
+            ],
+            "box_max": [
+              1.0,
+              1.0,
+              1.0
+            ],
+            "modulo": 2,
+            "remainder": 0,
+            "softness": 0.08,
+            "invert": false
+          },
+          "filters": [
+            {
+              "type": "mirror_symmetry",
+              "enabled": true,
+              "params": {
+                "axis": "x",
+                "mix": 0.35
+              }
+            }
+          ],
+          "snap_zcl": true,
+          "name": "Drop II roots",
+          "color": "#00cdff"
+        },
+        {
+          "id": "floor_after",
+          "start_s": 207.8302,
+          "end_s": 224.9123,
+          "fade_in_s": 2.0,
+          "fade_out_s": 2.0,
+          "preset": "solid",
+          "opacity": 1.0,
+          "params": {
+            "color": [
+              255,
+              188,
+              76
+            ],
+            "brightness": 0.23
+          },
+          "expressions": {},
+          "keyframes": [],
+          "spatial_mask": {
+            "kind": "none",
+            "axis": "x",
+            "position": 0.5,
+            "width": 0.25,
+            "center": [
+              0.5,
+              0.5,
+              0.5
+            ],
+            "radius": 0.3,
+            "box_min": [
+              0.0,
+              0.0,
+              0.0
+            ],
+            "box_max": [
+              1.0,
+              1.0,
+              1.0
+            ],
+            "modulo": 2,
+            "remainder": 0,
+            "softness": 0.08,
+            "invert": false
+          },
+          "filters": [],
+          "snap_zcl": true,
+          "name": "Afterglow roots",
+          "color": "#ffbc4c"
+        },
+        {
+          "id": "floor_return",
+          "start_s": 259.0766,
+          "end_s": 276.1587,
+          "fade_in_s": 0.0,
+          "fade_out_s": 0.0,
+          "preset": "pulse_breathe",
+          "opacity": 1.0,
+          "params": {
+            "color": [
+              236,
+              24,
+              152
+            ],
+            "accent_color": [
+              0,
+              205,
+              255
+            ],
+            "axis": "z",
+            "rate_hz": 0.25,
+            "depth": 0.5,
+            "spatial_offset": 0.45,
+            "brightness": 0.5
+          },
+          "expressions": {},
+          "keyframes": [],
+          "spatial_mask": {
+            "kind": "none",
+            "axis": "x",
+            "position": 0.5,
+            "width": 0.25,
+            "center": [
+              0.5,
+              0.5,
+              0.5
+            ],
+            "radius": 0.3,
+            "box_min": [
+              0.0,
+              0.0,
+              0.0
+            ],
+            "box_max": [
+              1.0,
+              1.0,
+              1.0
+            ],
+            "modulo": 2,
+            "remainder": 0,
+            "softness": 0.08,
+            "invert": false
+          },
+          "filters": [
+            {
+              "type": "audio_mod",
+              "enabled": true,
+              "params": {
+                "source": "kick",
+                "depth": 0.2,
+                "mode": "brightness"
+              }
+            }
+          ],
+          "snap_zcl": true,
+          "name": "Return roots",
+          "color": "#ec1898"
+        },
+        {
+          "id": "floor_outro",
+          "start_s": 276.1587,
+          "end_s": 287.1147,
+          "fade_in_s": 0.0,
+          "fade_out_s": 2.0,
+          "preset": "solid",
+          "opacity": 1.0,
+          "params": {
+            "color": [
+              255,
+              120,
+              24
+            ],
+            "brightness": 0.3
+          },
+          "expressions": {},
+          "keyframes": [
+            {
+              "t_s": 0.0,
+              "param": "brightness",
+              "value": 0.35,
+              "easing": "ease_in_out"
+            },
+            {
+              "t_s": 10.0,
+              "param": "brightness",
+              "value": 0.04,
+              "easing": "ease_in_out"
+            }
+          ],
+          "spatial_mask": {
+            "kind": "none",
+            "axis": "x",
+            "position": 0.5,
+            "width": 0.25,
+            "center": [
+              0.5,
+              0.5,
+              0.5
+            ],
+            "radius": 0.3,
+            "box_min": [
+              0.0,
+              0.0,
+              0.0
+            ],
+            "box_max": [
+              1.0,
+              1.0,
+              1.0
+            ],
+            "modulo": 2,
+            "remainder": 0,
+            "softness": 0.08,
+            "invert": false
+          },
+          "filters": [],
+          "snap_zcl": true,
+          "name": "Last roots",
+          "color": "#ff7818"
+        }
+      ]
+    },
+    {
+      "id": "blackout",
+      "name": "Blackout · Override",
+      "target_group": "all",
+      "blend_mode": "override",
+      "opacity": 1.0,
+      "muted": false,
+      "solo": false,
+      "kind": "layer",
+      "parent_id": null,
+      "clipped_to_below": false,
+      "height_px": 36,
+      "clips": [
+        {
+          "id": "blackout_pre",
+          "start_s": 169.6,
+          "end_s": 173.55,
+          "fade_in_s": 0.0,
+          "fade_out_s": 0.0,
+          "preset": "solid",
+          "opacity": 1.0,
+          "params": {
+            "color": [
+              0,
+              0,
+              0
+            ],
+            "brightness": 0
+          },
+          "expressions": {},
+          "keyframes": [],
+          "spatial_mask": {
+            "kind": "none",
+            "axis": "x",
+            "position": 0.5,
+            "width": 0.25,
+            "center": [
+              0.5,
+              0.5,
+              0.5
+            ],
+            "radius": 0.3,
+            "box_min": [
+              0.0,
+              0.0,
+              0.0
+            ],
+            "box_max": [
+              1.0,
+              1.0,
+              1.0
+            ],
+            "modulo": 2,
+            "remainder": 0,
+            "softness": 0.08,
+            "invert": false
+          },
+          "filters": [],
+          "snap_zcl": true,
+          "name": "Pre-drop blackout",
+          "color": "#000000"
+        },
+        {
+          "id": "flash_drop1",
+          "start_s": 173.8594,
+          "end_s": 174.15,
+          "fade_in_s": 0.0,
+          "fade_out_s": 0.0,
+          "preset": "solid",
+          "opacity": 1.0,
+          "params": {
+            "color": [
+              255,
+              250,
+              240
+            ],
+            "brightness": 1
+          },
+          "expressions": {},
+          "keyframes": [],
+          "spatial_mask": {
+            "kind": "none",
+            "axis": "x",
+            "position": 0.5,
+            "width": 0.25,
+            "center": [
+              0.5,
+              0.5,
+              0.5
+            ],
+            "radius": 0.3,
+            "box_min": [
+              0.0,
+              0.0,
+              0.0
+            ],
+            "box_max": [
+              1.0,
+              1.0,
+              1.0
+            ],
+            "modulo": 2,
+            "remainder": 0,
+            "softness": 0.08,
+            "invert": false
+          },
+          "filters": [],
+          "snap_zcl": true,
+          "name": "Drop flash",
+          "color": "#fffaf0"
+        },
+        {
+          "id": "flash_drop2",
+          "start_s": 190.9415,
+          "end_s": 191.15,
+          "fade_in_s": 0.0,
+          "fade_out_s": 0.0,
+          "preset": "solid",
+          "opacity": 1.0,
+          "params": {
+            "color": [
+              210,
+              248,
+              255
+            ],
+            "brightness": 1
+          },
+          "expressions": {},
+          "keyframes": [],
+          "spatial_mask": {
+            "kind": "none",
+            "axis": "x",
+            "position": 0.5,
+            "width": 0.25,
+            "center": [
+              0.5,
+              0.5,
+              0.5
+            ],
+            "radius": 0.3,
+            "box_min": [
+              0.0,
+              0.0,
+              0.0
+            ],
+            "box_max": [
+              1.0,
+              1.0,
+              1.0
+            ],
+            "modulo": 2,
+            "remainder": 0,
+            "softness": 0.08,
+            "invert": false
+          },
+          "filters": [],
+          "snap_zcl": true,
+          "name": "Drop flash",
+          "color": "#fffaf0"
+        },
+        {
+          "id": "blackout_end",
+          "start_s": 286.2,
+          "end_s": 287.1147,
+          "fade_in_s": 0.0,
+          "fade_out_s": 0.0,
+          "preset": "solid",
+          "opacity": 1.0,
+          "params": {
+            "color": [
+              0,
+              0,
+              0
+            ],
+            "brightness": 0
+          },
+          "expressions": {},
+          "keyframes": [],
+          "spatial_mask": {
+            "kind": "none",
+            "axis": "x",
+            "position": 0.5,
+            "width": 0.25,
+            "center": [
+              0.5,
+              0.5,
+              0.5
+            ],
+            "radius": 0.3,
+            "box_min": [
+              0.0,
+              0.0,
+              0.0
+            ],
+            "box_max": [
+              1.0,
+              1.0,
+              1.0
+            ],
+            "modulo": 2,
+            "remainder": 0,
+            "softness": 0.08,
+            "invert": false
+          },
+          "filters": [],
+          "snap_zcl": true,
+          "name": "End blackout",
+          "color": "#000000"
+        }
+      ]
+    }
+  ],
+  "notes": "Supernova live show for Slayyyter — DANCE… Built from the extracted 112.4 BPM blueprint. Cold chrome intro, mirrorball verse, red pressure build, 2-bar blackout, 34-second supernova drop with mirrored wings and shockwave, acid runway, ice afterglow, void, heartbeat return, amber last call.",
+  "created_at": null
+}

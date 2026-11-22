@@ -67,6 +67,8 @@ class SendspinAudioSource:
         block=512,
         stop_event=None,
         state_dir="config",
+        metadata_only=False,
+        drain_audio=False,
     ):
         self.server_url = server_url
         self.client_name = client_name
@@ -75,6 +77,9 @@ class SendspinAudioSource:
         self.block = int(block)
         self.stop_event = stop_event or threading.Event()
         self.state_dir = state_dir
+        self.metadata_only = bool(metadata_only)
+        self.drain_audio = bool(drain_audio)
+        self._drain_thread = None
         self.connected = False
         self.last_error = _IMPORT_ERROR
         self.latency = 0.0
@@ -97,6 +102,7 @@ class SendspinAudioSource:
         self._thread = None
         self.pairing_token = None
         self.client_id = None
+        self.paired = False
         self.track_key = None
         self.track_title = ""
         self.track_artist = ""
@@ -106,6 +112,7 @@ class SendspinAudioSource:
         self._track_progress_base = 0.0
         self._track_progress_t0 = time.monotonic()
         self._track_speed = 1.0
+        self.meta_lead_s = 0.0
 
     # -- lifecycle --------------------------------------------------------
     def start(self):
@@ -115,8 +122,29 @@ class SendspinAudioSource:
         if self._thread and self._thread.is_alive():
             return
         self.stop_event.clear()
+        if self.drain_audio and not self.metadata_only:
+            if self._drain_thread is None or not self._drain_thread.is_alive():
+                self._drain_thread = threading.Thread(
+                    target=self._drain_loop, name="hueme-sendspin-drain", daemon=True
+                )
+                self._drain_thread.start()
         self._thread = threading.Thread(target=self._run_loop, name="hueme-sendspin", daemon=True)
         self._thread.start()
+
+    def _drain_loop(self):
+        """Keep the PLAYER role fed even though Studio does not render PCM.
+
+        A player that never reads its stream lets the Sendspin send-ahead/buffer
+        grow (``audio_lead_s`` was 20+ s) and can disturb the MA group timing.
+        The legacy AudioEngine reads the source itself; this drain is opt-in.
+        """
+        while not self.stop_event.is_set():
+            try:
+                self.read()
+            except Exception:
+                time.sleep(0.05)
+            else:
+                time.sleep(0.005)
 
     def _run_loop(self):
         self._loop = asyncio.new_event_loop()
@@ -152,7 +180,14 @@ class SendspinAudioSource:
         self._timing_logged = False
         os.makedirs(self.state_dir, exist_ok=True)
         identity = _load_or_create_identity(self.state_dir)
-        pairing_store = FileClientPairingStore(os.path.join(self.state_dir, "sendspin_pairings.json"))
+        # ``FileClientPairingStore`` only reads the persisted records through its
+        # async ``open()`` classmethod. Constructing it directly started with an
+        # empty store on every reconnect: the old pairing record vanished, and a
+        # new pairing PSK/token was generated each time, so MA could never keep
+        # the client paired.
+        pairing_store = await FileClientPairingStore.open(
+            os.path.join(self.state_dir, "sendspin_pairings.json")
+        )
         pairing_psk = await pairing_store.pairing_psk()
         if pairing_psk is None:
             psk = generate_psk()
@@ -162,21 +197,29 @@ class SendspinAudioSource:
         body = base64.b32encode(payload).decode("ascii").rstrip("=").replace("2", "9")
         self.pairing_token = "SP:0" + body
         self.client_id = identity.peer_id
-        player_support = ClientHelloPlayerSupport(
-            supported_formats=[
-                SupportedAudioFormat(
-                    codec=AudioCodec.PCM,
-                    channels=self.channels,
-                    sample_rate=self.rate,
-                    bit_depth=16,
-                )
-            ],
-            buffer_capacity=4 * 1024 * 1024,
-        )
+        log.info("Sendspin pairing token: %s", self.pairing_token)
+        player_support = None
+        roles = [Roles.METADATA]
+        if not self.metadata_only:
+            roles = [Roles.PLAYER, Roles.METADATA]
+            player_support = ClientHelloPlayerSupport(
+                supported_formats=[
+                    SupportedAudioFormat(
+                        codec=AudioCodec.PCM,
+                        channels=self.channels,
+                        sample_rate=self.rate,
+                        bit_depth=16,
+                    )
+                ],
+                # Advertise ~1 s, not 4 MiB (~22 s at 48 kHz stereo). The server
+                # fills the advertised capacity ahead of playback; a huge value
+                # inflated the MA group lead and dominated the perceived delay.
+                buffer_capacity=max(self.bytes_per_second, 256 * 1024),
+            )
         client = SendspinClient(
             identity,
             self.client_name,
-            [Roles.PLAYER, Roles.METADATA],
+            roles,
             pairing_store=pairing_store,
             player_support=player_support,
         )
@@ -187,12 +230,21 @@ class SendspinAudioSource:
         await client.connect(self.server_url)
         self.connected = True
         self.last_error = None
-        log.info("Sendspin connected (server: %s)", getattr(client.server_info, "name", "?"))
+        psk = getattr(client, "noise_psk", None)
+        self.paired = str(getattr(psk, "category", "")) == "long_term"
+        log.info(
+            "Sendspin connected (server: %s, paired: %s)",
+            getattr(client.server_info, "name", "?"),
+            self.paired,
+        )
         try:
             while not self.stop_event.is_set():
+                psk = getattr(client, "noise_psk", None)
+                self.paired = str(getattr(psk, "category", "")) == "long_term"
                 await asyncio.sleep(0.2)
         finally:
             self.connected = False
+            self.paired = False
             try:
                 await client.disconnect()
             except Exception:
@@ -209,6 +261,23 @@ class SendspinAudioSource:
                 asyncio.run_coroutine_threadsafe(client.disconnect(), loop)
             except Exception:
                 pass
+
+    def restart(self):
+        """Drop the current Sendspin session and reconnect with the same identity."""
+        self.close()
+        thread = self._thread
+        if thread is not None and thread.is_alive() and thread is not threading.current_thread():
+            thread.join(timeout=3.0)
+        drain = self._drain_thread
+        if drain is not None and drain.is_alive() and drain is not threading.current_thread():
+            drain.join(timeout=1.5)
+        self._drain_thread = None
+        self._thread = None
+        self._client = None
+        self.connected = False
+        self.paired = False
+        self.stop_event.clear()
+        self.start()
 
     # -- audio ------------------------------------------------------------
     def _drop_chunk_bytes_locked(self, n):
@@ -296,6 +365,25 @@ class SendspinAudioSource:
                 duration = max(0.0, int(progress.track_duration) / 1000.0)
             except (AttributeError, TypeError, ValueError):
                 pass
+        # ``metadata.timestamp`` is the server-clock time at which that
+        # ``track_progress`` is valid.  Mapping it through the Sendspin clock to
+        # the local monotonic domain lines the show up with the buffered audio
+        # instead of assuming the metadata was valid the instant it arrived.
+        now = time.monotonic()
+        base_time = now
+        lead = 0.0
+        meta_ts = getattr(meta, "timestamp", None)
+        client = self._client
+        if meta_ts is not None and client is not None:
+            try:
+                play_us = int(client.compute_play_time(int(meta_ts)))
+                delta = (play_us - int(client.now_us())) / 1e6
+                # Ignore absurd clock samples; a normal buffered lead is < 5 s.
+                if -5.0 <= delta <= 5.0:
+                    lead = delta
+                    base_time = now + delta
+            except Exception:
+                pass
         key = "|".join(part for part in (artist, title) if part) or title
         with self._track_lock:
             changed = key != self.track_key
@@ -305,8 +393,9 @@ class SendspinAudioSource:
             self.track_item_id = item_id or None
             self.track_duration_s = duration
             self._track_progress_base = base
-            self._track_progress_t0 = time.monotonic()
+            self._track_progress_t0 = base_time
             self._track_speed = speed
+            self.meta_lead_s = lead
         if changed:
             log.info("Sendspin track: '%s' (%.0fs)", key, duration)
 

@@ -279,17 +279,32 @@ def test_evaluation_is_repeatable_and_no_show_noops(rig):
         assert first.active_clips == second.active_clips
 
 
-def test_default_show_has_light_throughout_and_pre_drop_blackout(rig):
-    show = ShowDoc.from_json(SHOW_PATH.read_text(encoding="utf-8"))
+def test_override_blackout_and_default_show_render(rig):
+    # Blackout semantics are independent of the user-authored demo show.
+    show = simple_show(
+        [
+            Track(id="base", name="Base", clips=[solid_clip("base", [255, 255, 255])]),
+            Track(
+                id="cut",
+                name="Blackout",
+                blend_mode="override",
+                clips=[solid_clip("black", [0, 0, 0], start=1.0, end=2.0)],
+            ),
+        ]
+    )
     comp = Compositor(rig, show)
-    for t in (5.0, 40.0, 80.0, 120.0, 150.0, 200.0):
-        assert comp.evaluate(t).rgb.max() > 0.0
-    blackout = comp.evaluate(32.5)
-    assert np.allclose(blackout.rgb, 0.0)
-    assert (
-        blackout.snap_zcl[:7].all() or blackout.snap_zcl.sum() >= 0
-    )  # boundary snap is allowed
-    assert comp.evaluate(34.5).rgb.max() > 10.0
+    assert comp.evaluate(0.5).rgb.max() > 0.0
+    assert np.allclose(comp.evaluate(1.5).rgb, 0.0)
+    assert comp.evaluate(2.5).rgb.max() > 0.0
+
+    # The real show is runtime data: it must evaluate at any point in its
+    # duration without NaNs or out-of-range values.
+    user_show = ShowDoc.from_json(SHOW_PATH.read_text(encoding="utf-8"))
+    user_comp = Compositor(rig, user_show)
+    for t in np.linspace(0.5, user_show.duration_s - 0.5, 4):
+        frame = user_comp.evaluate(float(t))
+        assert np.isfinite(frame.rgb).all()
+        assert frame.rgb.min() >= 0.0 and frame.rgb.max() <= 255.0
 
 
 def test_empty_rig_is_a_valid_sandbox():
@@ -317,3 +332,125 @@ def test_filters_are_applied_without_changing_showdoc(rig):
     assert early.rgb[0].max() > 0.0
     assert late.rgb[0].max() == 0.0
     assert clip.filters[0].params == {"duty": 0.2, "floor": 0.0}
+
+
+def test_expression_generator_overrides_opacity_and_parameters(rig):
+    clip = Clip(
+        id="expr",
+        start_s=0.0,
+        end_s=4.0,
+        preset="solid",
+        opacity=1.0,
+        params={"color": [200, 0, 0], "brightness": 1.0},
+        expressions={
+            "opacity": "0.5 + 0.5 * sin(t * TAU)",
+            "brightness": "clamp(val * (0.5 + kick), 0, 1)",
+        },
+    )
+    # Unknown symbol must fail validation rather than silently evaluating.
+    with pytest.raises(Exception):
+        Clip(
+            id="bad",
+            start_s=0.0,
+            end_s=1.0,
+            preset="solid",
+            expressions={"opacity": "spring"},
+        )
+    track = Track(id="expr", name="Expr", target_group="all", clips=[clip])
+    comp = Compositor(rig, simple_show([track]))
+    early = comp.evaluate(0.0).rgb[0]
+    quarter = comp.evaluate(0.25).rgb[0]
+    assert np.allclose(early, [100.0, 0.0, 0.0], atol=2.0)
+    assert quarter[0] > 0.0
+
+
+def test_safe_expression_evaluator_has_no_builtins_or_attribute_access():
+    from hueme_studio.expressions import ExpressionError, evaluate_expression
+
+    assert evaluate_expression("clamp(val + sin(TAU / 4), 0, 10)", {"val": 2.0}) == pytest.approx(
+        3.0
+    )
+    for expression in (
+        "__import__('os').system('true')",
+        "t.__class__",
+        "val[0]",
+        "open('x')",
+        "lambda: 1",
+    ):
+        with pytest.raises(ExpressionError):
+            evaluate_expression(expression, {"val": 1.0, "t": 0.0})
+
+
+def test_clipping_mask_uses_the_layer_below_alpha(rig):
+    base = Track(
+        id="base",
+        name="Base",
+        target_group="all",
+        clips=[
+            solid_clip(
+                "base",
+                [100, 100, 100],
+                spatial_mask=SpatialMask(kind="parity", modulo=2, remainder=0),
+            )
+        ],
+    )
+    clipped = Track(
+        id="clip",
+        name="Clipped",
+        target_group="all",
+        clipped_to_below=True,
+        blend_mode="normal",
+        clips=[solid_clip("clip", [255, 0, 0])],
+    )
+    result = Compositor(rig, simple_show([base, clipped])).evaluate(1.0)
+    assert np.allclose(result.rgb[0], [255, 0, 0])
+    assert np.allclose(result.rgb[1], [0, 0, 0])
+    assert np.allclose(result.rgb[2], [255, 0, 0])
+
+
+def test_global_tracks_evaluate_last_and_single_fixture_targets_work(rig):
+    base = Track(
+        id="base",
+        name="Base",
+        target_group="all",
+        clips=[solid_clip("base", [50, 50, 50])],
+    )
+    single = Track(
+        id="single",
+        name="Single",
+        target_group="galerie_01",
+        clips=[solid_clip("single", [0, 255, 0])],
+    )
+    global_track = Track(
+        id="global",
+        name="Global",
+        target_group="all",
+        kind="global",
+        clips=[solid_clip("global", [200, 0, 0])],
+    )
+    result = Compositor(rig, simple_show([global_track, base, single])).evaluate(1.0)
+    assert np.allclose(result.rgb[0], [200, 0, 0])
+    assert np.allclose(result.rgb[7], [200, 0, 0])
+
+
+def test_sub_track_requires_parent_and_inherits_order(rig):
+    show = simple_show(
+        [
+            Track(id="parent", name="Parent", target_group="all"),
+            Track(
+                id="child",
+                name="Child",
+                target_group="boden_01",
+                kind="sub",
+                parent_id="parent",
+            ),
+        ]
+    )
+    assert [track.id for track in show.evaluation_order()] == ["parent", "child"]
+    with pytest.raises(Exception):
+        ShowDoc(
+            id="bad",
+            name="Bad",
+            duration_s=1.0,
+            tracks=[Track(id="orphan", name="Orphan", kind="sub")],
+        )

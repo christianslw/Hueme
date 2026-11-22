@@ -2,15 +2,125 @@
   "schema_version": 1,
   "shows": [
     {
+      "id": "new_show",
+      "name": "deep blue",
+      "file": "new_show.json",
+      "duration_s": 176.7503,
+      "bpm": 130.8,
+      "track_count": 1,
+      "clip_count": 1,
+      "artist": "",
+      "title": "deep blue",
+      "match": {
+        "artist": "",
+        "title": "deep blue",
+        "normalized_keys": [
+          "deep blue"
+        ],
+        "ma_item_ids": [],
+        "duration_s": 176.7503
+      }
+    },
+    {
+      "id": "flowers_hurricane",
+      "name": "Flowers In A Hurricane",
+      "file": "flowers_hurricane.json",
+      "duration_s": 224.9317,
+      "bpm": 125.0,
+      "track_count": 8,
+      "clip_count": 117,
+      "artist": "Grand Theft Auto VI/Justice/SZA/Tame Impala",
+      "title": "Flower In A Hurricane [From GTAVI: Original Score]",
+      "match": {
+        "artist": "Grand Theft Auto VI/Justice/SZA/Tame Impala",
+        "title": "Flower In A Hurricane [From GTAVI: Original Score]",
+        "normalized_keys": [
+          "grand theft auto vi/justice/sza/tame impala|flower in a hurricane [from gtavi: original score]"
+        ],
+        "ma_item_ids": [],
+        "duration_s": 225.0
+      }
+    },
+    {
+      "id": "jane_riot_bloom",
+      "name": "JANE — Slow Tide (Harmonic Cut)",
+      "file": "jane_riot_bloom.json",
+      "duration_s": 159.3121,
+      "bpm": 110.3,
+      "track_count": 5,
+      "clip_count": 60,
+      "artist": "Jane",
+      "title": "Jane",
+      "match": {
+        "artist": "Jane",
+        "title": "Jane",
+        "normalized_keys": [
+          "jane",
+          "kedalos|jane"
+        ],
+        "ma_item_ids": [],
+        "duration_s": 159.3121
+      }
+    },
+    {
+      "id": "jane_smooth_sunrise",
+      "name": "JANE — Smooth Sunrise",
+      "file": "jane_smooth_sunrise.json",
+      "duration_s": 287.1147,
+      "bpm": 112.4,
+      "track_count": 5,
+      "clip_count": 5,
+      "artist": "Jane",
+      "title": "Jane",
+      "match": {
+        "artist": "Jane",
+        "title": "Jane",
+        "normalized_keys": [
+          "jane"
+        ],
+        "ma_item_ids": [],
+        "duration_s": 287.1147
+      }
+    },
+    {
       "id": "dance_loft_v1",
-      "name": "Dance Loft V1",
+      "name": "KREWELLA — One Life (Supernova Anthem)",
       "file": "dance_loft_v1.json",
-      "duration_s": 236.25,
-      "bpm": 128.0,
-      "track_count": 7,
-      "clip_count": 23,
-      "artist": "Demo Artist",
-      "title": "Dance Loft 128"
+      "duration_s": 220.7289,
+      "bpm": 86.6,
+      "track_count": 6,
+      "clip_count": 110,
+      "artist": "Manila Killa",
+      "title": "ONE LIFE",
+      "match": {
+        "artist": "Manila Killa",
+        "title": "ONE LIFE",
+        "normalized_keys": [
+          "manila killa|one life"
+        ],
+        "ma_item_ids": [],
+        "duration_s": 221.0
+      }
+    },
+    {
+      "id": "slayyyter_dance_supernova",
+      "name": "SLAYYYTER — DANCE… (Supernova Live)",
+      "file": "slayyyter_dance_supernova.json",
+      "duration_s": 287.1147,
+      "bpm": 112.4,
+      "track_count": 6,
+      "clip_count": 77,
+      "artist": "Slayyyter",
+      "title": "Dance...",
+      "match": {
+        "artist": "Slayyyter",
+        "title": "Dance...",
+        "normalized_keys": [
+          "slayyyter|dance..."
+        ],
+        "ma_item_ids": [],
+        "duration_s": 287.1147
+      }
     }
   ]
 }

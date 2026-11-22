@@ -12,6 +12,8 @@ services:
     environment:
       - PYTHONUNBUFFERED=1
       # - HUEME_MQTT_PASSWORD=change-me
+      # Optional ML structure/beat analyzer (Dockerfile.analyzer).
+      # - ANALYZER_URL=http://analyzer:8700
     command:
       - python
       - -m
@@ -29,3 +31,23 @@ services:
     # DDP/E1.31/WLED output needs LAN multicast/broadcast; uncomment and drop
     # the ports mapping above if the container must own the host network.
     # network_mode: host
+
+  # Optional allin1 sidecar. Start with:
+  #   docker compose -f docker-compose.example.yml up analyzer hueme
+  analyzer:
+    build:
+      context: .
+      dockerfile: Dockerfile.analyzer
+    container_name: hueme-analyzer
+    restart: unless-stopped
+    ports:
+      - "8700:8700"
+    environment:
+      - PYTHONUNBUFFERED=1
+      - TORCH_HOME=/models
+    volumes:
+      - analyzer-models:/models
+    stop_grace_period: 10s
+
+volumes:
+  analyzer-models:

@@ -1,0 +1,3408 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Hueme Studio — 3D Spatial Lighting NLE</title>
+<style>
+  :root {
+    --bg-0: #111214;
+    --bg-1: #17181b;
+    --bg-2: #1d1f23;
+    --bg-3: #25282d;
+    --line: #2b2e34;
+    --line-strong: #3a3e46;
+    --text-0: #e8e9ec;
+    --text-1: #b3b6bd;
+    --text-2: #7c8089;
+    --accent: #e8862e;
+    --accent-dim: #7a4618;
+    --ok: #58a66b;
+    --warn: #c9a34a;
+    --danger: #c45a52;
+    --info: #5e9aa8;
+    --viewport: #0b0c0e;
+    --mono: ui-monospace, "JetBrains Mono", "SFMono-Regular", Menlo, Consolas, monospace;
+    --sans: Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    --left-w: 295px;
+    --right-w: 335px;
+    --tl-h: 325px;
+  }
+
+  * { box-sizing: border-box; }
+  html, body {
+    margin: 0; padding: 0; height: 100%; width: 100%;
+    overflow: hidden; background: var(--bg-0); color: var(--text-0);
+    font: 12px/1.35 var(--sans); -webkit-font-smoothing: antialiased;
+    user-select: none;
+  }
+  button, input, select { font: inherit; color: inherit; }
+  button { cursor: pointer; }
+  .mono { font-family: var(--mono); font-variant-numeric: tabular-nums; }
+  .muted { color: var(--text-2); }
+  .hidden { display: none !important; }
+  svg.ico { width: 14px; height: 14px; stroke: currentColor; fill: none; stroke-width: 1.75; stroke-linecap: round; stroke-linejoin: round; flex: none; }
+  svg.ico.sm { width: 12px; height: 12px; }
+  svg.ico.lg { width: 16px; height: 16px; }
+
+  ::-webkit-scrollbar { width: 6px; height: 6px; }
+  ::-webkit-scrollbar-track { background: var(--bg-1); }
+  ::-webkit-scrollbar-thumb { background: var(--line-strong); }
+  ::-webkit-scrollbar-thumb:hover { background: #4c525d; }
+
+  /* ── App Shell ─────────────────────────────────────────────────────── */
+  .app { display: flex; flex-direction: column; height: 100vh; width: 100vw; overflow: hidden; }
+
+  /* Topbar: Application Menu Bar + Global Session Status */
+  .topbar {
+    height: 36px; flex: none; display: flex; align-items: center; gap: 4px;
+    padding: 0 8px; background: var(--bg-1); border-bottom: 1px solid var(--line);
+    z-index: 30;
+  }
+  .brand { display: flex; align-items: center; gap: 6px; font-weight: 700; font-size: 11px; letter-spacing: 0.1em; color: var(--text-0); padding-right: 4px; }
+  .brand-mark { width: 10px; height: 10px; background: var(--accent); display: inline-block; }
+  .brand span { color: var(--text-2); font-weight: 500; }
+  .vdiv { width: 1px; height: 18px; background: var(--line); flex: none; margin: 0 3px; }
+  .spacer { flex: 1; }
+
+  /* Classic NLE Top Menu Buttons */
+  .menu-bar { display: flex; align-items: center; gap: 1px; }
+  .menu-btn {
+    height: 24px; padding: 0 8px; border: 1px solid transparent; background: transparent;
+    color: var(--text-1); font-size: 11px; font-weight: 500; display: inline-flex; align-items: center; gap: 4px;
+  }
+  .menu-btn:hover, .menu-btn.open { background: var(--bg-3); border-color: var(--line-strong); color: var(--text-0); }
+  .menu-dropdown {
+    position: fixed; top: 35px; z-index: 80; min-width: 215px; background: var(--bg-2);
+    border: 1px solid var(--line-strong); box-shadow: 0 10px 26px rgba(0,0,0,0.65); padding: 3px;
+  }
+  .menu-item {
+    width: 100%; padding: 5px 9px; border: 0; background: transparent; color: var(--text-0);
+    font-size: 11px; display: flex; align-items: center; justify-content: space-between; gap: 14px; text-align: left;
+  }
+  .menu-item:hover { background: var(--bg-3); color: var(--accent); }
+  .menu-sep { height: 1px; background: var(--line); margin: 3px 0; }
+
+  .seg-group { display: inline-flex; border: 1px solid var(--line-strong); background: var(--bg-0); }
+  .seg-btn {
+    height: 24px; padding: 0 9px; border: 0; background: transparent; color: var(--text-2);
+    font-size: 11px; font-weight: 500; display: inline-flex; align-items: center; gap: 5px;
+  }
+  .seg-btn:hover { color: var(--text-0); background: var(--bg-2); }
+  .seg-btn.active { background: var(--bg-3); color: var(--accent); box-shadow: inset 0 -2px 0 var(--accent); }
+
+  /* Buttons & Inputs */
+  .btn {
+    height: 24px; padding: 0 8px; border: 1px solid var(--line-strong); background: var(--bg-3);
+    color: var(--text-0); font-size: 11px; display: inline-flex; align-items: center; justify-content: center;
+    gap: 5px; white-space: nowrap; transition: background 90ms linear, border-color 90ms linear;
+  }
+  .btn:hover { background: #2d3138; border-color: #4b505a; }
+  .btn:active { background: var(--bg-2); }
+  .btn:disabled { opacity: 0.36; cursor: default; pointer-events: none; }
+  .btn.sm { height: 21px; padding: 0 6px; font-size: 10px; }
+  .btn.icon { width: 24px; padding: 0; }
+  .btn.icon.sm { width: 21px; height: 21px; padding: 0; }
+  .btn.accent { border-color: var(--accent-dim); color: var(--accent); background: #231b13; }
+  .btn.accent:hover { background: #2e2216; border-color: var(--accent); }
+  .btn.danger { border-color: #5a2d2a; color: var(--danger); }
+  .btn.danger:hover { background: #2b1716; }
+  .btn.live-on { border-color: #2f5c3a; color: var(--ok); background: #152419; }
+  .btn.warn-on { border-color: #6b5624; color: var(--warn); background: #261f12; }
+
+  .led { width: 6px; height: 6px; background: var(--text-2); display: inline-block; flex: none; }
+  .led.ok { background: var(--ok); box-shadow: 0 0 6px var(--ok); }
+  .led.warn { background: var(--warn); box-shadow: 0 0 6px var(--warn); }
+  .led.danger { background: var(--danger); box-shadow: 0 0 6px var(--danger); }
+  .led.accent { background: var(--accent); }
+
+  .select, .input {
+    height: 24px; padding: 0 6px; border: 1px solid var(--line-strong); background: var(--bg-3);
+    color: var(--text-0); font-size: 11px; min-width: 0; outline: none;
+  }
+  .select:focus, .input:focus { border-color: var(--accent); }
+  .input.sm { height: 21px; font-size: 10px; }
+
+  /* Custom Spinner-Free Number Input with Clean Stepper Buttons */
+  input[type="number"]::-webkit-inner-spin-button,
+  input[type="number"]::-webkit-outer-spin-button {
+    -webkit-appearance: none;
+    margin: 0;
+  }
+  input[type="number"] { -moz-appearance: textfield; }
+  .num-wrap {
+    display: inline-flex; align-items: stretch; height: 21px;
+    border: 1px solid var(--line-strong); background: var(--bg-0); width: 64px; flex: none;
+  }
+  .num-wrap:focus-within { border-color: var(--accent); }
+  .num-wrap input {
+    width: 100%; border: 0; background: transparent; color: var(--text-0);
+    font-family: var(--mono); font-size: 10px; text-align: right; padding: 0 3px; outline: none; min-width: 0;
+  }
+  .num-spin {
+    display: flex; flex-direction: column; width: 13px; border-left: 1px solid var(--line); flex: none;
+  }
+  .num-spin button {
+    flex: 1; border: 0; padding: 0; background: var(--bg-2); color: var(--text-2);
+    font-size: 7px; line-height: 1; display: flex; align-items: center; justify-content: center;
+  }
+  .num-spin button:first-child { border-bottom: 1px solid var(--line); }
+  .num-spin button:hover { background: var(--bg-3); color: var(--accent); }
+
+  /* Custom Pointer-Driven Slider (No Native Browser Range Bugs!) */
+  .c-slider {
+    position: relative; height: 20px; width: 100%; display: flex; align-items: center;
+    cursor: ew-resize; touch-action: none; min-width: 40px;
+  }
+  .c-slider-track {
+    position: relative; width: 100%; height: 4px; background: var(--bg-0);
+    border: 1px solid var(--line-strong); overflow: hidden;
+  }
+  .c-slider-fill {
+    position: absolute; left: 0; top: 0; bottom: 0; background: var(--accent); pointer-events: none;
+  }
+  .c-slider-thumb {
+    position: absolute; top: 50%; width: 8px; height: 13px; margin-left: -4px; margin-top: -6.5px;
+    background: var(--text-0); border: 1px solid var(--bg-0); box-shadow: 0 0 0 1px var(--accent);
+    pointer-events: none; transition: background 80ms linear;
+  }
+  .c-slider:hover .c-slider-thumb, .c-slider.active .c-slider-thumb { background: var(--accent); }
+
+  input[type="color"].swatch {
+    -webkit-appearance: none; appearance: none; width: 26px; height: 21px; padding: 1px;
+    border: 1px solid var(--line-strong); background: var(--bg-3); cursor: pointer; flex: none;
+  }
+  input[type="color"].swatch::-webkit-color-swatch-wrapper { padding: 0; }
+  input[type="color"].swatch::-webkit-color-swatch { border: none; }
+
+  /* Toggle Switch */
+  .switch { position: relative; display: inline-flex; width: 28px; height: 14px; cursor: pointer; flex: none; }
+  .switch input { position: absolute; opacity: 0; pointer-events: none; }
+  .switch span { width: 100%; height: 100%; border: 1px solid var(--line-strong); background: var(--bg-0); transition: 100ms linear; }
+  .switch span::after { content: ""; display: block; width: 8px; height: 8px; margin: 2px; background: var(--text-2); transition: 100ms linear; }
+  .switch input:checked + span { border-color: var(--accent-dim); background: #261d13; }
+  .switch input:checked + span::after { transform: translateX(14px); background: var(--accent); }
+
+  /* ── Studio Workspace + Resizers ───────────────────────────────────── */
+  .studio-body { flex: 1; display: flex; flex-direction: column; min-height: 0; overflow: hidden; }
+  .upper-row { flex: 1; display: flex; min-height: 150px; overflow: hidden; }
+
+  .left-pane {
+    width: var(--left-w); flex: none; display: flex; flex-direction: column;
+    background: var(--bg-1); min-width: 220px; max-width: 480px; overflow: hidden;
+  }
+  .center-pane {
+    flex: 1; position: relative; background: var(--viewport); min-width: 260px; overflow: hidden;
+  }
+  .right-pane {
+    width: var(--right-w); flex: none; display: flex; flex-direction: column;
+    background: var(--bg-1); min-width: 260px; max-width: 540px; overflow: hidden;
+  }
+  .bottom-pane {
+    height: var(--tl-h); flex: none; display: flex; flex-direction: column;
+    background: var(--bg-1); min-height: 185px; max-height: 72vh; overflow: hidden;
+  }
+
+  .splitter-v { width: 4px; flex: none; background: var(--line); cursor: col-resize; z-index: 10; }
+  .splitter-v:hover, .splitter-v.dragging { background: var(--accent); }
+  .splitter-h { height: 4px; flex: none; background: var(--line); cursor: row-resize; z-index: 10; }
+  .splitter-h:hover, .splitter-h.dragging { background: var(--accent); }
+  .app.stage-mode .bottom-pane, .app.stage-mode .splitter-h { display: none; }
+
+  /* ── Left Sidebar Tabs & Hierarchical Rig Tree ─────────────────────── */
+  .pane-tabs { display: flex; height: 28px; flex: none; border-bottom: 1px solid var(--line); background: var(--bg-0); }
+  .pane-tab {
+    flex: 1; border: 0; border-right: 1px solid var(--line); background: transparent;
+    color: var(--text-2); font-size: 10px; font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase;
+    display: inline-flex; align-items: center; justify-content: center; gap: 4px;
+  }
+  .pane-tab:last-child { border-right: 0; }
+  .pane-tab:hover { color: var(--text-0); background: var(--bg-1); }
+  .pane-tab.active { color: var(--accent); background: var(--bg-1); box-shadow: inset 0 -2px 0 var(--accent); }
+
+  .pane-scroll { flex: 1; overflow-y: auto; padding: 6px; }
+  .search-box { position: relative; margin-bottom: 6px; }
+  .search-box input { width: 100%; padding-left: 24px; }
+  .search-box svg { position: absolute; left: 6px; top: 5px; color: var(--text-2); pointer-events: none; }
+
+  .cat-group { margin-bottom: 4px; border: 1px solid var(--line); background: var(--bg-0); }
+  .cat-head {
+    width: 100%; height: 22px; padding: 0 6px; border: 0; background: var(--bg-2); color: var(--text-1);
+    font-size: 10px; font-weight: 600; letter-spacing: 0.07em; text-transform: uppercase;
+    display: flex; align-items: center; gap: 5px; text-align: left;
+  }
+  .cat-head:hover { color: var(--text-0); }
+  .cat-head .chev { transition: transform 100ms linear; }
+  .cat-group.closed .cat-head .chev { transform: rotate(-90deg); }
+  .cat-group.closed .cat-body { display: none; }
+  .cat-body { padding: 3px; display: flex; flex-direction: column; gap: 2px; }
+
+  .fx-item {
+    display: flex; align-items: center; gap: 6px; padding: 4px 6px;
+    border: 1px solid transparent; background: var(--bg-1); color: var(--text-1);
+    font-size: 11px; cursor: grab; text-align: left;
+  }
+  .fx-item:hover { background: var(--bg-3); border-color: var(--line-strong); color: var(--text-0); }
+  .fx-dot { width: 6px; height: 6px; flex: none; }
+  .fx-item .fx-name { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .fx-item .fx-tag { font-family: var(--mono); font-size: 9px; color: var(--text-2); text-transform: uppercase; }
+
+  .list-row {
+    display: flex; align-items: center; gap: 5px; min-height: 24px; padding: 2px 6px;
+    border: 1px solid transparent; background: transparent; color: var(--text-1); font-size: 11px; cursor: pointer;
+  }
+  .list-row:hover { background: var(--bg-2); color: var(--text-0); }
+  .list-row.selected { border-color: var(--accent-dim); background: #231b13; color: var(--text-0); }
+  .list-row.incomplete { border-left: 2px solid var(--danger); background: rgba(196, 90, 82, 0.08); }
+  .list-row .name { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+  /* Hierarchical Folder Tree vs Smart Selection Chips */
+  .tree-folder { border: 1px solid var(--line); background: var(--bg-0); margin-bottom: 4px; }
+  .tree-folder-hdr {
+    display: flex; align-items: center; gap: 5px; height: 24px; padding: 0 6px;
+    background: var(--bg-2); cursor: pointer; font-size: 11px; font-weight: 600;
+  }
+  .tree-folder-hdr:hover { background: var(--bg-3); }
+  .tree-folder-hdr.selected { background: #261d14; color: var(--accent); box-shadow: inset 2px 0 0 var(--accent); }
+  .tree-children { padding: 2px 0 2px 14px; border-top: 1px solid #202329; }
+  .tree-folder.collapsed .tree-children { display: none; }
+
+  .smart-pill {
+    display: inline-flex; align-items: center; gap: 4px; padding: 3px 7px;
+    border: 1px dashed var(--info); background: rgba(94, 154, 168, 0.08); color: #9ad0dc;
+    font-size: 10px; font-family: var(--mono); cursor: pointer;
+  }
+  .smart-pill:hover, .smart-pill.selected { background: rgba(94, 154, 168, 0.22); color: #fff; }
+
+  .badge {
+    height: 15px; padding: 0 4px; border: 1px solid var(--line-strong); font-family: var(--mono);
+    font-size: 9px; color: var(--text-2); display: inline-flex; align-items: center; text-transform: uppercase;
+  }
+  .badge.hue { border-color: #544123; color: #d6a954; }
+  .badge.ddp { border-color: #294c54; color: #67b0c2; }
+  .badge.err { border-color: var(--danger); color: var(--danger); background: rgba(196,90,82,0.16); }
+
+  .proxy-banner {
+    padding: 6px 8px; margin-bottom: 6px; border: 1px solid var(--line-strong); background: var(--bg-0); font-size: 10px;
+  }
+  .proxy-banner.err { border-color: var(--danger); background: rgba(196,90,82,0.12); }
+  .proxy-banner.ok { border-color: #2f5c3a; background: rgba(88,166,107,0.08); }
+
+  .subhead {
+    display: flex; align-items: center; justify-content: space-between; margin: 8px 0 4px;
+    font-size: 9px; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; color: var(--text-2);
+  }
+
+  /* ── 3D Viewport ───────────────────────────────────────────────────── */
+  .viewport-canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block; cursor: crosshair; }
+  .vp-toolbar {
+    position: absolute; top: 8px; left: 8px; display: flex; gap: 2px; padding: 2px;
+    background: rgba(17, 18, 20, 0.88); border: 1px solid var(--line);
+  }
+  .vp-toolbar .btn { height: 21px; border-color: transparent; background: transparent; color: var(--text-2); }
+  .vp-toolbar .btn:hover, .vp-toolbar .btn.active { color: var(--accent); background: var(--bg-2); }
+  .vp-telemetry {
+    position: absolute; top: 8px; right: 8px; padding: 4px 8px;
+    background: rgba(17, 18, 20, 0.88); border: 1px solid var(--line);
+    font-family: var(--mono); font-size: 10px; color: var(--text-1); display: flex; gap: 10px; align-items: center;
+    pointer-events: none;
+  }
+  .vp-hint {
+    position: absolute; bottom: 8px; left: 8px; padding: 3px 7px;
+    background: rgba(17, 18, 20, 0.82); border: 1px solid var(--line);
+    font-family: var(--mono); font-size: 9px; color: var(--text-2); pointer-events: none;
+  }
+  .vp-section {
+    position: absolute; bottom: 8px; right: 8px; padding: 3px 8px;
+    background: rgba(17, 18, 20, 0.88); border: 1px solid var(--line);
+    font-size: 10px; font-weight: 600; display: flex; align-items: center; gap: 6px; pointer-events: none;
+  }
+
+  /* ── Right Context Inspector + Function Generator (Expressions) ────── */
+  .ins-head {
+    height: 28px; flex: none; padding: 0 8px; border-bottom: 1px solid var(--line);
+    background: var(--bg-0); display: flex; align-items: center; justify-content: space-between;
+  }
+  .ins-title { font-size: 10px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; color: var(--text-0); display: flex; align-items: center; gap: 6px; }
+  .ins-sub { font-family: var(--mono); font-size: 9px; color: var(--accent); }
+  .ins-body { flex: 1; overflow-y: auto; padding: 8px; }
+  .ins-sec { margin-bottom: 10px; padding-bottom: 8px; border-bottom: 1px solid var(--line); }
+  .ins-sec:last-child { border-bottom: 0; }
+  .ins-sec-title {
+    font-size: 9px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase;
+    color: var(--text-2); margin: 0 0 6px; display: flex; align-items: center; justify-content: space-between;
+  }
+  .param-row {
+    display: grid; grid-template-columns: 78px minmax(0, 1fr) 64px 38px;
+    align-items: center; gap: 4px; min-height: 23px; margin-bottom: 3px;
+  }
+  .param-row.no-kf { grid-template-columns: 82px minmax(0, 1fr); }
+  .param-row.color-row { grid-template-columns: 78px 26px minmax(0, 1fr) 38px; }
+  .param-row label { font-size: 10px; color: var(--text-1); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+  .param-actions { display: inline-flex; align-items: center; gap: 2px; justify-content: flex-end; }
+  .kf-btn, .expr-btn {
+    width: 17px; height: 18px; padding: 0; border: 0; background: transparent;
+    color: var(--text-2); display: inline-flex; align-items: center; justify-content: center; font-family: var(--mono); font-size: 9px;
+  }
+  .kf-btn:hover, .expr-btn:hover { color: var(--text-0); background: var(--bg-3); }
+  .kf-btn.has-kf { color: #b58450; }
+  .kf-btn.active { color: var(--accent); }
+  .kf-btn.active svg { fill: var(--accent); }
+  .expr-btn.active { color: #67b0c2; background: rgba(94, 154, 168, 0.16); font-weight: 700; }
+
+  /* Expression / Function Generator Drawer inline under parameter */
+  .expr-box {
+    margin: 2px 0 6px 0; padding: 6px; border: 1px solid #2c474f; background: #101619;
+    display: flex; flex-direction: column; gap: 5px;
+  }
+  .expr-presets { display: flex; flex-wrap: wrap; gap: 3px; }
+  .expr-chip {
+    padding: 2px 5px; border: 1px solid var(--line-strong); background: var(--bg-2);
+    color: #9ad0dc; font-family: var(--mono); font-size: 9px;
+  }
+  .expr-chip:hover { border-color: var(--info); color: #fff; }
+  .expr-input {
+    width: 100%; height: 22px; padding: 0 6px; border: 1px solid var(--info); background: var(--bg-0);
+    color: #9ad0dc; font-family: var(--mono); font-size: 10px; outline: none;
+  }
+  .expr-hints { display: flex; flex-wrap: wrap; gap: 4px; font-family: var(--mono); font-size: 9px; color: var(--text-2); }
+  .expr-hints span { cursor: pointer; padding: 0 3px; background: var(--bg-2); }
+  .expr-hints span:hover { color: var(--accent); }
+
+  .filter-card { border: 1px solid var(--line); background: var(--bg-0); margin-bottom: 5px; }
+  .filter-card-head {
+    display: flex; align-items: center; gap: 5px; padding: 3px 6px; background: var(--bg-2);
+    border-bottom: 1px solid var(--line); font-size: 11px;
+  }
+  .filter-card.collapsed .filter-card-head { border-bottom: 0; }
+  .filter-card.collapsed .filter-card-body { display: none; }
+  .filter-card-body { padding: 6px; }
+  .nudge-grid { display: grid; grid-template-columns: 20px 34px minmax(0, 1fr) 34px 40px; gap: 4px; align-items: center; margin-bottom: 4px; }
+
+  /* ── Bottom Timeline + Transport Bar ───────────────────────────────── */
+  .tl-transport {
+    height: 34px; flex: none; padding: 0 8px; border-bottom: 1px solid var(--line);
+    background: var(--bg-2); display: flex; align-items: center; gap: 5px; overflow-x: auto;
+  }
+  .tc-box {
+    display: inline-flex; align-items: center; gap: 8px; height: 24px; padding: 0 8px;
+    background: var(--bg-0); border: 1px solid var(--line-strong); font-family: var(--mono);
+    cursor: pointer; transition: border-color 90ms linear;
+  }
+  .tc-box:hover { border-color: var(--accent); }
+  .tc-main { font-size: 12px; font-weight: 600; color: var(--accent); }
+  .tc-mode-tag { font-size: 9px; color: var(--text-2); text-transform: uppercase; border-left: 1px solid var(--line); padding-left: 6px; }
+
+  .tl-canvas-wrap { flex: 1; position: relative; min-height: 0; overflow: hidden; background: var(--bg-0); }
+  .tl-canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
+  .tl-drop-hint {
+    position: absolute; inset: 0; border: 2px dashed var(--accent); background: rgba(232, 134, 46, 0.06);
+    pointer-events: none; display: none; z-index: 5;
+  }
+  .tl-canvas-wrap.drag-over .tl-drop-hint { display: block; }
+
+  /* ── MCP Slide-over Drawer ─────────────────────────────────────────── */
+  .mcp-drawer {
+    position: fixed; top: 36px; right: 0; bottom: 0; width: 370px; z-index: 40;
+    background: var(--bg-1); border-left: 1px solid var(--line-strong);
+    box-shadow: -8px 0 28px rgba(0,0,0,0.55); display: flex; flex-direction: column;
+    transform: translateX(100%); transition: transform 140ms ease-out;
+  }
+  .mcp-drawer.open { transform: translateX(0); }
+  .mcp-stats { display: grid; grid-template-columns: repeat(4, 1fr); border-bottom: 1px solid var(--line); background: var(--bg-0); }
+  .mcp-stat { padding: 6px 8px; border-right: 1px solid var(--line); font-family: var(--mono); font-size: 11px; }
+  .mcp-stat:last-child { border-right: 0; }
+  .mcp-stat span { display: block; font-family: var(--sans); font-size: 9px; color: var(--text-2); text-transform: uppercase; }
+  .mcp-actions { padding: 8px; border-bottom: 1px solid var(--line); display: flex; flex-direction: column; gap: 5px; }
+  .mcp-log { flex: 1; overflow-y: auto; padding: 8px; font-family: var(--mono); font-size: 10px; line-height: 1.55; }
+  .mcp-entry { padding: 3px 0; border-bottom: 1px solid #1f2228; }
+  .mcp-entry.ok .tool { color: var(--ok); }
+  .mcp-entry.err .tool { color: var(--danger); }
+
+  /* ── Live Deck Mode (/live) ────────────────────────────────────────── */
+  .live-view { flex: 1; overflow-y: auto; background: var(--bg-0); padding: 24px 16px; display: flex; justify-content: center; }
+  .live-shell { width: 100%; max-width: 680px; display: flex; flex-direction: column; gap: 14px; }
+  .live-card { border: 1px solid var(--line); background: var(--bg-1); padding: 16px; }
+  .live-time { font-family: var(--mono); font-size: 38px; font-weight: 600; color: var(--accent); margin: 4px 0; }
+  .live-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; min-height: 44px; }
+  .blackout-pad {
+    width: 100%; height: 116px; border: 1px solid #6b312d; background: #1c1313; color: #e2a49e;
+    font-size: 13px; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase;
+    display: flex; align-items: center; justify-content: center; gap: 8px; touch-action: none;
+  }
+  .blackout-pad.active { background: #000000; border-color: #ffffff; color: #ffffff; }
+
+  /* ── Context Menu, Dialogs & Toasts ────────────────────────────────── */
+  .ctx-menu {
+    position: fixed; z-index: 60; min-width: 185px; background: var(--bg-2);
+    border: 1px solid var(--line-strong); box-shadow: 0 8px 20px rgba(0,0,0,0.55); padding: 3px;
+  }
+  .ctx-item {
+    width: 100%; padding: 5px 8px; border: 0; background: transparent; color: var(--text-0);
+    font-size: 11px; display: flex; align-items: center; justify-content: space-between; gap: 12px; text-align: left;
+  }
+  .ctx-item:hover { background: var(--bg-3); color: var(--accent); }
+  .ctx-item.danger { color: var(--danger); }
+
+  dialog { width: 410px; padding: 0; border: 1px solid var(--line-strong); background: var(--bg-1); color: var(--text-0); }
+  dialog::backdrop { background: rgba(0,0,0,0.65); }
+  .dlg-head { padding: 10px 12px; border-bottom: 1px solid var(--line); font-size: 11px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; }
+  .dlg-body { padding: 12px; display: flex; flex-direction: column; gap: 8px; font-size: 11px; line-height: 1.5; }
+  .dlg-foot { padding: 10px 12px; border-top: 1px solid var(--line); display: flex; justify-content: flex-end; gap: 6px; }
+
+  .toasts { position: fixed; left: 12px; bottom: 12px; z-index: 70; display: flex; flex-direction: column; gap: 4px; pointer-events: none; }
+  .toast {
+    padding: 6px 10px; border: 1px solid var(--line-strong); background: var(--bg-1); color: var(--text-0);
+    font-size: 11px; display: flex; align-items: center; gap: 8px; pointer-events: auto;
+  }
+  .toast.ok { border-color: #2f5c3a; color: #b6dec0; }
+  .toast.warn { border-color: #6b5624; color: #ebd08c; }
+  .toast.danger { border-color: #6b312d; color: #ebb2ac; }
+</style>
+</head>
+<body>
+<div class="app" id="app">
+
+  <!-- ═══════════════════════════════════════════════════════════════════════
+       TOP BAR — Application Menu Bar + Global Session Controls
+       ═══════════════════════════════════════════════════════════════════════ -->
+  <header class="topbar">
+    <div class="brand">
+      <span class="brand-mark"></span>
+      HUEME <span>STUDIO</span>
+    </div>
+    <div class="vdiv"></div>
+
+    <!-- Classic Application Menu Bar -->
+    <nav class="menu-bar" id="top-menus">
+      <button class="menu-btn" data-menu="file">Datei</button>
+      <button class="menu-btn" data-menu="edit">Bearbeiten</button>
+      <button class="menu-btn" data-menu="layer">Ebenen</button>
+      <button class="menu-btn" data-menu="fx">Filter &amp; Effekte</button>
+      <button class="menu-btn" data-menu="view">Ansicht</button>
+      <button class="menu-btn" data-menu="help">Hilfe</button>
+    </nav>
+
+    <div class="vdiv"></div>
+    <select id="show-select" class="select" style="width:145px" title="Aktive ShowDoc"></select>
+
+    <div class="seg-group" id="ws-switch">
+      <button class="seg-btn active" data-ws="compose">Compose</button>
+      <button class="seg-btn" data-ws="stage">Stage</button>
+    </div>
+
+    <div class="spacer"></div>
+
+    <!-- Hue Proxy Requirement Status Badge -->
+    <button id="btn-proxy-status" class="btn sm" title="Zigbee2MQTT Hue Proxy-Abdeckung (Pflicht: max. 10 Hue-Lampen pro Proxy)">
+      <span class="led ok" id="proxy-led"></span>
+      <span class="mono" id="proxy-lbl">PROXIES 2/2 OK</span>
+    </button>
+
+    <button id="btn-hw" class="btn sm" title="Live Hardware Output (Hue Z2M + WLED DDP)">
+      <span class="led" id="hw-led"></span>
+      <span>HW OUT</span>
+    </button>
+
+    <button id="btn-ma-sync" class="btn sm" title="Music Assistant / Sendspin Sync">
+      <span class="led ok" id="ma-led"></span>
+      <span id="ma-label">MA LOCK</span>
+    </button>
+
+    <div class="vdiv"></div>
+
+    <button id="btn-undo" class="btn sm" title="Rückgängig (Ctrl+Z)"></button>
+    <button id="btn-redo" class="btn sm" title="Wiederherstellen (Ctrl+Y)"></button>
+
+    <div class="vdiv"></div>
+
+    <button id="btn-mcp" class="btn sm" title="MCP AI Co-Director Drawer"></button>
+    <button id="btn-live-view" class="btn sm" title="Mobile / Sofa Live Deck"></button>
+  </header>
+
+  <div class="menu-dropdown hidden" id="menu-dropdown"></div>
+
+  <!-- ═══════════════════════════════════════════════════════════════════════
+       STUDIO NLE WORKSPACE (4-Panel Resizable Layout)
+       ═══════════════════════════════════════════════════════════════════════ -->
+  <div class="studio-body" id="studio-view">
+    <div class="upper-row">
+
+      <!-- LEFT SIDEBAR: FX & Filters | Rig & Hierarchical Groups | Markers -->
+      <aside class="left-pane" id="left-pane">
+        <div class="pane-tabs">
+          <button class="pane-tab active" data-ltab="fx" id="ltab-fx"></button>
+          <button class="pane-tab" data-ltab="rig" id="ltab-rig"></button>
+          <button class="pane-tab" data-ltab="markers" id="ltab-markers"></button>
+        </div>
+
+        <!-- Tab 1: FX & Filters -->
+        <div class="pane-scroll" id="panel-fx">
+          <div class="search-box">
+            <span id="fx-search-ico"></span>
+            <input type="text" id="fx-search" class="input" placeholder="Presets & Filter suchen...">
+          </div>
+          <div id="fx-catalog"></div>
+        </div>
+
+        <!-- Tab 2: Hierarchical Rig Folders, Smart Selection Groups & Proxy Validation -->
+        <div class="pane-scroll hidden" id="panel-rig">
+          <div style="display:flex;gap:4px;margin-bottom:6px">
+            <select id="rig-select" class="select" style="flex:1"></select>
+            <button id="btn-add-spot" class="btn sm" title="Hue Spot hinzufügen"></button>
+            <button id="btn-add-strip" class="btn sm" title="WLED Strip hinzufügen"></button>
+          </div>
+
+          <div id="proxy-health-box" class="proxy-banner ok"></div>
+
+          <div class="subhead">
+            <span>Ordner-Hierarchie (Fixtures &amp; Proxies)</span>
+            <span class="mono" id="rig-voxel-count">192 vox</span>
+          </div>
+          <div id="rig-hierarchy"></div>
+
+          <div class="subhead">
+            <span>Smart-Auswahlgruppen (Schnellwahl)</span>
+          </div>
+          <div id="rig-smart-groups" style="display:flex;flex-wrap:wrap;gap:4px"></div>
+        </div>
+
+        <!-- Tab 3: Markers -->
+        <div class="pane-scroll hidden" id="panel-markers">
+          <div style="display:flex;gap:4px;margin-bottom:6px">
+            <button id="btn-add-marker" class="btn sm accent" style="flex:1"></button>
+          </div>
+          <div id="marker-list"></div>
+        </div>
+      </aside>
+
+      <div class="splitter-v" id="split-left"></div>
+
+      <!-- CENTER PANEL: Interactive 3D Loft Viewport -->
+      <main class="center-pane" id="center-pane">
+        <canvas id="vp-canvas" class="viewport-canvas"></canvas>
+
+        <div class="vp-toolbar" id="cam-bar">
+          <button class="btn active" data-cam="persp">Persp</button>
+          <button class="btn" data-cam="front">Front</button>
+          <button class="btn" data-cam="top">Top</button>
+          <button class="btn" data-cam="side">Side</button>
+          <button class="btn" data-cam="fit">Fit</button>
+        </div>
+
+        <div class="vp-telemetry">
+          <span id="vp-zcl">ZCL: SMOOTH 33ms</span>
+          <span id="vp-sel">0 SEL</span>
+          <span id="vp-fps">60 FPS</span>
+        </div>
+
+        <div class="vp-hint">Alt/RMB Orbit · Shift+Drag Pan · Wheel Zoom · Klick/Drag Block (Shift = Z)</div>
+        <div class="vp-section" id="vp-section"><span class="led accent"></span><span>Intro</span></div>
+      </main>
+
+      <div class="splitter-v" id="split-right"></div>
+
+      <!-- RIGHT PANEL: Contextual Inspector -->
+      <aside class="right-pane" id="right-pane">
+        <div class="ins-head">
+          <div class="ins-title" id="ins-title">Inspector</div>
+          <span class="ins-sub" id="ins-sub">SHOW</span>
+        </div>
+        <div class="ins-body" id="ins-body"></div>
+      </aside>
+    </div>
+
+    <div class="splitter-h" id="split-bottom"></div>
+
+    <!-- BOTTOM PANEL: Timeline Transport Bar + Global/Child Layers + Clipping Masks -->
+    <section class="bottom-pane" id="bottom-pane">
+      <div class="tl-transport">
+        <button id="tl-start" class="btn icon" title="Zum Anfang (Home)"></button>
+        <button id="tl-play" class="btn accent" style="min-width:68px" title="Play / Pause (Space)"></button>
+        <button id="tl-end" class="btn icon" title="Zum Ende (End)"></button>
+        <button id="tl-loop" class="btn icon" title="Loop umschalten"></button>
+
+        <!-- Clickable Timecode Display: Cycles Time (mm:ss.mmm) -> Frames (@30fps) -> Bar.Beat -->
+        <div class="tc-box" id="tc-box" title="Klicken zum Wechseln: Zeitcode (ms) / Frames (@30 FPS) / Takt (Bar.Beat)">
+          <span class="tc-main" id="tc-time">00:00.000</span>
+          <span class="tc-mode-tag" id="tc-mode-tag">ZEIT</span>
+        </div>
+
+        <div class="vdiv"></div>
+
+        <button id="tl-add-global" class="btn sm" title="Globale Einstellungsebene über allem einfügen"></button>
+        <button id="tl-add-track" class="btn sm" title="Neue Lampen-/Gruppenebene"></button>
+        <button id="tl-add-sub" class="btn sm" title="Unterebene / Effekt-Layer in ausgewählte Ebene einrücken"></button>
+        <button id="tl-split" class="btn sm" title="Clip am Playhead teilen (S)"></button>
+
+        <select id="tl-snap" class="select sm" style="width:74px" title="Magnetisches Takt-Raster">
+          <option value="4">Snap 1/1</option>
+          <option value="2">Snap 1/2</option>
+          <option value="1" selected>Snap 1/4</option>
+          <option value="0.5">Snap 1/8</option>
+          <option value="0.25">Snap 1/16</option>
+          <option value="0">Snap Aus</option>
+        </select>
+
+        <div class="spacer"></div>
+
+        <label class="btn sm" title="Audio laden (WAV / MP3 / OGG)">
+          <span id="ico-upload"></span>
+          <span id="audio-lbl">Audio</span>
+          <input type="file" id="audio-input" accept="audio/*" class="hidden">
+        </label>
+        <button id="tl-sync-markers" class="btn sm" title="Marker & Dauer aus Audio synchronisieren"></button>
+        <div style="display:flex;align-items:center;gap:4px;width:72px">
+          <span id="ico-vol" class="muted"></span>
+          <div id="tl-vol-mount" style="flex:1"></div>
+        </div>
+
+        <div class="vdiv"></div>
+
+        <button id="tl-zoom-out" class="btn icon sm" title="Rauszoomen"></button>
+        <button id="tl-zoom-in" class="btn icon sm" title="Reinzoomen"></button>
+        <button id="tl-zoom-fit" class="btn sm" title="Gesamte Show einpassen">Fit</button>
+      </div>
+
+      <div class="tl-canvas-wrap" id="tl-wrap">
+        <canvas id="tl-canvas" class="tl-canvas"></canvas>
+        <div class="tl-drop-hint"></div>
+      </div>
+    </section>
+  </div>
+
+  <!-- ═══════════════════════════════════════════════════════════════════════
+       LIVE DECK VIEW (/live)
+       ═══════════════════════════════════════════════════════════════════════ -->
+  <div class="live-view hidden" id="live-view">
+    <div class="live-shell">
+      <div class="live-card">
+        <div class="live-row" style="min-height:auto;margin-bottom:6px">
+          <span class="badge" style="border-color:var(--accent-dim);color:var(--accent)" id="live-match-badge">MA MATCHED</span>
+          <span class="mono muted" style="font-size:10px">Sendspin PLL ±2ms</span>
+        </div>
+        <div style="font-size:18px;font-weight:700" id="live-show-name">Dance Loft V1</div>
+        <div class="muted" style="font-size:11px;margin-top:2px" id="live-section-name">Intro</div>
+        <div class="live-time" id="live-time">00:00.000</div>
+        <div style="display:grid;grid-template-columns:72px 1fr 72px;gap:8px;margin-top:10px">
+          <button class="btn" style="height:46px" id="live-back">-10s</button>
+          <button class="btn accent" style="height:46px;font-size:13px;font-weight:700" id="live-play">PLAY</button>
+          <button class="btn" style="height:46px" id="live-fwd">+10s</button>
+        </div>
+      </div>
+
+      <div class="live-card">
+        <div class="live-row">
+          <div>
+            <div style="font-weight:600;font-size:12px">Auto-Show (Music Assistant Sync)</div>
+            <div class="mono muted" style="font-size:10px">switch.studio_auto_show</div>
+          </div>
+          <label class="switch">
+            <input type="checkbox" id="live-auto-sync" checked>
+            <span></span>
+          </label>
+        </div>
+        <div class="live-row" style="border-top:1px solid var(--line);margin-top:8px;padding-top:8px">
+          <span style="width:110px;font-size:11px;color:var(--text-1)">Master Brightness</span>
+          <div id="live-master-mount" style="flex:1"></div>
+          <span class="mono" style="width:42px;text-align:right" id="live-master-val">100%</span>
+        </div>
+      </div>
+
+      <button class="blackout-pad" id="live-blackout">
+        <span id="ico-blackout"></span>
+        <span>HOLD FOR PRE-DROP BLACKOUT · RELEASE FOR IMPACT</span>
+      </button>
+    </div>
+  </div>
+
+  <!-- ═══════════════════════════════════════════════════════════════════════
+       SLIDE-OVER MCP AI CO-DIRECTOR DRAWER
+       ═══════════════════════════════════════════════════════════════════════ -->
+  <aside class="mcp-drawer" id="mcp-drawer">
+    <div class="ins-head">
+      <div class="ins-title">MCP AI Co-Director</div>
+      <button class="btn sm" id="mcp-close">Close</button>
+    </div>
+    <div class="mcp-stats">
+      <div class="mcp-stat"><span>Calls</span><b id="mcp-calls">0</b></div>
+      <div class="mcp-stat"><span>Errors</span><b id="mcp-errors">0</b></div>
+      <div class="mcp-stat"><span>P50</span><b id="mcp-p50">0ms</b></div>
+      <div class="mcp-stat"><span>Endpoint</span><b style="color:var(--ok)">/mcp</b></div>
+    </div>
+    <div class="mcp-actions">
+      <div class="subhead" style="margin:0 0 2px"><span>Execute Live MCP Tool Calls (Undoable)</span></div>
+      <button class="btn" style="justify-content:flex-start" id="mcp-act-strobe">batch_apply_edits("Add Drop Strobe")</button>
+      <button class="btn" style="justify-content:flex-start" id="mcp-act-lint">lint_show("dance_loft_v1")</button>
+      <button class="btn" style="justify-content:flex-start" id="mcp-act-telem">render_telemetry_strip(playhead, +8s)</button>
+    </div>
+    <div class="mcp-log" id="mcp-log">
+      <div class="mcp-entry ok"><span class="muted">00:00:00</span> <span class="tool">READY</span> Streamable HTTP /mcp initialized (14 tools)</div>
+    </div>
+  </aside>
+
+  <div class="ctx-menu hidden" id="ctx-menu"></div>
+  <div class="toasts" id="toasts"></div>
+</div>
+
+<script>
+"use strict";
+
+/* ── 1. MONOCHROME INLINE SVG ICONS ───────────────────────────────────────── */
+const SVG_PATHS = {
+  play: '<polygon points="5 3 19 12 5 21 5 3" fill="currentColor" stroke="none"/>',
+  pause: '<rect x="5" y="4" width="4" height="16" fill="currentColor" stroke="none"/><rect x="15" y="4" width="4" height="16" fill="currentColor" stroke="none"/>',
+  start: '<line x1="5" y1="4" x2="5" y2="20"/><polygon points="19 4 9 12 19 20 19 4" fill="currentColor" stroke="none"/>',
+  end: '<line x1="19" y1="4" x2="19" y2="20"/><polygon points="5 4 15 12 5 20 5 4" fill="currentColor" stroke="none"/>',
+  loop: '<polyline points="17 1 21 5 17 9"/><path d="M3 11V9a4 4 0 0 1 4-4h14"/><polyline points="7 23 3 19 7 15"/><path d="M21 13v2a4 4 0 0 1-4 4H3"/>',
+  split: '<circle cx="6" cy="6" r="3"/><circle cx="6" cy="18" r="3"/><line x1="20" y1="4" x2="8.12" y2="15.88"/><line x1="14.47" y1="14.48" x2="20" y2="20"/><line x1="8.12" y1="8.12" x2="12" y2="12"/>',
+  plus: '<line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>',
+  minus: '<line x1="5" y1="12" x2="19" y2="12"/>',
+  trash: '<polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14H6L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/>',
+  eye: '<path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/>',
+  eyeOff: '<path d="M17.94 17.94A10.94 10.94 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94"/><line x1="1" y1="1" x2="23" y2="23"/>',
+  vol: '<polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/><path d="M15.54 8.46a5 5 0 0 1 0 7.07"/>',
+  diamond: '<polygon points="12 3 21 12 12 21 3 12 12 3"/>',
+  undo: '<polyline points="9 14 4 9 9 4"/><path d="M20 20v-7a4 4 0 0 0-4-4H4"/>',
+  redo: '<polyline points="15 14 20 9 15 4"/><path d="M4 20v-7a4 4 0 0 1 4-4h12"/>',
+  cpu: '<rect x="4" y="4" width="16" height="16" rx="1"/><rect x="9" y="9" width="6" height="6"/><line x1="9" y1="1" x2="9" y2="4"/><line x1="15" y1="1" x2="15" y2="4"/><line x1="9" y1="20" x2="9" y2="23"/><line x1="15" y1="20" x2="15" y2="23"/>',
+  sliders: '<line x1="4" y1="21" x2="4" y2="14"/><line x1="4" y1="10" x2="4" y2="3"/><line x1="12" y1="21" x2="12" y2="12"/><line x1="12" y1="8" x2="12" y2="3"/><line x1="20" y1="21" x2="20" y2="16"/><line x1="20" y1="12" x2="20" y2="3"/><line x1="1" y1="14" x2="7" y2="14"/><line x1="9" y1="8" x2="15" y2="8"/><line x1="17" y1="16" x2="23" y2="16"/>',
+  layers: '<polygon points="12 2 2 7 12 12 22 7 12 2"/><polyline points="2 17 12 22 22 17"/><polyline points="2 12 12 17 22 12"/>',
+  cube: '<path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/><polyline points="3.27 6.96 12 12.01 20.73 6.96"/><line x1="12" y1="22.08" x2="12" y2="12"/>',
+  folder: '<path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/>',
+  flag: '<path d="M4 15s1-1 4-1 5 2 8 2 4-1 4-1V3s-1 1-4 1-5-2-8-2-4 1-4 1z"/><line x1="4" y1="22" x2="4" y2="15"/>',
+  upload: '<path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/>',
+  search: '<circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>',
+  bolt: '<polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/>',
+  chev: '<polyline points="6 9 12 15 18 9"/>',
+  sync: '<polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/>',
+  warn: '<path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/>',
+  globe: '<circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/>',
+  maskDown: '<polyline points="9 10 4 15 9 20"/><path d="M20 4v7a4 4 0 0 1-4 4H4"/>',
+};
+function ico(name, cls = "") {
+  return `<svg class="ico ${cls}" viewBox="0 0 24 24">${SVG_PATHS[name] || ""}</svg>`;
+}
+
+/* ── 2. MATH & OKLAB COLOR UTILITIES ─────────────────────────────────────── */
+const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
+const deepClone = (v) => JSON.parse(JSON.stringify(v));
+const hexToRgb = (h) => {
+  const s = String(h || "#ffffff").replace("#", "");
+  if (s.length !== 6) return [255, 255, 255];
+  return [parseInt(s.slice(0,2),16)||0, parseInt(s.slice(2,4),16)||0, parseInt(s.slice(4,6),16)||0];
+};
+const rgbToHex = (c) => {
+  const [r,g,b] = Array.isArray(c) ? c : [255,255,255];
+  return "#" + [r,g,b].map(x => Math.round(clamp(x,0,255)).toString(16).padStart(2,"0")).join("");
+};
+function srgbToLin(c) { const x = clamp(c / 255, 0, 1); return x <= 0.04045 ? x / 12.92 : Math.pow((x + 0.055) / 1.055, 2.4); }
+function linToSrgb(x) { const c = clamp(x, 0, 1); return (c <= 0.0031308 ? c * 12.92 : 1.055 * Math.pow(c, 1 / 2.4) - 0.055) * 255; }
+function rgbToOklab(rgb) {
+  const r = srgbToLin(rgb[0]), g = srgbToLin(rgb[1]), b = srgbToLin(rgb[2]);
+  const l = Math.cbrt(0.4122214708*r + 0.5363325363*g + 0.0514459929*b);
+  const m = Math.cbrt(0.2119034982*r + 0.6806995451*g + 0.1073969566*b);
+  const s = Math.cbrt(0.0883024619*r + 0.2817188376*g + 0.6299787005*b);
+  return [0.2104542553*l + 0.7936177850*m - 0.0040720468*s, 1.9779984951*l - 2.4285922050*m + 0.4505937099*s, 0.0259040371*l + 0.7827717662*m - 0.8086757660*s];
+}
+function oklabToRgb(lab) {
+  const [L, a, b] = lab;
+  const l_ = L + 0.3963377774*a + 0.2158037573*b;
+  const m_ = L - 0.1055613458*a - 0.0638541728*b;
+  const s_ = L - 0.0894841775*a - 1.2914855480*b;
+  const l = l_*l_*l_, m = m_*m_*m_, s = s_*s_*s_;
+  return [
+    linToSrgb(4.0767416621*l - 3.3077115913*m + 0.2309699292*s),
+    linToSrgb(-1.2684380046*l + 2.6097574011*m - 0.3413193965*s),
+    linToSrgb(-0.0041960863*l - 0.7034186147*m + 1.7076147010*s),
+  ];
+}
+function lerpOklab(c1, c2, t) {
+  const u = clamp(t, 0, 1);
+  if (u <= 0) return [c1[0], c1[1], c1[2]];
+  if (u >= 1) return [c2[0], c2[1], c2[2]];
+  const a = rgbToOklab(c1), b = rgbToOklab(c2);
+  return oklabToRgb([a[0]+(b[0]-a[0])*u, a[1]+(b[1]-a[1])*u, a[2]+(b[2]-a[2])*u]);
+}
+function hash1(n) { const x = Math.sin(n * 127.1 + 311.7) * 43758.5453123; return x - Math.floor(x); }
+function noise3(x, y, z) {
+  const ix = Math.floor(x), iy = Math.floor(y), iz = Math.floor(z);
+  const fx = x - ix, fy = y - iy, fz = z - iz;
+  const ux = fx*fx*(3-2*fx), uy = fy*fy*(3-2*fy), uz = fz*fz*(3-2*fz);
+  const h = (a,b,c) => hash1(a*17.3 + b*59.7 + c*113.1);
+  const c000 = h(ix,iy,iz), c100 = h(ix+1,iy,iz), c010 = h(ix,iy+1,iz), c110 = h(ix+1,iy+1,iz);
+  const c001 = h(ix,iy,iz+1), c101 = h(ix+1,iy,iz+1), c011 = h(ix,iy+1,iz+1), c111 = h(ix+1,iy+1,iz+1);
+  const x00 = c000 + (c100-c000)*ux, x10 = c010 + (c110-c010)*ux;
+  const x01 = c001 + (c101-c001)*ux, x11 = c011 + (c111-c011)*ux;
+  const y0 = x00 + (x10-x00)*uy, y1 = x01 + (x11-x01)*uy;
+  return y0 + (y1-y0)*uz;
+}
+function formatTime(sec) {
+  const s = Math.max(0, Number(sec) || 0);
+  const m = Math.floor(s / 60);
+  return `${String(m).padStart(2,"0")}:${(s - m*60).toFixed(3).padStart(6,"0")}`;
+}
+function formatShort(sec) {
+  const s = Math.max(0, Math.floor(Number(sec) || 0));
+  return `${String(Math.floor(s/60)).padStart(2,"0")}:${String(s%60).padStart(2,"0")}`;
+}
+
+/* ── 3. CUSTOM UI WIDGETS (POINTER SLIDER + STEPPER NUMBER INPUT) ─────────── */
+function createCustomSlider(val, min, max, step, onInput, onCommit) {
+  const wrap = document.createElement("div");
+  wrap.className = "c-slider";
+  wrap.innerHTML = `<div class="c-slider-track"><div class="c-slider-fill"></div></div><div class="c-slider-thumb"></div>`;
+  const fill = wrap.querySelector(".c-slider-fill");
+  const thumb = wrap.querySelector(".c-slider-thumb");
+
+  const setVisual = (v) => {
+    const pct = clamp((v - min) / Math.max(1e-9, max - min), 0, 1) * 100;
+    fill.style.width = pct + "%";
+    thumb.style.left = pct + "%";
+  };
+  setVisual(val);
+
+  const calcFromEvent = (e) => {
+    const rect = wrap.getBoundingClientRect();
+    const u = clamp((e.clientX - rect.left) / Math.max(1, rect.width), 0, 1);
+    const raw = min + u * (max - min);
+    const snapped = Math.round(raw / step) * step;
+    const dec = step >= 1 ? 0 : Math.min(4, Math.ceil(-Math.log10(step)));
+    return clamp(Number(snapped.toFixed(dec)), min, max);
+  };
+
+  wrap.addEventListener("pointerdown", (e) => {
+    e.preventDefault();
+    wrap.classList.add("active");
+    wrap.setPointerCapture(e.pointerId);
+    let cur = calcFromEvent(e);
+    setVisual(cur);
+    onInput(cur);
+
+    const move = (ev) => {
+      cur = calcFromEvent(ev);
+      setVisual(cur);
+      onInput(cur);
+    };
+    const up = () => {
+      wrap.classList.remove("active");
+      window.removeEventListener("pointermove", move);
+      if (onCommit) onCommit(cur);
+    };
+    window.addEventListener("pointermove", move);
+    window.addEventListener("pointerup", up, { once: true });
+  });
+
+  wrap._setVisual = setVisual;
+  return wrap;
+}
+
+function createStepperNumber(val, min, max, step, onChange) {
+  const wrap = document.createElement("div");
+  wrap.className = "num-wrap";
+  const dec = step >= 1 ? 0 : Math.min(3, Math.ceil(-Math.log10(step)));
+  wrap.innerHTML = `<input type="number" step="${step}" min="${min}" max="${max}" value="${Number(val).toFixed(dec)}"><div class="num-spin"><button type="button" data-d="1">▲</button><button type="button" data-d="-1">▼</button></div>`;
+  const inp = wrap.querySelector("input");
+
+  const apply = (nv) => {
+    const clamped = clamp(Number(nv.toFixed(dec)), min, max);
+    inp.value = clamped.toFixed(dec);
+    onChange(clamped);
+  };
+  inp.onchange = () => apply(parseFloat(inp.value) || 0);
+  wrap.querySelectorAll("button").forEach(b => {
+    b.onclick = (e) => {
+      e.preventDefault();
+      apply((parseFloat(inp.value) || 0) + parseFloat(b.dataset.d) * step);
+    };
+  });
+  wrap._setValue = (v) => { inp.value = Number(v).toFixed(dec); };
+  return wrap;
+}
+
+/* ── 4. FUNCTION GENERATORS / AFTER EFFECTS EXPRESSIONS ENGINE ───────────── */
+const EXPRESSION_PRESETS = [
+  { label: "Sinus 1Hz", code: "0.5 + 0.5 * sin(t * TAU * 1.0)" },
+  { label: "Beat Pulse 1/4", code: "exp(-beatPhase * 4.5)" },
+  { label: "Beat Saw 1/4", code: "1.0 - beatPhase" },
+  { label: "Kick Envelope", code: "kick" },
+  { label: "Wiggle 4Hz", code: "clamp(val + (noise(t * 4.0) - 0.5) * 0.4, 0, 1)" },
+  { label: "Bar Square", code: "barPos % 2 == 0 ? 1.0 : 0.1" },
+];
+const EXPR_TOKENS = ["t", "beat", "beatPhase", "barPos", "bpm", "kick", "energy", "val", "sin(", "cos(", "abs(", "exp(", "noise(", "clamp(", "TAU"];
+
+function evalExpression(code, ctx) {
+  if (!code || !code.trim()) return ctx.val;
+  try {
+    const fn = new Function(
+      "t", "beat", "beatPhase", "barPos", "bpm", "kick", "energy", "val",
+      "sin", "cos", "abs", "exp", "min", "max", "floor", "round", "noise", "clamp", "TAU",
+      `return (${code});`
+    );
+    const res = fn(
+      ctx.t, ctx.beat, ctx.beatPhase, ctx.barPos, ctx.bpm, ctx.kick, ctx.energy, ctx.val,
+      Math.sin, Math.cos, Math.abs, Math.exp, Math.min, Math.max, Math.floor, Math.round,
+      (x) => noise3(x, 0.5, 0.5), clamp, Math.PI * 2
+    );
+    return Number.isFinite(res) ? res : ctx.val;
+  } catch {
+    return ctx.val;
+  }
+}
+
+/* ── 5. PRESET & FILTER CATALOGS (15 PRESETS + 8 FILTERS) ────────────────── */
+const PRESET_CATS = ["Basic", "Patterns", "Particles", "Spatial FX", "Atmosphere"];
+const PRESETS = {
+  solid: {
+    id: "solid", name: "Solid Field", cat: "Basic", swatch: "#e8862e",
+    params: [
+      { k: "color", l: "Color", t: "color", d: [255, 115, 25] },
+      { k: "brightness", l: "Brightness", t: "range", d: 1.0, min: 0, max: 1, step: 0.01 },
+    ],
+  },
+  gradient_3d: {
+    id: "gradient_3d", name: "3D Gradient", cat: "Basic", swatch: "#5e9aa8",
+    params: [
+      { k: "color1", l: "Color A", t: "color", d: [255, 90, 20] },
+      { k: "color2", l: "Color B", t: "color", d: [0, 175, 255] },
+      { k: "mode", l: "Shape", t: "select", d: "linear", opts: [["linear","Linear"],["radial","Radial"],["spherical","Spherical"]] },
+      { k: "angle", l: "Azimuth", t: "range", d: 0, min: 0, max: 360, step: 1 },
+      { k: "offset", l: "Offset", t: "range", d: 0, min: -1, max: 1, step: 0.01 },
+      { k: "speed", l: "Drift", t: "range", d: 0.15, min: -2, max: 2, step: 0.01 },
+    ],
+  },
+  pulse_breathe: {
+    id: "pulse_breathe", name: "Pulse / Breathe", cat: "Basic", swatch: "#c9a34a",
+    params: [
+      { k: "color1", l: "Peak Color", t: "color", d: [255, 130, 35] },
+      { k: "color2", l: "Idle Color", t: "color", d: [24, 14, 48] },
+      { k: "rate", l: "Rate Hz", t: "range", d: 0.5, min: 0.05, max: 4, step: 0.05 },
+      { k: "min_level", l: "Floor", t: "range", d: 0.12, min: 0, max: 0.8, step: 0.01 },
+      { k: "spatial_phase", l: "Wave Delay", t: "range", d: 0.4, min: 0, max: 3, step: 0.05 },
+    ],
+  },
+  chase_scanner: {
+    id: "chase_scanner", name: "Chase / Scanner", cat: "Patterns", swatch: "#d06b4a",
+    params: [
+      { k: "color", l: "Beam Color", t: "color", d: [255, 60, 15] },
+      { k: "bg_color", l: "Background", t: "color", d: [8, 10, 18] },
+      { k: "axis", l: "Axis", t: "select", d: "x", opts: [["x","X Width"],["y","Y Depth"],["z","Z Height"]] },
+      { k: "mode", l: "Mode", t: "select", d: "ping_pong", opts: [["ping_pong","Ping Pong"],["forward","Forward"],["reverse","Reverse"]] },
+      { k: "speed", l: "Speed", t: "range", d: 0.6, min: 0.05, max: 4, step: 0.05 },
+      { k: "width", l: "Beam Width", t: "range", d: 0.16, min: 0.03, max: 0.6, step: 0.01 },
+    ],
+  },
+  pattern_bands: {
+    id: "pattern_bands", name: "Pattern Bands", cat: "Patterns", swatch: "#9b7fb5",
+    params: [
+      { k: "color1", l: "Color A", t: "color", d: [255, 40, 80] },
+      { k: "color2", l: "Color B", t: "color", d: [0, 210, 255] },
+      { k: "axis", l: "Axis", t: "select", d: "x", opts: [["x","X Width"],["y","Y Depth"],["z","Z Height"]] },
+      { k: "freq", l: "Bands", t: "range", d: 3.0, min: 1, max: 12, step: 0.5 },
+      { k: "speed", l: "Scroll", t: "range", d: 0.4, min: -3, max: 3, step: 0.05 },
+      { k: "duty", l: "Duty", t: "range", d: 0.5, min: 0.1, max: 0.9, step: 0.01 },
+    ],
+  },
+  ma3_wings: {
+    id: "ma3_wings", name: "MA3 Wings", cat: "Patterns", swatch: "#d06b4a",
+    params: [
+      { k: "color", l: "Primary", t: "color", d: [255, 45, 0] },
+      { k: "color2", l: "Rim Color", t: "color", d: [0, 210, 255] },
+      { k: "style", l: "Style", t: "select", d: "inside_out", opts: [["inside_out","Inside Out"],["outside_in","Outside In"],["frame_lock","Frame Lock"]] },
+      { k: "gate", l: "Gate", t: "range", d: 0.55, min: 0.1, max: 0.95, step: 0.01 },
+      { k: "brightness", l: "Brightness", t: "range", d: 1.0, min: 0.1, max: 1, step: 0.01 },
+    ],
+  },
+  particles_3d: {
+    id: "particles_3d", name: "3D Particles", cat: "Particles", swatch: "#e8862e",
+    params: [
+      { k: "color", l: "Particle A", t: "color", d: [255, 145, 40] },
+      { k: "color2", l: "Particle B", t: "color", d: [255, 235, 190] },
+      { k: "density", l: "Count", t: "range", d: 8, min: 2, max: 24, step: 1 },
+      { k: "speed", l: "Speed", t: "range", d: 0.55, min: 0.05, max: 3, step: 0.05 },
+      { k: "tail", l: "Tail Size", t: "range", d: 0.14, min: 0.03, max: 0.45, step: 0.01 },
+    ],
+  },
+  sparkle_twinkle: {
+    id: "sparkle_twinkle", name: "Sparkle / Twinkle", cat: "Particles", swatch: "#8fa65a",
+    params: [
+      { k: "base_color", l: "Base Glow", t: "color", d: [16, 10, 28] },
+      { k: "spark_color", l: "Sparkle", t: "color", d: [255, 220, 150] },
+      { k: "density", l: "Density", t: "range", d: 0.35, min: 0.05, max: 0.95, step: 0.01 },
+      { k: "speed", l: "Twinkle Hz", t: "range", d: 2.2, min: 0.2, max: 8, step: 0.1 },
+    ],
+  },
+  shockwave_3d: {
+    id: "shockwave_3d", name: "3D Shockwave", cat: "Spatial FX", swatch: "#c45a52",
+    params: [
+      { k: "color", l: "Ring Color", t: "color", d: [255, 80, 20] },
+      { k: "radius", l: "Radius", t: "range", d: 0.5, min: 0, max: 1.5, step: 0.01 },
+      { k: "auto_speed", l: "Auto Pulse", t: "range", d: 0.7, min: 0, max: 3, step: 0.05 },
+      { k: "width", l: "Ring Width", t: "range", d: 0.14, min: 0.03, max: 0.5, step: 0.01 },
+    ],
+  },
+  strobe_blinder: {
+    id: "strobe_blinder", name: "Strobe / Blinder", cat: "Spatial FX", swatch: "#e8e9ec",
+    params: [
+      { k: "color", l: "Flash Color", t: "color", d: [255, 245, 230] },
+      { k: "hz", l: "Rate Hz", t: "range", d: 6.0, min: 0, max: 18, step: 0.5 },
+      { k: "duty", l: "Duty", t: "range", d: 0.3, min: 0.05, max: 1.0, step: 0.01 },
+      { k: "brightness", l: "Intensity", t: "range", d: 1.0, min: 0, max: 1, step: 0.01 },
+    ],
+  },
+  turrell_horizon: {
+    id: "turrell_horizon", name: "Turrell Horizon", cat: "Atmosphere", swatch: "#6d78b8",
+    params: [
+      { k: "sky_color", l: "Upper Field", t: "color", d: [20, 14, 54] },
+      { k: "seam_color", l: "Horizon Seam", t: "color", d: [255, 112, 26] },
+      { k: "earth_color", l: "Lower Field", t: "color", d: [90, 16, 36] },
+      { k: "speed", l: "Drift", t: "range", d: 0.12, min: 0, max: 1, step: 0.01 },
+      { k: "angle", l: "Axis Deg", t: "range", d: 75, min: 0, max: 360, step: 1 },
+      { k: "seam_width", l: "Seam Width", t: "range", d: 0.28, min: 0.06, max: 0.6, step: 0.01 },
+    ],
+  },
+  caustic_abyss: {
+    id: "caustic_abyss", name: "Caustic Abyss", cat: "Atmosphere", swatch: "#5e9aa8",
+    params: [
+      { k: "color1", l: "Deep Tint", t: "color", d: [10, 42, 74] },
+      { k: "color2", l: "Caustic Lens", t: "color", d: [110, 225, 255] },
+      { k: "speed", l: "Current", t: "range", d: 0.35, min: 0.05, max: 1.5, step: 0.01 },
+      { k: "scale", l: "Density", t: "range", d: 1.9, min: 0.5, max: 4.0, step: 0.05 },
+      { k: "focus", l: "Sharpness", t: "range", d: 2.4, min: 1.0, max: 5.0, step: 0.1 },
+    ],
+  },
+  blackbody_forge: {
+    id: "blackbody_forge", name: "Blackbody Forge", cat: "Atmosphere", swatch: "#b36b2a",
+    params: [
+      { k: "color1", l: "Ember 1800K", t: "color", d: [255, 95, 15] },
+      { k: "color2", l: "Peak Gold", t: "color", d: [255, 220, 145] },
+      { k: "speed", l: "Heat Flow", t: "range", d: 0.35, min: 0.05, max: 2, step: 0.05 },
+      { k: "intensity", l: "Intensity", t: "range", d: 0.9, min: 0.1, max: 1, step: 0.01 },
+    ],
+  },
+  noise_plasma: {
+    id: "noise_plasma", name: "Noise Plasma", cat: "Atmosphere", swatch: "#8f6cb5",
+    params: [
+      { k: "color1", l: "Low Cloud", t: "color", d: [18, 12, 48] },
+      { k: "color2", l: "Mid Plasma", t: "color", d: [215, 55, 95] },
+      { k: "color3", l: "High Crest", t: "color", d: [255, 175, 65] },
+      { k: "scale", l: "Noise Scale", t: "range", d: 2.6, min: 0.5, max: 8, step: 0.1 },
+      { k: "speed", l: "Flow Speed", t: "range", d: 0.35, min: 0, max: 2, step: 0.05 },
+    ],
+  },
+  aurora_veil: {
+    id: "aurora_veil", name: "Aurora Veil", cat: "Atmosphere", swatch: "#58a66b",
+    params: [
+      { k: "color1", l: "Curtain A", t: "color", d: [30, 220, 140] },
+      { k: "color2", l: "Curtain B", t: "color", d: [55, 95, 255] },
+      { k: "speed", l: "Drift", t: "range", d: 0.28, min: 0.02, max: 1.5, step: 0.02 },
+      { k: "ribbon", l: "Ribbon Fold", t: "range", d: 2.2, min: 0.5, max: 6, step: 0.1 },
+    ],
+  },
+};
+
+const FILTERS = {
+  spatial_blur: { id: "spatial_blur", name: "Spatial Blur", params: [{ k: "radius_m", l: "Radius (m)", t: "range", d: 0.75, min: 0.1, max: 3.0, step: 0.05 }, { k: "mix", l: "Mix", t: "range", d: 0.8, min: 0, max: 1, step: 0.01 }] },
+  grain_noise: { id: "grain_noise", name: "Grain / Noise", params: [{ k: "amount", l: "Amount", t: "range", d: 0.32, min: 0, max: 1, step: 0.01 }, { k: "scale", l: "Scale", t: "range", d: 8.0, min: 1, max: 24, step: 0.5 }, { k: "speed", l: "Jitter", t: "range", d: 6.0, min: 0, max: 20, step: 0.5 }] },
+  beat_gate: { id: "beat_gate", name: "Beat Gate", params: [{ k: "division", l: "Grid", t: "select", d: "1/4", opts: [["1/2","1/2"],["1/4","1/4"],["1/8","1/8"],["1/16","1/16"]] }, { k: "duty", l: "Duty", t: "range", d: 0.5, min: 0.05, max: 0.95, step: 0.01 }, { k: "floor", l: "Floor", t: "range", d: 0.05, min: 0, max: 0.6, step: 0.01 }] },
+  dim2warm: { id: "dim2warm", name: "Dim to Warm 1800K", params: [{ k: "amount", l: "Amount", t: "range", d: 0.65, min: 0, max: 1, step: 0.01 }, { k: "curve", l: "Curve", t: "range", d: 1.3, min: 0.3, max: 3, step: 0.05 }] },
+  mirror_symmetry: { id: "mirror_symmetry", name: "Mirror Symmetry", params: [{ k: "axis", l: "Axis", t: "select", d: "x", opts: [["x","X Width"],["y","Y Depth"],["z","Z Height"]] }, { k: "mix", l: "Mix", t: "range", d: 1.0, min: 0, max: 1, step: 0.01 }] },
+  color_grade: { id: "color_grade", name: "Color Grade", params: [{ k: "hue_shift", l: "Hue Deg", t: "range", d: 0, min: -180, max: 180, step: 1 }, { k: "saturation", l: "Saturation", t: "range", d: 1.0, min: 0, max: 2, step: 0.02 }, { k: "contrast", l: "Contrast", t: "range", d: 1.0, min: 0.2, max: 2.2, step: 0.02 }] },
+  strobe_shutter: { id: "strobe_shutter", name: "Strobe Shutter", params: [{ k: "hz", l: "Rate Hz", t: "range", d: 8.0, min: 1, max: 20, step: 0.5 }, { k: "duty", l: "Duty", t: "range", d: 0.35, min: 0.05, max: 0.9, step: 0.01 }, { k: "floor", l: "Floor", t: "range", d: 0.0, min: 0, max: 0.4, step: 0.01 }] },
+  invert_color: { id: "invert_color", name: "Invert Color", params: [{ k: "mix", l: "Mix", t: "range", d: 1.0, min: 0, max: 1, step: 0.01 }] },
+};
+
+function defaultPresetParams(id) {
+  const p = {}; const list = (PRESETS[id] && PRESETS[id].params) ? PRESETS[id].params : [];
+  for (const s of list) p[s.k] = deepClone(s.d);
+  return p;
+}
+function defaultFilterParams(id) {
+  const p = {}; const list = (FILTERS[id] && FILTERS[id].params) ? FILTERS[id].params : [];
+  for (const s of list) p[s.k] = deepClone(s.d);
+  return p;
+}
+
+/* ── 6. HIERARCHICAL RIG MODEL + HUE PROXY VALIDATION ────────────────────── */
+function validateFixtureMinimal(f) {
+  const missing = [];
+  if (!f.name || !f.name.trim()) missing.push("Name");
+  if (f.protocol === "hue_z2m") {
+    if (!f.address || !/^0x[0-9a-fA-F]{4}$/.test(f.address.trim())) missing.push("Z2M 16-bit Addr (0xXXXX)");
+    if (!f.proxy || !f.proxy.trim()) missing.push("Hue Proxy");
+  } else if (f.protocol === "wled_ddp") {
+    if (!f.host || !f.host.trim()) missing.push("WLED Host/IP");
+    if (!f.pixels || f.pixels < 2) missing.push("Pixel Count");
+  }
+  return missing;
+}
+
+function evaluateProxyRequirements(rig) {
+  const hueFixtures = rig.fixtures.filter(f => f.protocol === "hue_z2m" && f.enabled);
+  const requiredProxies = Math.ceil(hueFixtures.length / 10);
+  const proxyCounts = {};
+  const unassigned = [];
+  for (const f of hueFixtures) {
+    if (!f.proxy || !f.proxy.trim()) { unassigned.push(f.id); continue; }
+    proxyCounts[f.proxy] = (proxyCounts[f.proxy] || 0) + 1;
+  }
+  const overloaded = Object.entries(proxyCounts).filter(([, c]) => c > 10);
+  const activeProxyCount = Object.keys(proxyCounts).length;
+  const ok = hueFixtures.length === 0 || (activeProxyCount >= requiredProxies && overloaded.length === 0 && unassigned.length === 0);
+  return { hueCount: hueFixtures.length, requiredProxies, activeProxyCount, proxyCounts, overloaded, unassigned, ok };
+}
+
+function makeHuemeLoftRig() {
+  const fixtures = [];
+  for (let i = 0; i < 7; i++) {
+    fixtures.push({
+      id: `galerie_0${i+1}`, name: `Deckenstrahler ${i+1}`, type: "point", folderId: "fld_galerie",
+      protocol: "hue_z2m", enabled: true, address: `0x8B${i+1}C`, proxy: "Deckenstrahler 2", zcl_snap: true,
+      pos: [0.55 + i * 0.90, 1.15, 4.45], aim: [0, 0.35, -1], beam_deg: 42,
+    });
+  }
+  const lowNames = ["Deckenstrahler 8", "Deckenstrahler 10", "Deckenstrahler 12"];
+  const lowXs = [1.40, 3.25, 5.10];
+  for (let i = 0; i < 3; i++) {
+    fixtures.push({
+      id: `decke_unten_0${i+1}`, name: lowNames[i], type: "point", folderId: "fld_unten",
+      protocol: "hue_z2m", enabled: true, address: `0x1A4${i}`, proxy: "Deckenstrahler 8", zcl_snap: true,
+      pos: [lowXs[i], 6.30, 3.15], aim: [0, -0.35, -1], beam_deg: 50,
+    });
+  }
+  fixtures.push({
+    id: "bodenstrahler_01", name: "Bodenstrahler 1", type: "point", folderId: "fld_unten",
+    protocol: "hue_z2m", enabled: true, address: "0x19C7", proxy: "Deckenstrahler 8", zcl_snap: true,
+    pos: [1.10, 7.20, 0.25], aim: [0, -0.25, 1], beam_deg: 55,
+  });
+  fixtures.push({
+    id: "bodenstrahler_02", name: "Bodenstrahler 2", type: "point", folderId: "fld_unten",
+    protocol: "hue_z2m", enabled: true, address: "0x0C7F", proxy: "Deckenstrahler 8", zcl_snap: true,
+    pos: [5.40, 7.20, 0.25], aim: [0, -0.25, 1], beam_deg: 55,
+  });
+  fixtures.push({
+    id: "stahltraeger", name: "Stahlträger SK6812 1800K", type: "line", folderId: "fld_strip",
+    protocol: "wled_ddp", enabled: true, host: "192.168.10.40:4048", zcl_snap: false,
+    start: [0.35, 4.40, 4.05], end: [6.15, 4.40, 4.05], pixels: 180, aim: [0, 0, -1], beam_deg: 120,
+  });
+  return {
+    id: "hueme_loft", name: "Hueme Loft (12 Hue + 180px Strip)",
+    room: { min: [0, 0, 0], max: [6.5, 8.0, 5.1] },
+    folders: [
+      { id: "fld_galerie", name: "Galerie Oben (Hue)", collapsed: false },
+      { id: "fld_unten", name: "Decke Unten & Boden (Hue)", collapsed: false },
+      { id: "fld_strip", name: "Stahlträger LED (WLED)", collapsed: false },
+    ],
+    fixtures,
+    smartGroups: [
+      { id: "all", name: "Alle Lampen", rule: { kind: "all" } },
+      { id: "galerie_oben", name: "Galerie (7)", rule: { kind: "folder", value: "fld_galerie" } },
+      { id: "decke_unten", name: "Unten & Boden (5)", rule: { kind: "folder", value: "fld_unten" } },
+      { id: "stahltraeger", name: "SK6812 Strip", rule: { kind: "id", value: "stahltraeger" } },
+      { id: "hue_only", name: "Nur Hue Spots", rule: { kind: "protocol", value: "hue_z2m" } },
+    ],
+  };
+}
+function makeEmptyRig() {
+  return {
+    id: "empty_loft", name: "Empty Loft",
+    room: { min: [0, 0, 0], max: [6.5, 8.0, 5.1] },
+    folders: [{ id: "fld_main", name: "Hauptbereich", collapsed: false }],
+    fixtures: [],
+    smartGroups: [{ id: "all", name: "Alle Lampen", rule: { kind: "all" } }],
+  };
+}
+
+function matchSmartGroup(sg, f) {
+  if (typeof sg.filter === "function") return sg.filter(f);
+  const r = sg.rule;
+  if (!r || r.kind === "all") return true;
+  if (r.kind === "folder") return f.folderId === r.value;
+  if (r.kind === "id") return f.id === r.value;
+  if (r.kind === "protocol") return f.protocol === r.value;
+  return false;
+}
+function makeEmptyRig() {
+  return {
+    id: "empty_loft", name: "Empty Loft",
+    room: { min: [0, 0, 0], max: [6.5, 8.0, 5.1] },
+    folders: [{ id: "fld_main", name: "Hauptbereich", collapsed: false }],
+    fixtures: [],
+    smartGroups: [{ id: "all", name: "Alle Lampen", filter: () => true }],
+  };
+}
+
+/* ── 7. SHOWDOC WITH GLOBAL LAYERS, CHILD SUB-LAYERS & CLIPPING MASKS ─────── */
+function makeDefaultShow() {
+  return {
+    id: "dance_loft_v1", name: "Dance Loft V1", duration_s: 150.0, bpm: 128.0, beat_offset_s: 0.0,
+    markers: [
+      { t_s: 0.0, name: "Intro", kind: "section", color: "#5e9aa8" },
+      { t_s: 15.0, name: "Build 1", kind: "section", color: "#c9a34a" },
+      { t_s: 30.0, name: "Drop 1", kind: "drop", color: "#d06b4a" },
+      { t_s: 60.0, name: "Breakdown", kind: "section", color: "#9b7fb5" },
+      { t_s: 82.5, name: "Build 2", kind: "section", color: "#c9a34a" },
+      { t_s: 97.5, name: "Drop 2", kind: "drop", color: "#c45a52" },
+      { t_s: 127.5, name: "Outro", kind: "section", color: "#58a66b" },
+    ],
+    tracks: [
+      // Global Adjustment / Overlay Layer sitting ABOVE everything below it
+      {
+        id: "trk_global_1", name: "Global Pre-Drop & Dimmer", kind: "global", parentId: null, clippedToBelow: false,
+        target_id: "all", blend_mode: "override", opacity: 1.0, height: 32, muted: false, solo: false, expanded: false,
+        clips: [
+          { id: "c_cut_1", name: "BLACKOUT 1", start_s: 28.5, end_s: 30.0, fade_in_s: 0, fade_out_s: 0, preset: "solid", opacity: 1, snap_zcl: true, params: { color: [0,0,0], brightness: 0 }, expressions: {}, mask: { kind: "none" }, filters: [], keyframes: [] },
+          { id: "c_cut_2", name: "BLACKOUT 2", start_s: 96.0, end_s: 97.5, fade_in_s: 0, fade_out_s: 0, preset: "solid", opacity: 1, snap_zcl: true, params: { color: [0,0,0], brightness: 0 }, expressions: {}, mask: { kind: "none" }, filters: [], keyframes: [] },
+        ],
+      },
+      // Clipping Mask Layer (Alt+Click masks onto Gallery Beams below!)
+      {
+        id: "trk_clip_mask", name: "Scanner Mask (Alt-Clip)", kind: "layer", parentId: null, clippedToBelow: true,
+        target_id: "galerie_oben", blend_mode: "multiply", opacity: 1.0, height: 32, muted: false, solo: false, expanded: false,
+        clips: [
+          { id: "c_msk_1", name: "Sweep Window", start_s: 30.0, end_s: 60.0, fade_in_s: 0, fade_out_s: 0, preset: "chase_scanner", opacity: 1, snap_zcl: false, params: { color: [255,255,255], bg_color: [35,35,35], axis: "x", mode: "ping_pong", speed: 0.85, width: 0.34 }, expressions: {}, mask: { kind: "none" }, filters: [], keyframes: [] },
+        ],
+      },
+      // Main Lamp / Group Layer
+      {
+        id: "trk_gal", name: "Gallery Beams (7)", kind: "layer", parentId: null, clippedToBelow: false,
+        target_id: "galerie_oben", blend_mode: "add", opacity: 1.0, height: 42, muted: false, solo: false, expanded: true,
+        clips: [
+          { id: "c_gal_1", name: "Build Scanner", start_s: 15, end_s: 28.5, fade_in_s: 0.5, fade_out_s: 0.1, preset: "chase_scanner", opacity: 0.95, snap_zcl: true, params: { ...defaultPresetParams("chase_scanner"), speed: 0.9, width: 0.18 }, expressions: {}, mask: { kind: "none" }, filters: [{ id: "f2", type: "beat_gate", enabled: true, open: false, params: { division: "1/8", duty: 0.45, floor: 0.06 } }], keyframes: [{ id: "kf_1", t_s: 0, param: "opacity", value: 0.35, easing: "ease_in" }, { id: "kf_2", t_s: 13, param: "opacity", value: 1.0, easing: "linear" }] },
+          { id: "c_gal_2", name: "Drop 1 Wings", start_s: 30, end_s: 60, fade_in_s: 0, fade_out_s: 1.5, preset: "ma3_wings", opacity: 1.0, snap_zcl: true, params: { ...defaultPresetParams("ma3_wings"), color: [255,38,0], color2: [0,215,255] }, expressions: { brightness: "0.7 + 0.3 * exp(-beatPhase * 4.5)" }, mask: { kind: "none" }, filters: [], keyframes: [] },
+          { id: "c_gal_3", name: "Drop 2 Shock", start_s: 97.5, end_s: 127.5, fade_in_s: 0, fade_out_s: 2.0, preset: "shockwave_3d", opacity: 1.0, snap_zcl: true, params: { ...defaultPresetParams("shockwave_3d"), color: [255,65,20], auto_speed: 1.1 }, expressions: {}, mask: { kind: "none" }, filters: [], keyframes: [] },
+        ],
+      },
+      // Child Sub-Layer nested inside Gallery Beams (Targets single Spot 4 directly!)
+      {
+        id: "trk_gal_sub1", name: "└ Spot 4 Center Accent", kind: "sub", parentId: "trk_gal", clippedToBelow: false,
+        target_id: "galerie_04", blend_mode: "add", opacity: 1.0, height: 30, muted: false, solo: false, expanded: false,
+        clips: [
+          { id: "c_sub_1", name: "Center Strobe", start_s: 30, end_s: 45, fade_in_s: 0, fade_out_s: 0.5, preset: "strobe_blinder", opacity: 0.9, snap_zcl: true, params: { color: [255,240,210], hz: 4, duty: 0.25, brightness: 1 }, expressions: {}, mask: { kind: "none" }, filters: [], keyframes: [] },
+        ],
+      },
+      // Steel Beam Strip Layer
+      {
+        id: "trk_strip", name: "Steel Beam 180px", kind: "layer", parentId: null, clippedToBelow: false,
+        target_id: "stahltraeger", blend_mode: "add", opacity: 0.95, height: 38, muted: false, solo: false, expanded: false,
+        clips: [
+          { id: "c_str_1", name: "1800K Embers", start_s: 0, end_s: 28.5, fade_in_s: 2, fade_out_s: 0.2, preset: "particles_3d", opacity: 1, snap_zcl: false, params: { ...defaultPresetParams("particles_3d"), density: 10, speed: 0.5, tail: 0.16 }, expressions: {}, mask: { kind: "none" }, filters: [{ id: "f4", type: "spatial_blur", enabled: true, open: false, params: { radius_m: 0.35, mix: 0.65 } }], keyframes: [] },
+          { id: "c_str_2", name: "Caustic Beam", start_s: 30, end_s: 60, fade_in_s: 0.1, fade_out_s: 1.0, preset: "caustic_abyss", opacity: 1, snap_zcl: false, params: { ...defaultPresetParams("caustic_abyss"), color1: [160,28,12], color2: [255,215,130], speed: 0.65 }, expressions: {}, mask: { kind: "none" }, filters: [], keyframes: [] },
+          { id: "c_str_3", name: "Gradient Sweep", start_s: 97.5, end_s: 148, fade_in_s: 0.1, fade_out_s: 4.0, preset: "gradient_3d", opacity: 1, snap_zcl: false, params: { ...defaultPresetParams("gradient_3d"), speed: 0.55 }, expressions: {}, mask: { kind: "none" }, filters: [], keyframes: [] },
+        ],
+      },
+      // Base Atmosphere Layer
+      {
+        id: "trk_base", name: "Base Atmosphere", kind: "layer", parentId: null, clippedToBelow: false,
+        target_id: "all", blend_mode: "normal", opacity: 0.65, height: 36, muted: false, solo: false, expanded: false,
+        clips: [
+          { id: "c_base_1", name: "Turrell Sky", start_s: 0, end_s: 60, fade_in_s: 3, fade_out_s: 1.5, preset: "turrell_horizon", opacity: 1, snap_zcl: false, params: defaultPresetParams("turrell_horizon"), expressions: {}, mask: { kind: "none" }, filters: [{ id: "f1", type: "dim2warm", enabled: true, open: false, params: defaultFilterParams("dim2warm") }], keyframes: [] },
+          { id: "c_base_2", name: "Aurora Break", start_s: 60, end_s: 97.5, fade_in_s: 1.5, fade_out_s: 0.5, preset: "aurora_veil", opacity: 0.9, snap_zcl: false, params: defaultPresetParams("aurora_veil"), expressions: {}, mask: { kind: "none" }, filters: [], keyframes: [] },
+          { id: "c_base_3", name: "Plasma Finale", start_s: 97.5, end_s: 150, fade_in_s: 0.2, fade_out_s: 6, preset: "noise_plasma", opacity: 0.85, snap_zcl: false, params: defaultPresetParams("noise_plasma"), expressions: {}, mask: { kind: "none" }, filters: [], keyframes: [] },
+        ],
+      },
+    ],
+  };
+}
+
+/* ── 8. STATE, UNDO/REDO & WAVEFORM ──────────────────────────────────────── */
+const RIG_PRESETS = { hueme_loft: makeHuemeLoftRig(), empty_loft: makeEmptyRig() };
+const SHOWS = { dance_loft_v1: makeDefaultShow() };
+
+const state = {
+  rigId: "hueme_loft",
+  rig: deepClone(RIG_PRESETS.hueme_loft),
+  compiled: null,
+  showId: "dance_loft_v1",
+  show: deepClone(SHOWS.dance_loft_v1),
+  undo: [],
+  redo: [],
+  playing: false,
+  loop: true,
+  time: 0.0,
+  tcDisplayMode: "time", // time | frames | bars
+  fps: 30,
+  lastFrameMs: performance.now(),
+  fpsSmooth: 60,
+  hwEnabled: false,
+  maSyncEnabled: true,
+  masterBrightness: 1.0,
+  blackoutHold: false,
+  workspace: "compose",
+  viewMode: "studio",
+  leftTab: "fx",
+  snapBeats: 1,
+  selType: "clip",
+  selClipId: "c_gal_2",
+  selTrackId: "trk_gal",
+  selKfId: null,
+  selFixtures: new Set(),
+  selFolderId: null,
+  selSmartId: null,
+  openExprParam: null,
+  tlStart: 0,
+  tlEnd: 75,
+  tlScrollY: 0,
+  audioCtx: null,
+  audioBuffer: null,
+  audioSource: null,
+  audioGain: null,
+  audioVol: 0.8,
+  audioName: "Dance_Loft_128.wav",
+  wfMin: null, wfMax: null, wfRms: null,
+  mcpCalls: 0, mcpErrors: 0, mcpLatencies: [],
+  lastRgb: null, lastSnap: false,
+};
+
+function buildProceduralWaveform(duration_s) {
+  const N = 16384;
+  const minA = new Float32Array(N), maxA = new Float32Array(N), rmsA = new Float32Array(N);
+  for (let i = 0; i < N; i++) {
+    const t = (i / N) * duration_s;
+    const beat = (t * (state.show.bpm / 60)) % 1;
+    const kick = Math.exp(-beat * 7.5);
+    let env = 0.25;
+    if (t < 15) env = 0.22 + (t / 15) * 0.22;
+    else if (t < 28.5) env = 0.45 + ((t - 15) / 13.5) * 0.42;
+    else if (t < 30.0) env = 0.03;
+    else if (t < 60.0) env = 0.78 + 0.20 * kick;
+    else if (t < 82.5) env = 0.30 + 0.14 * Math.sin(t * 0.5);
+    else if (t < 96.0) env = 0.42 + ((t - 82.5) / 13.5) * 0.48;
+    else if (t < 97.5) env = 0.03;
+    else if (t < 127.5) env = 0.84 + 0.16 * kick;
+    else env = Math.max(0.05, 0.55 * (1 - (t - 127.5) / Math.max(1, duration_s - 127.5)));
+    const grit = 0.65 + 0.35 * Math.sin(i * 1.73) * Math.cos(i * 0.37);
+    const pk = clamp(env * (0.55 + 0.45 * kick) * grit, 0.01, 1.0);
+    maxA[i] = pk; minA[i] = -pk * (0.85 + 0.15 * Math.sin(i * 2.1)); rmsA[i] = pk * 0.52;
+  }
+  state.wfMin = minA; state.wfMax = maxA; state.wfRms = rmsA;
+}
+
+function buildWaveformFromAudioBuffer(buffer) {
+  const ch = buffer.getChannelData(0);
+  const N = 16384;
+  const minA = new Float32Array(N), maxA = new Float32Array(N), rmsA = new Float32Array(N);
+  const step = Math.max(1, Math.floor(ch.length / N));
+  for (let i = 0; i < N; i++) {
+    const s0 = i * step, s1 = Math.min(ch.length, s0 + step);
+    let lo = 0, hi = 0, sq = 0;
+    for (let j = s0; j < s1; j += Math.max(1, Math.floor((s1 - s0) / 32))) {
+      const v = ch[j];
+      if (v < lo) lo = v;
+      if (v > hi) hi = v;
+      sq += v * v;
+    }
+    minA[i] = lo; maxA[i] = hi;
+    rmsA[i] = Math.sqrt(sq / Math.max(1, Math.min(32, s1 - s0)));
+  }
+  state.wfMin = minA; state.wfMax = maxA; state.wfRms = rmsA;
+}
+
+function compileRig() {
+  const rig = state.rig;
+  const rMin = rig.room.min, rMax = rig.room.max;
+  const rSize = [rMax[0]-rMin[0], rMax[1]-rMin[1], rMax[2]-rMin[2]];
+  const pos = [], norm = [];
+  const slices = {};
+  let off = 0;
+  rig.fixtures.forEach((f) => {
+    const count = f.type === "line" ? (f.pixels || 60) : 1;
+    slices[f.id] = [off, off + count];
+    for (let k = 0; k < count; k++) {
+      let x, y, z;
+      if (f.type === "line") {
+        const u = count > 1 ? k / (count - 1) : 0.5;
+        x = f.start[0] + (f.end[0] - f.start[0]) * u;
+        y = f.start[1] + (f.end[1] - f.start[1]) * u;
+        z = f.start[2] + (f.end[2] - f.start[2]) * u;
+      } else {
+        [x, y, z] = f.pos;
+      }
+      pos.push(x, y, z);
+      norm.push((x - rMin[0]) / rSize[0], (y - rMin[1]) / rSize[1], (z - rMin[2]) / rSize[2]);
+    }
+    off += count;
+  });
+
+  // Resolve voxel index lists for: all, folders, smartGroups, AND every single fixture ID!
+  const targets = { all: Int32Array.from({ length: off }, (_, i) => i) };
+  for (const fld of (rig.folders || [])) {
+    const idx = [];
+    for (const f of rig.fixtures) if (f.folderId === fld.id) { const sl = slices[f.id]; if (sl) for (let i=sl[0]; i<sl[1]; i++) idx.push(i); }
+    targets[fld.id] = Int32Array.from(idx);
+  }
+  for (const sg of (rig.smartGroups || [])) {
+    const idx = [];
+    for (const f of rig.fixtures) if (matchSmartGroup(sg, f)) { const sl = slices[f.id]; if (sl) for (let i=sl[0]; i<sl[1]; i++) idx.push(i); }
+    targets[sg.id] = Int32Array.from(idx);
+  }
+  for (const f of rig.fixtures) {
+    const sl = slices[f.id];
+    if (sl) targets[f.id] = Int32Array.from({ length: sl[1] - sl[0] }, (_, k) => sl[0] + k);
+  }
+
+  state.compiled = { count: off, pos: new Float32Array(pos), norm: new Float32Array(norm), slices, targets };
+  updateProxyHealthUI();
+}
+
+function updateProxyHealthUI() {
+  const res = evaluateProxyRequirements(state.rig);
+  const btn = document.getElementById("btn-proxy-status");
+  const led = document.getElementById("proxy-led");
+  const lbl = document.getElementById("proxy-lbl");
+  if (res.ok) {
+    btn.classList.remove("warn-on");
+    led.className = "led ok";
+    lbl.textContent = `PROXIES ${res.activeProxyCount}/${Math.max(1, res.requiredProxies)} OK`;
+  } else {
+    btn.classList.add("warn-on");
+    led.className = "led danger";
+    lbl.textContent = `PROXY FEHLT (${res.activeProxyCount}/${res.requiredProxies})`;
+  }
+}
+
+function pushUndo(label = "Edit") {
+  state.undo.push({ label, show: deepClone(state.show) });
+  if (state.undo.length > 60) state.undo.shift();
+  state.redo.length = 0;
+  updateUndoUI();
+}
+function doUndo() {
+  if (!state.undo.length) return;
+  const snap = state.undo.pop();
+  state.redo.push({ label: snap.label, show: deepClone(state.show) });
+  state.show = snap.show; SHOWS[state.showId] = state.show;
+  updateUndoUI(); renderAllUI(); toast(`Undo: ${snap.label}`, "ok");
+}
+function doRedo() {
+  if (!state.redo.length) return;
+  const snap = state.redo.pop();
+  state.undo.push({ label: snap.label, show: deepClone(state.show) });
+  state.show = snap.show; SHOWS[state.showId] = state.show;
+  updateUndoUI(); renderAllUI(); toast(`Redo: ${snap.label}`, "ok");
+}
+function updateUndoUI() {
+  const u = document.getElementById("btn-undo"), r = document.getElementById("btn-redo");
+  u.disabled = !state.undo.length; r.disabled = !state.redo.length;
+  u.innerHTML = `${ico("undo","sm")}<span class="mono">${state.undo.length}</span>`;
+  r.innerHTML = `${ico("redo","sm")}<span class="mono">${state.redo.length}</span>`;
+}
+function toast(msg, kind = "info") {
+  const host = document.getElementById("toasts");
+  while (host.children.length >= 3) host.firstElementChild.remove();
+  const el = document.createElement("div"); el.className = `toast ${kind}`; el.textContent = msg;
+  host.appendChild(el); setTimeout(() => el.remove(), 3000);
+}
+
+/* ── 9. DETERMINISTIC 3D MULTI-TRACK COMPOSITOR (GLOBAL, SUB-LAYER & CLIPPING) ─ */
+function easeVal(kind, p) {
+  const u = clamp(p, 0, 1);
+  if (kind === "hold") return 0;
+  if (kind === "ease_in") return u * u;
+  if (kind === "ease_out") return 1 - (1 - u) * (1 - u);
+  if (kind === "ease_in_out") return u * u * (3 - 2 * u);
+  if (kind === "exp_decay") return (1 - Math.exp(-5 * u)) / (1 - Math.exp(-5));
+  return u;
+}
+
+function evalClipKeyframes(clip, localT) {
+  const out = {};
+  if (!clip.keyframes || !clip.keyframes.length) return out;
+  const byParam = {};
+  for (const kf of clip.keyframes) { if (!byParam[kf.param]) byParam[kf.param] = []; byParam[kf.param].push(kf); }
+  for (const [param, list] of Object.entries(byParam)) {
+    list.sort((a, b) => a.t_s - b.t_s);
+    if (localT <= list[0].t_s) { out[param] = list[0].value; continue; }
+    if (localT >= list[list.length - 1].t_s) { out[param] = list[list.length - 1].value; continue; }
+    for (let i = 0; i < list.length - 1; i++) {
+      const k0 = list[i], k1 = list[i + 1];
+      if (localT >= k0.t_s && localT <= k1.t_s) {
+        const u = easeVal(k0.easing || "linear", (localT - k0.t_s) / Math.max(1e-6, k1.t_s - k0.t_s));
+        out[param] = Array.isArray(k0.value) ? lerpOklab(k0.value, k1.value, u) : k0.value + (k1.value - k0.value) * u;
+        break;
+      }
+    }
+  }
+  return out;
+}
+
+function evalPresetVoxel(id, p, t, beatF, nx, ny, nz, vIdx) {
+  const bIdx = Math.floor(beatF), bPhase = ((beatF % 1) + 1) % 1, barPos = ((bIdx % 4) + 4) % 4;
+  if (id === "solid") { const c = p.color || [255,115,25], b = p.brightness ?? 1; return [c[0]*b, c[1]*b, c[2]*b]; }
+  if (id === "gradient_3d") {
+    const c1 = p.color1 || [255,90,20], c2 = p.color2 || [0,175,255], ang = ((p.angle || 0) * Math.PI) / 180;
+    let u = p.mode === "radial" ? Math.hypot(nx-0.5, ny-0.5)*1.4 : (p.mode === "spherical" ? Math.hypot(nx-0.5, ny-0.5, nz-0.5)*1.5 : (nx-0.5)*Math.cos(ang)+(ny-0.5)*Math.sin(ang)+0.5);
+    u = ((u + (p.offset || 0) + t * (p.speed || 0)) % 1 + 1) % 1;
+    return lerpOklab(c1, c2, 0.5 - 0.5 * Math.cos(u * Math.PI * 2));
+  }
+  if (id === "pulse_breathe") {
+    const c1 = p.color1 || [255,130,35], c2 = p.color2 || [24,14,48];
+    const v = (p.min_level ?? 0.12) + (1 - (p.min_level ?? 0.12)) * (0.5 + 0.5 * Math.sin(t * (p.rate || 0.5) * Math.PI * 2 - (nx + ny) * (p.spatial_phase || 0)));
+    return lerpOklab(c2, c1, v);
+  }
+  if (id === "chase_scanner") {
+    const c = p.color || [255,60,15], bg = p.bg_color || [8,10,18];
+    const coord = p.axis === "y" ? ny : (p.axis === "z" ? nz : nx);
+    const raw = (t * (p.speed || 0.6)) % 2;
+    let head = p.mode === "reverse" ? (1 - (raw % 1)) : (p.mode === "ping_pong" ? (raw <= 1 ? raw : 2 - raw) : (raw % 1));
+    return lerpOklab(bg, c, Math.exp(-Math.pow(Math.abs(coord - head) / Math.max(0.02, p.width || 0.16), 2)));
+  }
+  if (id === "pattern_bands") {
+    const coord = p.axis === "y" ? ny : (p.axis === "z" ? nz : nx);
+    const ph = ((coord * (p.freq || 3) + t * (p.speed || 0.4)) % 1 + 1) % 1;
+    return ph < (p.duty ?? 0.5) ? (p.color1 || [255,40,80]) : (p.color2 || [0,210,255]);
+  }
+  if (id === "ma3_wings") {
+    const c1 = p.color || [255,45,0], c2 = p.color2 || [0,210,255], ring = Math.min(3, Math.floor(Math.abs(nx - 0.5) * 7));
+    const active = p.style === "outside_in" ? ring === (3 - barPos) : (p.style === "frame_lock" ? (barPos % 2 === 0 ? ring <= 1 : ring >= 2) : ring === barPos);
+    const gate = bPhase < (p.gate ?? 0.55) ? Math.pow(1 - bPhase / Math.max(0.05, p.gate ?? 0.55), 1.2) : 0;
+    const bri = (active ? (0.2 + 0.8 * gate) : 0.03) * (p.brightness ?? 1);
+    const col = barPos === 3 ? c2 : c1;
+    return [col[0]*bri, col[1]*bri, col[2]*bri];
+  }
+  if (id === "particles_3d") {
+    const c1 = p.color || [255,145,40], c2 = p.color2 || [255,235,190], cnt = Math.round(p.density || 8), spd = p.speed || 0.55, tail = Math.max(0.03, p.tail || 0.14);
+    let r = 0, g = 0, b = 0;
+    for (let k = 0; k < cnt; k++) {
+      const hx = ((hash1(k * 13.7) + t * spd * (0.6 + 0.8 * hash1(k * 7.1))) % 1.3) - 0.15;
+      const dx = nx - hx;
+      if (dx <= 0.04 && dx >= -tail) {
+        const f = Math.exp(-Math.pow(dx / (tail * 0.45), 2)) * Math.exp(-Math.pow((ny - hash1(k * 29.3)) / 0.45, 2));
+        const col = k % 3 === 0 ? c2 : c1;
+        r += col[0] * f; g += col[1] * f; b += col[2] * f;
+      }
+    }
+    return [Math.min(255, r), Math.min(255, g), Math.min(255, b)];
+  }
+  if (id === "sparkle_twinkle") {
+    const bg = p.base_color || [16,10,28], sp = p.spark_color || [255,220,150];
+    const cell = Math.floor(t * (p.speed || 2.2) + hash1(vIdx * 3.17) * 10);
+    if (hash1(vIdx * 19.3 + cell * 71.7) > 1 - (p.density ?? 0.35)) {
+      const gl = Math.sin(((t * (p.speed || 2.2) + hash1(vIdx * 3.17) * 10) % 1) * Math.PI);
+      return lerpOklab(bg, sp, gl * gl);
+    }
+    return bg;
+  }
+  if (id === "shockwave_3d") {
+    const c = p.color || [255,80,20], rad = (p.auto_speed || 0) > 0 ? ((t * p.auto_speed) % 1.35) : (p.radius ?? 0.5);
+    const ring = Math.exp(-Math.pow((Math.hypot(nx - 0.5, ny - 0.5, (nz - 0.5) * 0.5) - rad) / Math.max(0.02, p.width || 0.14), 2));
+    return [c[0]*ring, c[1]*ring, c[2]*ring];
+  }
+  if (id === "strobe_blinder") {
+    const c = p.color || [255,245,230], hz = p.hz ?? 6, on = hz <= 0 ? 1 : (((t * hz) % 1) < (p.duty ?? 0.3) ? 1 : 0), bri = p.brightness ?? 1;
+    return [c[0]*on*bri, c[1]*on*bri, c[2]*on*bri];
+  }
+  if (id === "turrell_horizon") {
+    const sky = p.sky_color || [20,14,54], seam = p.seam_color || [255,112,26], earth = p.earth_color || [90,16,36];
+    const ang = ((p.angle || 75) * Math.PI) / 180;
+    const dist = ((nx - 0.5)*Math.cos(ang) + (ny - 0.5)*Math.sin(ang) + (nz - 0.5)*0.2) - 0.42 * Math.sin(t * (p.speed || 0.12));
+    const s = Math.exp(-Math.pow(dist / Math.max(0.05, p.seam_width || 0.28), 2));
+    const mix = lerpOklab(lerpOklab(earth, sky, clamp(0.5 + dist * 1.6, 0, 1)), seam, s * 0.9);
+    const b = 0.25 + 0.75 * s;
+    return [mix[0]*b, mix[1]*b, mix[2]*b];
+  }
+  if (id === "caustic_abyss") {
+    const tt = t * (p.speed || 0.35), k = (p.scale || 1.9) * Math.PI;
+    const w = (Math.sin(nx*k*0.9 + ny*k*1.1 - tt*2) + Math.sin(nx*k*1.4 - ny*k*0.7 + tt*1.236 + 1.5) + Math.cos((nx-ny+nz*0.5)*k - tt*0.764) + 3) / 6;
+    const col = lerpOklab(p.color1 || [10,42,74], p.color2 || [110,225,255], w), b = 0.08 + 0.92 * Math.pow(w, p.focus || 2.4);
+    return [col[0]*b, col[1]*b, col[2]*b];
+  }
+  if (id === "blackbody_forge") {
+    const heat = clamp((Math.exp(-Math.pow((nx - (0.5 + 0.36 * Math.sin(t * (p.speed || 0.35) * 1.4))) / 0.28, 2)) * 0.75 + Math.exp(-bPhase * 4.0) * 0.45) * (p.intensity ?? 0.9), 0, 1);
+    const col = lerpOklab(p.color1 || [255,95,15], p.color2 || [255,220,145], heat * 0.85), b = 0.08 + 0.92 * heat;
+    return [col[0]*b, col[1]*b, col[2]*b];
+  }
+  if (id === "noise_plasma") {
+    const sc = p.scale || 2.6, tt = t * (p.speed || 0.35), n = noise3(nx*sc + tt, ny*sc - tt*0.7, nz*sc + tt*0.4);
+    return n < 0.5 ? lerpOklab(p.color1 || [18,12,48], p.color2 || [215,55,95], n * 2) : lerpOklab(p.color2 || [215,55,95], p.color3 || [255,175,65], (n - 0.5) * 2);
+  }
+  if (id === "aurora_veil") {
+    const tt = t * (p.speed || 0.28), wave = 0.5 + 0.5 * Math.sin(nx * (p.ribbon || 2.2) * Math.PI + Math.sin(ny * 3.1 + tt * 1.8) * 1.6 - tt * 1.2);
+    const col = lerpOklab(p.color2 || [55,95,255], p.color1 || [30,220,140], wave), b = 0.14 + 0.86 * Math.pow(wave, 1.5);
+    return [col[0]*b, col[1]*b, col[2]*b];
+  }
+  return [0,0,0];
+}
+
+function evalSpatialMask(mask, nx, ny, nz, vIdx) {
+  if (!mask || mask.kind === "none") return 1.0;
+  const soft = Math.max(0.001, mask.softness ?? 0.1);
+  if (mask.kind === "plane_sweep") {
+    const c = mask.axis === "y" ? ny : (mask.axis === "z" ? nz : nx);
+    const d = Math.abs(c - (mask.position ?? 0.5)), half = (mask.width ?? 0.35) * 0.5;
+    return d <= half ? 1 : clamp(1 - (d - half) / soft, 0, 1);
+  }
+  if (mask.kind === "sphere_narrow") {
+    const d = Math.hypot(nx - 0.5, ny - 0.5, nz - 0.5), r = mask.radius ?? 0.4;
+    return d <= r ? 1 : clamp(1 - (d - r) / soft, 0, 1);
+  }
+  if (mask.kind === "box") return (nx >= 0.15 && nx <= 0.85 && ny >= 0.15 && ny <= 0.85) ? 1 : 0;
+  if (mask.kind === "parity") return (vIdx % 2 === 0) ? 1 : 0;
+  return 1.0;
+}
+
+function applyFilterStack(buf, filters, t, beatSec, grpIdx) {
+  if (!filters || !filters.length) return;
+  const comp = state.compiled;
+  for (const f of filters) {
+    if (!f.enabled) continue;
+    const p = f.params || {};
+    if (f.type === "beat_gate") {
+      const divs = { "1/2": 2, "1/4": 1, "1/8": 0.5, "1/16": 0.25 };
+      const iv = beatSec * (divs[p.division] || 1);
+      const ph = ((t - state.show.beat_offset_s) / iv % 1 + 1) % 1;
+      const g = ph <= (p.duty ?? 0.5) ? 1.0 : (p.floor ?? 0.05);
+      for (let i = 0; i < grpIdx.length; i++) { const o = grpIdx[i]*3; buf[o]*=g; buf[o+1]*=g; buf[o+2]*=g; }
+    } else if (f.type === "strobe_shutter") {
+      const g = (((t * (p.hz || 8)) % 1) < (p.duty ?? 0.35)) ? 1.0 : (p.floor ?? 0);
+      for (let i = 0; i < grpIdx.length; i++) { const o = grpIdx[i]*3; buf[o]*=g; buf[o+1]*=g; buf[o+2]*=g; }
+    } else if (f.type === "dim2warm") {
+      const amt = p.amount ?? 0.65, crv = p.curve ?? 1.3;
+      for (let i = 0; i < grpIdx.length; i++) {
+        const o = grpIdx[i]*3, lum = clamp((0.2126*buf[o] + 0.7152*buf[o+1] + 0.0722*buf[o+2]) / 255, 0, 1);
+        const m = amt * Math.pow(1 - lum, crv);
+        if (m > 0.01 && lum > 0.005) { buf[o] = buf[o]*(1-m) + 255*lum*m; buf[o+1] = buf[o+1]*(1-m) + 115*lum*m; buf[o+2] = buf[o+2]*(1-m) + 24*lum*m; }
+      }
+    } else if (f.type === "invert_color") {
+      const m = p.mix ?? 1;
+      for (let i = 0; i < grpIdx.length; i++) { const o = grpIdx[i]*3; buf[o] = buf[o]*(1-m)+(255-buf[o])*m; buf[o+1] = buf[o+1]*(1-m)+(255-buf[o+1])*m; buf[o+2] = buf[o+2]*(1-m)+(255-buf[o+2])*m; }
+    } else if (f.type === "grain_noise") {
+      const amt = p.amount ?? 0.3, sc = p.scale || 8, spd = p.speed || 6;
+      for (let i = 0; i < grpIdx.length; i++) {
+        const v = grpIdx[i], o = v*3, fmul = 1 - amt + amt * (0.4 + 1.2 * noise3(comp.norm[o]*sc, comp.norm[o+1]*sc, t*spd + v*0.13));
+        buf[o] = clamp(buf[o]*fmul, 0, 255); buf[o+1] = clamp(buf[o+1]*fmul, 0, 255); buf[o+2] = clamp(buf[o+2]*fmul, 0, 255);
+      }
+    } else if (f.type === "color_grade") {
+      const sat = p.saturation ?? 1, con = p.contrast ?? 1, hue = ((p.hue_shift || 0) * Math.PI) / 180, cosH = Math.cos(hue), sinH = Math.sin(hue);
+      for (let i = 0; i < grpIdx.length; i++) {
+        const o = grpIdx[i]*3; let r = buf[o], g = buf[o+1], b = buf[o+2], lum = 0.299*r + 0.587*g + 0.114*b;
+        r = lum + (r - lum)*sat; g = lum + (g - lum)*sat; b = lum + (b - lum)*sat;
+        if (Math.abs(hue) > 0.01) {
+          const nr = r*(0.299+0.701*cosH+0.168*sinH) + g*(0.587-0.587*cosH+0.330*sinH) + b*(0.114-0.114*cosH-0.497*sinH);
+          const ng = r*(0.299-0.299*cosH-0.328*sinH) + g*(0.587+0.413*cosH+0.035*sinH) + b*(0.114-0.114*cosH+0.292*sinH);
+          const nb = r*(0.299-0.300*cosH+1.250*sinH) + g*(0.587-0.588*cosH-1.050*sinH) + b*(0.114+0.886*cosH-0.203*sinH);
+          r = nr; g = ng; b = nb;
+        }
+        buf[o] = clamp((r - 127.5)*con + 127.5, 0, 255); buf[o+1] = clamp((g - 127.5)*con + 127.5, 0, 255); buf[o+2] = clamp((b - 127.5)*con + 127.5, 0, 255);
+      }
+    } else if (f.type === "mirror_symmetry") {
+      const m = p.mix ?? 1, n = grpIdx.length, copy = new Float32Array(n * 3);
+      for (let i = 0; i < n; i++) { const o = grpIdx[i]*3; copy[i*3]=buf[o]; copy[i*3+1]=buf[o+1]; copy[i*3+2]=buf[o+2]; }
+      for (let i = 0; i < n; i++) { const j = n - 1 - i, o = grpIdx[i]*3; buf[o] = buf[o]*(1-m)+copy[j*3]*m; buf[o+1] = buf[o+1]*(1-m)+copy[j*3+1]*m; buf[o+2] = buf[o+2]*(1-m)+copy[j*3+2]*m; }
+    } else if (f.type === "spatial_blur") {
+      const rad = Math.max(0.1, p.radius_m ?? 0.75), m = p.mix ?? 0.8, n = grpIdx.length, copy = new Float32Array(n * 3);
+      for (let i = 0; i < n; i++) { const o = grpIdx[i]*3; copy[i*3]=buf[o]; copy[i*3+1]=buf[o+1]; copy[i*3+2]=buf[o+2]; }
+      const span = n > 30 ? 8 : n;
+      for (let i = 0; i < n; i++) {
+        const vi = grpIdx[i], px = comp.pos[vi*3], py = comp.pos[vi*3+1], pz = comp.pos[vi*3+2];
+        let wr = 0, wg = 0, wb = 0, ws = 0;
+        for (let j = n > 30 ? Math.max(0, i-span) : 0; j < (n > 30 ? Math.min(n, i+span+1) : n); j++) {
+          const vj = grpIdx[j], d2 = (comp.pos[vj*3]-px)**2 + (comp.pos[vj*3+1]-py)**2 + (comp.pos[vj*3+2]-pz)**2, w = Math.exp(-d2 / (rad * rad));
+          wr += copy[j*3]*w; wg += copy[j*3+1]*w; wb += copy[j*3+2]*w; ws += w;
+        }
+        if (ws > 1e-6) { const o = vi*3; buf[o] = buf[o]*(1-m)+(wr/ws)*m; buf[o+1] = buf[o+1]*(1-m)+(wg/ws)*m; buf[o+2] = buf[o+2]*(1-m)+(wb/ws)*m; }
+      }
+    }
+  }
+}
+
+function renderTrackIntoBuffers(tr, t, beatSec, beatF, bPhase, barPos, kickEnv, energyEnv, rgbOut, alphaOut) {
+  const comp = state.compiled;
+  const grpIdx = comp.targets[tr.target_id] || comp.targets.all;
+  if (!grpIdx || !grpIdx.length) return;
+  const clipBuf = new Float32Array(comp.count * 3);
+
+  for (const clip of tr.clips) {
+    if (t < clip.start_s || t >= clip.end_s) continue;
+    const localT = t - clip.start_s;
+    let fade = 1.0;
+    if (clip.fade_in_s > 0 && localT < clip.fade_in_s) { const u = localT / clip.fade_in_s; fade *= u*u*(3-2*u); }
+    if (clip.fade_out_s > 0 && (clip.end_s - t) < clip.fade_out_s) { const u = (clip.end_s - t) / clip.fade_out_s; fade *= u*u*(3-2*u); }
+
+    const kfVals = evalClipKeyframes(clip, localT);
+    const effParams = { ...clip.params, ...kfVals };
+    // Evaluate Expression / Function Generators on parameters!
+    if (clip.expressions) {
+      for (const [k, expr] of Object.entries(clip.expressions)) {
+        if (!expr || !expr.trim()) continue;
+        const baseV = k === "opacity" ? (kfVals.opacity ?? clip.opacity ?? 1) : (effParams[k] ?? 0);
+        const res = evalExpression(expr, { t: localT, beat: beatF, beatPhase: bPhase, barPos, bpm: state.show.bpm, kick: kickEnv, energy: energyEnv, val: Number(baseV) || 0 });
+        if (k === "opacity") kfVals.opacity = res;
+        else effParams[k] = res;
+      }
+    }
+
+    const effOpacity = clamp(kfVals.opacity ?? clip.opacity ?? 1, 0, 1);
+    if (clip.snap_zcl && (bPhase < 0.12 || localT < 0.05)) state.lastSnap = true;
+
+    for (let i = 0; i < grpIdx.length; i++) {
+      const v = grpIdx[i], o = v * 3;
+      const c = evalPresetVoxel(clip.preset, effParams, t, beatF, comp.norm[o], comp.norm[o+1], comp.norm[o+2], v);
+      clipBuf[o] = c[0]; clipBuf[o+1] = c[1]; clipBuf[o+2] = c[2];
+    }
+    applyFilterStack(clipBuf, clip.filters, t, beatSec, grpIdx);
+
+    const baseA = fade * effOpacity * (tr.opacity ?? 1);
+    for (let i = 0; i < grpIdx.length; i++) {
+      const v = grpIdx[i], o = v * 3;
+      const a = clamp(baseA * evalSpatialMask(clip.mask, comp.norm[o], comp.norm[o+1], comp.norm[o+2], v), 0, 1);
+      if (a <= 1e-5) continue;
+      rgbOut[o] = clipBuf[o]; rgbOut[o+1] = clipBuf[o+1]; rgbOut[o+2] = clipBuf[o+2];
+      alphaOut[v] = Math.max(alphaOut[v], a);
+    }
+  }
+}
+
+function blendBuffers(master, srcRgb, srcAlpha, mode) {
+  for (let v = 0; v < srcAlpha.length; v++) {
+    const a = srcAlpha[v];
+    if (a <= 1e-5) continue;
+    const o = v * 3;
+    const sr = srcRgb[o], sg = srcRgb[o+1], sb = srcRgb[o+2];
+    const dr = master[o], dg = master[o+1], db = master[o+2];
+    if (mode === "add") {
+      master[o] = Math.min(255, dr + sr*a); master[o+1] = Math.min(255, dg + sg*a); master[o+2] = Math.min(255, db + sb*a);
+    } else if (mode === "max") {
+      master[o] = Math.max(dr, sr*a); master[o+1] = Math.max(dg, sg*a); master[o+2] = Math.max(db, sb*a);
+    } else if (mode === "multiply") {
+      master[o] = dr * (1 - a + a*(sr/255)); master[o+1] = dg * (1 - a + a*(sg/255)); master[o+2] = db * (1 - a + a*(sb/255));
+    } else if (mode === "override") {
+      master[o] = sr*a; master[o+1] = sg*a; master[o+2] = sb*a;
+    } else {
+      master[o] = dr*(1-a) + sr*a; master[o+1] = dg*(1-a) + sg*a; master[o+2] = db*(1-a) + sb*a;
+    }
+  }
+}
+
+function evaluateCompositor(t) {
+  const comp = state.compiled, N = comp.count;
+  const master = new Float32Array(N * 3);
+  state.lastSnap = false;
+  if (state.blackoutHold || N === 0) { state.lastRgb = master; state.lastSnap = state.blackoutHold; return master; }
+
+  const beatSec = 60 / (state.show.bpm || 128);
+  const beatF = (t - (state.show.beat_offset_s || 0)) / beatSec;
+  const bPhase = ((beatF % 1) + 1) % 1;
+  const barPos = ((Math.floor(beatF) % 4) + 4) % 4;
+  const kickEnv = Math.exp(-bPhase * 7.0);
+  const energyEnv = 0.45 + 0.35 * kickEnv;
+  const anySolo = state.show.tracks.some(tr => tr.solo && !tr.muted);
+
+  // Evaluate bottom-to-top (index length-1 down to 0) so higher layers sit OVER lower layers!
+  const tracks = state.show.tracks;
+  let i = tracks.length - 1;
+  while (i >= 0) {
+    const tr = tracks[i];
+    if (tr.muted || (anySolo && !tr.solo)) { i--; continue; }
+
+    const layerRgb = new Float32Array(N * 3);
+    const layerAlpha = new Float32Array(N);
+    renderTrackIntoBuffers(tr, t, beatSec, beatF, bPhase, barPos, kickEnv, energyEnv, layerRgb, layerAlpha);
+
+    // Check if layer above (i - 1) is Alt-Clipped (Photoshop Clipping Mask) onto this layer!
+    while (i - 1 >= 0 && tracks[i - 1].clippedToBelow) {
+      i--;
+      const maskTr = tracks[i];
+      if (maskTr.muted || (anySolo && !maskTr.solo)) continue;
+      const mRgb = new Float32Array(N * 3), mAlpha = new Float32Array(N);
+      renderTrackIntoBuffers(maskTr, t, beatSec, beatF, bPhase, barPos, kickEnv, energyEnv, mRgb, mAlpha);
+      // Clipping Mask: ONLY affects voxels where base layerAlpha > 0!
+      for (let v = 0; v < N; v++) {
+        if (layerAlpha[v] <= 1e-5 || mAlpha[v] <= 1e-5) continue;
+        const o = v * 3, a = mAlpha[v];
+        if (maskTr.blend_mode === "multiply") {
+          layerRgb[o] *= (1 - a + a*(mRgb[o]/255));
+          layerRgb[o+1] *= (1 - a + a*(mRgb[o+1]/255));
+          layerRgb[o+2] *= (1 - a + a*(mRgb[o+2]/255));
+        } else if (maskTr.blend_mode === "add") {
+          layerRgb[o] = Math.min(255, layerRgb[o] + mRgb[o]*a);
+          layerRgb[o+1] = Math.min(255, layerRgb[o+1] + mRgb[o+1]*a);
+          layerRgb[o+2] = Math.min(255, layerRgb[o+2] + mRgb[o+2]*a);
+        } else {
+          layerRgb[o] = layerRgb[o]*(1-a) + mRgb[o]*a;
+          layerRgb[o+1] = layerRgb[o+1]*(1-a) + mRgb[o+1]*a;
+          layerRgb[o+2] = layerRgb[o+2]*(1-a) + mRgb[o+2]*a;
+        }
+      }
+    }
+
+    blendBuffers(master, layerRgb, layerAlpha, tr.blend_mode || "normal");
+    i--;
+  }
+
+  if (state.masterBrightness < 0.999) {
+    const g = state.masterBrightness;
+    for (let k = 0; k < master.length; k++) master[k] *= g;
+  }
+  state.lastRgb = master;
+  return master;
+}
+
+/* ── 10. 3D LOFT VIEWPORT ────────────────────────────────────────────────── */
+const cam = { yaw: -0.68, pitch: 0.46, dist: 14.5, target: [3.25, 4.0, 2.3], fov: 48 * Math.PI / 180 };
+const vpCanvas = document.getElementById("vp-canvas");
+const vpCtx = vpCanvas.getContext("2d");
+let vpW = 1, vpH = 1, vpDrag = null;
+
+function vecNorm(v) { const l = Math.hypot(v[0],v[1],v[2]) || 1; return [v[0]/l, v[1]/l, v[2]/l]; }
+function vecCross(a,b) { return [a[1]*b[2]-a[2]*b[1], a[2]*b[0]-a[0]*b[2], a[0]*b[1]-a[1]*b[0]]; }
+function camBasis() {
+  const cp = Math.cos(cam.pitch), sp = Math.sin(cam.pitch);
+  const eye = [cam.target[0] + cam.dist*cp*Math.sin(cam.yaw), cam.target[1] - cam.dist*cp*Math.cos(cam.yaw), cam.target[2] + cam.dist*sp];
+  const fwd = vecNorm([cam.target[0]-eye[0], cam.target[1]-eye[1], cam.target[2]-eye[2]]);
+  let right = vecNorm(vecCross(fwd, [0,0,1]));
+  if (Math.hypot(right[0],right[1],right[2]) < 0.01) right = [1,0,0];
+  return { eye, fwd, right, up: vecCross(right, fwd) };
+}
+function project3(p, b) {
+  const rx = p[0]-b.eye[0], ry = p[1]-b.eye[1], rz = p[2]-b.eye[2];
+  const depth = rx*b.fwd[0] + ry*b.fwd[1] + rz*b.fwd[2];
+  if (depth <= 0.1) return null;
+  const f = (vpH * 0.5) / Math.tan(cam.fov * 0.5);
+  return { x: vpW*0.5 + (rx*b.right[0]+ry*b.right[1]+rz*b.right[2])*f/depth, y: vpH*0.5 - (rx*b.up[0]+ry*b.up[1]+rz*b.up[2])*f/depth, depth, f };
+}
+function draw3Line(ctx, a, b, col, basis, lw = 1) {
+  const pa = project3(a, basis), pb = project3(b, basis);
+  if (!pa || !pb) return;
+  ctx.strokeStyle = col; ctx.lineWidth = lw;
+  ctx.beginPath(); ctx.moveTo(pa.x, pa.y); ctx.lineTo(pb.x, pb.y); ctx.stroke();
+}
+
+function drawViewport() {
+  const ctx = vpCtx, basis = camBasis();
+  ctx.fillStyle = "#0b0c0e"; ctx.fillRect(0, 0, vpW, vpH);
+  const [x0,y0,z0] = state.rig.room.min, [x1,y1,z1] = state.rig.room.max;
+  for (let x = x0; x <= x1 + 1e-4; x += 0.5) draw3Line(ctx, [x,y0,z0], [x,y1,z0], Math.abs(x%2)<1e-4 ? "#23262c" : "#17191e", basis);
+  for (let y = y0; y <= y1 + 1e-4; y += 0.5) draw3Line(ctx, [x0,y,z0], [x1,y,z0], Math.abs(y%2)<1e-4 ? "#23262c" : "#17191e", basis);
+  const corners = [[x0,y0,z0],[x1,y0,z0],[x1,y1,z0],[x0,y1,z0],[x0,y0,z1],[x1,y0,z1],[x1,y1,z1],[x0,y1,z1]];
+  [[0,1],[1,2],[2,3],[3,0],[4,5],[5,6],[6,7],[7,4],[0,4],[1,5],[2,6],[3,7]].forEach(([i,j]) => draw3Line(ctx, corners[i], corners[j], "#272b33", basis));
+  draw3Line(ctx, [x0, 4.4, 4.05], [x1, 4.4, 4.05], "#323742", basis, 1.5);
+
+  const rgb = state.lastRgb || new Float32Array(state.compiled.count * 3), comp = state.compiled;
+  for (const f of state.rig.fixtures) {
+    if (!f.enabled || f.type !== "point") continue;
+    const sl = comp.slices[f.id]; if (!sl) continue;
+    const r = Math.round(rgb[sl[0]*3]), g = Math.round(rgb[sl[0]*3+1]), b = Math.round(rgb[sl[0]*3+2]), peak = Math.max(r,g,b)/255;
+    if (peak < 0.02) continue;
+    const aim = vecNorm(f.aim || [0,0,-1]), hitZ = aim[2] < 0 ? z0 : z1;
+    const dist = Math.abs(aim[2]) > 0.05 ? clamp((hitZ - f.pos[2]) / aim[2], 0.4, 6.0) : 2.5;
+    const hit = [f.pos[0]+aim[0]*dist, f.pos[1]+aim[1]*dist, f.pos[2]+aim[2]*dist];
+    const pHit = project3(hit, basis), pTop = project3(f.pos, basis);
+    if (pHit && aim[2] < 0) {
+      const rad = clamp((pHit.f / pHit.depth) * Math.tan(((f.beam_deg||45)*Math.PI)/360) * dist * 0.6, 10, 150);
+      ctx.save(); ctx.globalCompositeOperation = "lighter"; ctx.translate(pHit.x, pHit.y); ctx.scale(1, 0.45);
+      const gr = ctx.createRadialGradient(0,0,0,0,0,rad); gr.addColorStop(0, `rgba(${r},${g},${b},${(peak*0.32).toFixed(3)})`); gr.addColorStop(1, `rgba(${r},${g},${b},0)`);
+      ctx.fillStyle = gr; ctx.beginPath(); ctx.arc(0,0,rad,0,Math.PI*2); ctx.fill(); ctx.restore();
+    }
+    if (pTop && pHit) {
+      const cLen = Math.min(dist, 2.8), radW = Math.tan(((f.beam_deg||45)*Math.PI)/360) * cLen, u = vecNorm(vecCross(aim, [1,0,0]));
+      const pL = project3([f.pos[0]+aim[0]*cLen-u[0]*radW, f.pos[1]+aim[1]*cLen-u[1]*radW, f.pos[2]+aim[2]*cLen-u[2]*radW], basis);
+      const pR = project3([f.pos[0]+aim[0]*cLen+u[0]*radW, f.pos[1]+aim[1]*cLen+u[1]*radW, f.pos[2]+aim[2]*cLen+u[2]*radW], basis);
+      if (pL && pR) {
+        ctx.save(); ctx.globalCompositeOperation = "lighter";
+        const gr = ctx.createLinearGradient(pTop.x, pTop.y, (pL.x+pR.x)/2, (pL.y+pR.y)/2);
+        gr.addColorStop(0, `rgba(${r},${g},${b},${(peak*0.20).toFixed(3)})`); gr.addColorStop(1, `rgba(${r},${g},${b},0)`);
+        ctx.fillStyle = gr; ctx.beginPath(); ctx.moveTo(pTop.x, pTop.y); ctx.lineTo(pL.x, pL.y); ctx.lineTo(pR.x, pR.y); ctx.closePath(); ctx.fill(); ctx.restore();
+      }
+    }
+  }
+
+  const selPts = [];
+  for (const f of state.rig.fixtures) {
+    const sl = comp.slices[f.id]; if (!sl) continue;
+    const isSel = state.selFixtures.has(f.id), bad = validateFixtureMinimal(f).length > 0;
+    if (f.type === "point") {
+      if (isSel) selPts.push(f.pos);
+      const p = project3(f.pos, basis); if (!p) continue;
+      const r = f.enabled ? Math.round(rgb[sl[0]*3]) : 28, g = f.enabled ? Math.round(rgb[sl[0]*3+1]) : 30, b = f.enabled ? Math.round(rgb[sl[0]*3+2]) : 34;
+      const rad = clamp(160 / p.depth, 3.2, 7.5);
+      if (f.enabled && Math.max(r,g,b) > 15) {
+        const gr = ctx.createRadialGradient(p.x, p.y, 0, p.x, p.y, rad * 4.2); gr.addColorStop(0, `rgba(${r},${g},${b},0.6)`); gr.addColorStop(1, `rgba(${r},${g},${b},0)`);
+        ctx.fillStyle = gr; ctx.beginPath(); ctx.arc(p.x, p.y, rad*4.2, 0, Math.PI*2); ctx.fill();
+      }
+      ctx.fillStyle = `rgb(${r},${g},${b})`; ctx.strokeStyle = isSel ? "#e8862e" : (bad ? "#c45a52" : "#565b66"); ctx.lineWidth = isSel || bad ? 2 : 1;
+      ctx.beginPath(); ctx.arc(p.x, p.y, rad, 0, Math.PI*2); ctx.fill(); ctx.stroke();
+    } else {
+      if (isSel) { selPts.push(f.start, f.end); }
+      const p0 = project3(f.start, basis), p1 = project3(f.end, basis);
+      if (p0 && p1) { ctx.strokeStyle = isSel ? "#e8862e" : "#2e333d"; ctx.lineWidth = isSel ? 7 : 5; ctx.beginPath(); ctx.moveTo(p0.x, p0.y); ctx.lineTo(p1.x, p1.y); ctx.stroke(); }
+      const step = Math.max(1, Math.floor((sl[1] - sl[0]) / 60)); let prev = null;
+      for (let idx = sl[0]; idx < sl[1]; idx += step) {
+        const pt = project3([comp.pos[idx*3], comp.pos[idx*3+1], comp.pos[idx*3+2]], basis); if (!pt) continue;
+        if (prev) { ctx.strokeStyle = `rgb(${Math.round(rgb[idx*3])},${Math.round(rgb[idx*3+1])},${Math.round(rgb[idx*3+2])})`; ctx.lineWidth = clamp(65 / pt.depth, 2, 4.5); ctx.beginPath(); ctx.moveTo(prev.x, prev.y); ctx.lineTo(pt.x, pt.y); ctx.stroke(); }
+        prev = pt;
+      }
+    }
+  }
+
+  if (selPts.length) {
+    let bx0=1e9,by0=1e9,bz0=1e9,bx1=-1e9,by1=-1e9,bz1=-1e9;
+    for (const pt of selPts) { bx0=Math.min(bx0,pt[0]-0.18); by0=Math.min(by0,pt[1]-0.18); bz0=Math.min(bz0,pt[2]-0.18); bx1=Math.max(bx1,pt[0]+0.18); by1=Math.max(by1,pt[1]+0.18); bz1=Math.max(bz1,pt[2]+0.18); }
+    const bc = [[bx0,by0,bz0],[bx1,by0,bz0],[bx1,by1,bz0],[bx0,by1,bz0],[bx0,by0,bz1],[bx1,by0,bz1],[bx1,by1,bz1],[bx0,by1,bz1]];
+    [[0,1],[1,2],[2,3],[3,0],[4,5],[5,6],[6,7],[7,4],[0,4],[1,5],[2,6],[3,7]].forEach(([i,j]) => draw3Line(ctx, bc[i], bc[j], "#e8862e", basis, 1));
+    const piv = [(bx0+bx1)/2, (by0+by1)/2, (bz0+bz1)/2], pO = project3(piv, basis);
+    if (pO) {
+      [{v:[0.65,0,0],c:"#e05a5a",l:"X"},{v:[0,0.65,0],c:"#58a66b",l:"Y"},{v:[0,0,0.65],c:"#5e9aa8",l:"Z"}].forEach(ax => {
+        const pE = project3([piv[0]+ax.v[0], piv[1]+ax.v[1], piv[2]+ax.v[2]], basis); if (!pE) return;
+        ctx.strokeStyle = ax.c; ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(pO.x, pO.y); ctx.lineTo(pE.x, pE.y); ctx.stroke();
+        ctx.fillStyle = ax.c; ctx.font = "bold 9px monospace"; ctx.fillText(ax.l, pE.x+3, pE.y+3);
+      });
+    }
+  }
+
+  document.getElementById("vp-zcl").innerHTML = state.lastSnap ? `ZCL: <span style="color:var(--danger);font-weight:700">SNAP 5ms</span>` : `ZCL: <span style="color:var(--text-1)">SMOOTH 33ms</span>`;
+  document.getElementById("vp-sel").textContent = `${state.selFixtures.size} SEL`;
+}
+
+function hitFixture3D(x, y) {
+  const basis = camBasis(); let best = null, bestD = 14;
+  for (const f of state.rig.fixtures) {
+    if (f.type === "point") {
+      const p = project3(f.pos, basis); if (!p) continue;
+      const d = Math.hypot(p.x - x, p.y - y); if (d < bestD) { bestD = d; best = f.id; }
+    } else {
+      const p0 = project3(f.start, basis), p1 = project3(f.end, basis); if (!p0 || !p1) continue;
+      const dx = p1.x - p0.x, dy = p1.y - p0.y, t = clamp(((x-p0.x)*dx + (y-p0.y)*dy) / (dx*dx+dy*dy || 1), 0, 1);
+      const d = Math.hypot(x - (p0.x + t*dx), y - (p0.y + t*dy)); if (d < bestD) { bestD = d; best = f.id; }
+    }
+  }
+  return best;
+}
+function moveSelectedFixtures(dx, dy, dz) {
+  const [x0,y0,z0] = state.rig.room.min, [x1,y1,z1] = state.rig.room.max;
+  for (const fid of state.selFixtures) {
+    const f = state.rig.fixtures.find(item => item.id === fid); if (!f) continue;
+    if (f.type === "point") f.pos = [clamp(f.pos[0]+dx, x0, x1), clamp(f.pos[1]+dy, y0, y1), clamp(f.pos[2]+dz, z0, z1)];
+    else { f.start = [clamp(f.start[0]+dx, x0, x1), clamp(f.start[1]+dy, y0, y1), clamp(f.start[2]+dz, z0, z1)]; f.end = [clamp(f.end[0]+dx, x0, x1), clamp(f.end[1]+dy, y0, y1), clamp(f.end[2]+dz, z0, z1)]; }
+  }
+  compileRig();
+}
+function bindViewportEvents() {
+  vpCanvas.addEventListener("contextmenu", e => e.preventDefault());
+  vpCanvas.addEventListener("pointerdown", e => {
+    const r = vpCanvas.getBoundingClientRect(), x = e.clientX - r.left, y = e.clientY - r.top;
+    if (e.button === 2 || e.altKey) { vpDrag = { mode: "orbit", x0: x, y0: y, yaw: cam.yaw, pitch: cam.pitch }; vpCanvas.setPointerCapture(e.pointerId); return; }
+    if (e.button === 1) { vpDrag = { mode: "pan", x0: x, y0: y, target: [...cam.target] }; vpCanvas.setPointerCapture(e.pointerId); return; }
+    const hit = hitFixture3D(x, y);
+    if (hit) {
+      if (!state.selFixtures.has(hit)) {
+        if (!e.shiftKey) state.selFixtures.clear();
+        state.selFixtures.add(hit); state.selFolderId = null; state.selType = state.selFixtures.size > 1 ? "group" : "fixture";
+        renderRigPanel(); renderInspector();
+      }
+      vpDrag = { mode: "move", lx: x, ly: y }; vpCanvas.setPointerCapture(e.pointerId);
+    } else if (e.shiftKey) {
+      vpDrag = { mode: "pan", x0: x, y0: y, target: [...cam.target] }; vpCanvas.setPointerCapture(e.pointerId);
+    } else { state.selFixtures.clear(); state.selFolderId = null; renderRigPanel(); renderInspector(); }
+  });
+  vpCanvas.addEventListener("pointermove", e => {
+    if (!vpDrag) return;
+    const r = vpCanvas.getBoundingClientRect(), x = e.clientX - r.left, y = e.clientY - r.top;
+    if (vpDrag.mode === "orbit") { cam.yaw = vpDrag.yaw + (x - vpDrag.x0) * 0.008; cam.pitch = clamp(vpDrag.pitch + (y - vpDrag.y0) * 0.008, -1.45, 1.48); }
+    else if (vpDrag.mode === "pan") {
+      const b = camBasis(), scale = cam.dist / Math.max(200, vpH), dx = -(x - vpDrag.x0) * scale, dy = (y - vpDrag.y0) * scale;
+      cam.target = [vpDrag.target[0] + b.right[0]*dx + b.up[0]*dy, vpDrag.target[1] + b.right[1]*dx + b.up[1]*dy, vpDrag.target[2] + b.right[2]*dx + b.up[2]*dy];
+    } else if (vpDrag.mode === "move") {
+      const dxPx = x - vpDrag.lx, dyPx = y - vpDrag.ly; vpDrag.lx = x; vpDrag.ly = y;
+      const b = camBasis(), sc = cam.dist / Math.max(220, vpH);
+      if (e.shiftKey) moveSelectedFixtures(0, 0, -dyPx * sc);
+      else moveSelectedFixtures(b.right[0]*dxPx*sc - b.up[0]*dyPx*sc, b.right[1]*dxPx*sc - b.up[1]*dyPx*sc, 0);
+      renderInspector();
+    }
+  });
+  vpCanvas.addEventListener("pointerup", () => { vpDrag = null; });
+  vpCanvas.addEventListener("wheel", e => { e.preventDefault(); cam.dist = clamp(cam.dist * (1 + Math.sign(e.deltaY) * 0.1), 3, 35); }, { passive: false });
+  document.querySelectorAll("#cam-bar [data-cam]").forEach(btn => {
+    btn.onclick = () => {
+      document.querySelectorAll("#cam-bar [data-cam]").forEach(b => b.classList.remove("active"));
+      btn.classList.add("active"); cam.target = [3.25, 4.0, 2.3]; cam.dist = 14.5;
+      const c = btn.dataset.cam;
+      if (c === "front") { cam.yaw = 0; cam.pitch = 0.06; }
+      else if (c === "top") { cam.yaw = 0; cam.pitch = 1.48; cam.dist = 13.5; }
+      else if (c === "side") { cam.yaw = Math.PI/2; cam.pitch = 0.08; }
+      else { cam.yaw = -0.68; cam.pitch = 0.46; }
+    };
+  });
+}
+
+/* ── 11. MULTI-TRACK TIMELINE (VARIABLE HEIGHT, GLOBAL, SUB-LAYERS, ALT-CLIP) ─ */
+const tlCanvas = document.getElementById("tl-canvas");
+const tlCtx = tlCanvas.getContext("2d");
+const HDR_W = 196, RULER_H = 22, AUDIO_H = 48, KF_LANE_H = 22;
+const TRK_COLORS = ["#c9a34a", "#5e9aa8", "#e8862e", "#9b7fb5", "#8fa65a", "#c45a52"];
+let tlW = 1, tlH = 1, tlDrag = null, tlRows = [];
+
+function timeToX(t) { return HDR_W + ((t - state.tlStart) / Math.max(0.1, state.tlEnd - state.tlStart)) * (tlW - HDR_W); }
+function xToTime(x) { return state.tlStart + ((x - HDR_W) / Math.max(1, tlW - HDR_W)) * (state.tlEnd - state.tlStart); }
+function snapT(t, bypass = false) {
+  if (bypass || state.snapBeats <= 0) return clamp(t, 0, state.show.duration_s);
+  const step = (60 / (state.show.bpm || 128)) * state.snapBeats;
+  return clamp(Math.round((t - state.show.beat_offset_s) / step) * step + state.show.beat_offset_s, 0, state.show.duration_s);
+}
+
+function targetDisplayName(targetId) {
+  if (targetId === "all") return "Alle Lampen";
+  const fld = (state.rig.folders || []).find(x => x.id === targetId);
+  if (fld) return fld.name;
+  const sg = (state.rig.smartGroups || []).find(x => x.id === targetId);
+  if (sg) return sg.name;
+  const fx = state.rig.fixtures.find(x => x.id === targetId);
+  if (fx) return fx.name;
+  return targetId;
+}
+
+function computeTimelineRows() {
+  const rows = [];
+  let y = RULER_H + AUDIO_H - state.tlScrollY;
+  state.show.tracks.forEach((tr, ti) => {
+    const h = clamp(tr.height || 36, 24, 140);
+    rows.push({ kind: "track", track: tr, trackIdx: ti, y, h });
+    y += h;
+    if (tr.expanded) {
+      const paramSet = new Set();
+      tr.clips.forEach(c => (c.keyframes || []).forEach(k => paramSet.add(k.param)));
+      if (!paramSet.size) paramSet.add("opacity");
+      for (const param of paramSet) {
+        rows.push({ kind: "kf", track: tr, trackIdx: ti, param, y, h: KF_LANE_H });
+        y += KF_LANE_H;
+      }
+    }
+  });
+  tlRows = rows;
+  return rows;
+}
+
+function drawTimeline() {
+  const ctx = tlCtx, rows = computeTimelineRows();
+  ctx.fillStyle = "#111214"; ctx.fillRect(0, 0, tlW, tlH);
+
+  // Beat & Bar Grid
+  const beatSec = 60 / (state.show.bpm || 128);
+  let step = beatSec;
+  while ((step / (state.tlEnd - state.tlStart)) * (tlW - HDR_W) < 12) step *= 2;
+  const firstT = Math.floor(state.tlStart / step) * step;
+  for (let t = firstT; t <= state.tlEnd; t += step) {
+    if (t < 0) continue;
+    const x = Math.round(timeToX(t)) + 0.5;
+    if (x < HDR_W) continue;
+    const isBar = Math.abs((t / (beatSec * 4)) - Math.round(t / (beatSec * 4))) < 0.02;
+    ctx.strokeStyle = isBar ? "#272a32" : "#1a1c22"; ctx.lineWidth = 1;
+    ctx.beginPath(); ctx.moveTo(x, RULER_H); ctx.lineTo(x, tlH); ctx.stroke();
+  }
+
+  ctx.save();
+  ctx.beginPath(); ctx.rect(0, RULER_H + AUDIO_H, tlW, tlH - (RULER_H + AUDIO_H)); ctx.clip();
+
+  for (const row of rows) {
+    if (row.y + row.h < RULER_H + AUDIO_H || row.y > tlH) continue;
+    const tr = row.track;
+    const isGlobal = tr.kind === "global";
+    const isSub = tr.kind === "sub";
+    const col = isGlobal ? "#c9a34a" : (isSub ? "#9b7fb5" : TRK_COLORS[row.trackIdx % TRK_COLORS.length]);
+
+    if (row.kind === "track") {
+      const isSelTrk = state.selTrackId === tr.id && state.selType === "track";
+      ctx.fillStyle = isSelTrk ? "#261d14" : (isGlobal ? "#1b1915" : (isSub ? "#141519" : "#17181b"));
+      ctx.fillRect(0, row.y, HDR_W, row.h);
+      ctx.fillStyle = row.trackIdx % 2 === 0 ? "#121317" : "#15161a";
+      ctx.fillRect(HDR_W, row.y, tlW - HDR_W, row.h);
+
+      // Left color stripe & nesting indentation
+      const indent = isSub ? 14 : 0;
+      ctx.fillStyle = col;
+      ctx.fillRect(indent, row.y, 3, row.h);
+
+      // Alt-Click Clipping Mask Down-Arrow indicator
+      if (tr.clippedToBelow) {
+        ctx.fillStyle = "#e8862e";
+        ctx.font = "bold 11px monospace";
+        ctx.fillText("↴", indent + 5, row.y + 15);
+      }
+
+      // Expand chevron
+      ctx.fillStyle = tr.expanded ? "#e8862e" : "#7c8089";
+      ctx.font = "10px monospace";
+      ctx.fillText(tr.expanded ? "▾" : "▸", indent + (tr.clippedToBelow ? 15 : 6), row.y + 15);
+
+      // High-contrast readable Track Name & Target Tag
+      const textX = indent + (tr.clippedToBelow ? 26 : 17);
+      ctx.fillStyle = tr.muted ? "#5c6069" : "#f0f1f4";
+      ctx.font = "600 11px Inter, sans-serif";
+      ctx.fillText(tr.name.slice(0, 17), textX, row.y + 14);
+
+      if (row.h >= 28) {
+        ctx.fillStyle = isGlobal ? "#c9a34a" : "#8e939e";
+        ctx.font = "9px monospace";
+        const tag = isGlobal ? "GLOBAL OVERLAY" : `${tr.blend_mode.toUpperCase()} · ${targetDisplayName(tr.target_id).slice(0, 13)}`;
+        ctx.fillText(tag, textX, row.y + 26);
+      }
+
+      // M / S buttons
+      ctx.fillStyle = tr.muted ? "#c45a52" : "#25282d";
+      ctx.fillRect(HDR_W - 42, row.y + 6, 17, 17);
+      ctx.fillStyle = tr.muted ? "#fff" : "#9da1aa";
+      ctx.font = "bold 9px monospace"; ctx.fillText("M", HDR_W - 36, row.y + 18);
+
+      ctx.fillStyle = tr.solo ? "#e8862e" : "#25282d";
+      ctx.fillRect(HDR_W - 22, row.y + 6, 17, 17);
+      ctx.fillStyle = tr.solo ? "#111" : "#9da1aa";
+      ctx.fillText("S", HDR_W - 16, row.y + 18);
+
+      // Clips (Crisp, high-contrast labels)
+      for (const clip of tr.clips) {
+        const cx0 = timeToX(clip.start_s), cx1 = timeToX(clip.end_s);
+        if (cx1 < HDR_W || cx0 > tlW) continue;
+        const x0 = Math.max(HDR_W, cx0), x1 = Math.min(tlW, cx1), cw = Math.max(4, x1 - x0);
+        const cy = row.y + 3, ch = row.h - 6;
+        const isSel = state.selClipId === clip.id && state.selType === "clip";
+
+        ctx.fillStyle = tr.muted ? "#23252b" : `${col}38`;
+        ctx.fillRect(x0, cy, cw, ch);
+        ctx.fillStyle = tr.muted ? "#555" : col;
+        ctx.fillRect(x0, cy, cw, 2.5);
+
+        ctx.strokeStyle = isSel ? "#e8862e" : "#383d47";
+        ctx.lineWidth = isSel ? 1.5 : 1;
+        ctx.strokeRect(x0 + 0.5, cy + 0.5, cw - 1, ch - 1);
+
+        if (cw > 26) {
+          ctx.save();
+          ctx.beginPath(); ctx.rect(x0 + 3, cy, cw - 6, ch); ctx.clip();
+          ctx.fillStyle = "#ffffff"; ctx.font = "600 10.5px Inter, sans-serif";
+          const presetName = PRESETS[clip.preset] ? PRESETS[clip.preset].name : clip.preset;
+          ctx.fillText(clip.name || presetName, x0 + 5, cy + 13);
+          if (ch >= 24) {
+            const hasExpr = clip.expressions && Object.values(clip.expressions).some(v => v && v.trim());
+            const meta = [hasExpr ? "ƒ(x)" : "", (clip.filters||[]).filter(f=>f.enabled).length ? `${clip.filters.filter(f=>f.enabled).length}FX` : "", clip.snap_zcl ? "SNAP" : ""].filter(Boolean).join(" · ");
+            if (meta) { ctx.fillStyle = "#b8bcc4"; ctx.font = "9px monospace"; ctx.fillText(meta, x0 + 5, cy + 24); }
+          }
+          ctx.restore();
+        }
+      }
+
+      // Bottom Track Resize Handle Line
+      ctx.strokeStyle = "#2b2f38"; ctx.lineWidth = 1;
+      ctx.beginPath(); ctx.moveTo(0, row.y + row.h + 0.5); ctx.lineTo(tlW, row.y + row.h + 0.5); ctx.stroke();
+    } else {
+      // Keyframe Sub-Lane
+      ctx.fillStyle = "#131418"; ctx.fillRect(0, row.y, HDR_W, row.h);
+      ctx.fillStyle = "#0e1013"; ctx.fillRect(HDR_W, row.y, tlW - HDR_W, row.h);
+      ctx.fillStyle = "#8e939e"; ctx.font = "9px monospace";
+      ctx.fillText(`└ ${row.param}`, 22, row.y + 14);
+      for (const clip of tr.clips) {
+        const kfs = (clip.keyframes || []).filter(k => k.param === row.param).sort((a,b) => a.t_s - b.t_s);
+        if (!kfs.length) continue;
+        ctx.strokeStyle = "rgba(232,134,46,0.55)"; ctx.lineWidth = 1.25; ctx.beginPath();
+        kfs.forEach((kf, idx) => {
+          const kx = timeToX(clip.start_s + kf.t_s), v = Array.isArray(kf.value) ? 0.5 : clamp(Number(kf.value)||0, 0, 1);
+          const ky = row.y + row.h - 4 - v * (row.h - 8);
+          if (idx === 0) ctx.moveTo(kx, ky); else ctx.lineTo(kx, ky);
+        });
+        ctx.stroke();
+        for (const kf of kfs) {
+          const kx = timeToX(clip.start_s + kf.t_s); if (kx < HDR_W - 4 || kx > tlW + 4) continue;
+          const v = Array.isArray(kf.value) ? 0.5 : clamp(Number(kf.value)||0, 0, 1), ky = row.y + row.h - 4 - v * (row.h - 8);
+          ctx.fillStyle = state.selKfId === kf.id ? "#fff" : "#e8862e";
+          ctx.beginPath(); ctx.moveTo(kx, ky-5); ctx.lineTo(kx+5, ky); ctx.lineTo(kx, ky+5); ctx.lineTo(kx-5, ky); ctx.closePath(); ctx.fill();
+        }
+      }
+      ctx.strokeStyle = "#24272e"; ctx.beginPath(); ctx.moveTo(0, row.y + row.h + 0.5); ctx.lineTo(tlW, row.y + row.h + 0.5); ctx.stroke();
+    }
+  }
+  ctx.restore();
+
+  // Audio Track & Section Headers
+  ctx.fillStyle = "#15171c"; ctx.fillRect(0, RULER_H, HDR_W, AUDIO_H);
+  ctx.fillStyle = "#0d0f13"; ctx.fillRect(HDR_W, RULER_H, tlW - HDR_W, AUDIO_H);
+  ctx.fillStyle = "#5e9aa8"; ctx.fillRect(0, RULER_H, 3, AUDIO_H);
+  ctx.fillStyle = "#e8e9ec"; ctx.font = "600 10px Inter, sans-serif"; ctx.fillText("AUDIO & MARKERS", 10, RULER_H + 17);
+  ctx.fillStyle = "#7c8089"; ctx.font = "9px monospace"; ctx.fillText(state.audioName.slice(0, 24), 10, RULER_H + 31);
+
+  const markers = [...state.show.markers].sort((a,b) => a.t_s - b.t_s);
+  for (let i = 0; i < markers.length; i++) {
+    const m = markers[i], nextT = i + 1 < markers.length ? markers[i+1].t_s : state.show.duration_s;
+    const mx0 = Math.max(HDR_W, timeToX(m.t_s)), mx1 = Math.min(tlW, timeToX(nextT));
+    if (mx1 <= mx0) continue;
+    ctx.fillStyle = `${m.color || "#5e9aa8"}38`; ctx.fillRect(mx0, RULER_H, mx1 - mx0, 14);
+    ctx.fillStyle = m.color || "#5e9aa8"; ctx.fillRect(mx0, RULER_H, 2, 14);
+    if (mx1 - mx0 > 26) { ctx.fillStyle = "#e8e9ec"; ctx.font = "600 9px Inter, sans-serif"; ctx.fillText(m.name, mx0 + 5, RULER_H + 10); }
+  }
+
+  if (state.wfMax && state.wfMin) {
+    const N = state.wfMax.length, dur = Math.max(0.1, state.show.duration_s);
+    const waveTop = RULER_H + 15, waveH = AUDIO_H - 17, mid = waveTop + waveH * 0.5;
+    for (let x = HDR_W; x < tlW; x++) {
+      const t0 = xToTime(x), t1 = xToTime(x + 1); if (t1 < 0 || t0 > dur) continue;
+      const i0 = clamp(Math.floor((t0 / dur) * N), 0, N - 1), i1 = clamp(Math.ceil((t1 / dur) * N), i0 + 1, N);
+      let lo = 0, hi = 0, rms = 0;
+      for (let k = i0; k < i1; k++) { if (state.wfMin[k] < lo) lo = state.wfMin[k]; if (state.wfMax[k] > hi) hi = state.wfMax[k]; if (state.wfRms[k] > rms) rms = state.wfRms[k]; }
+      ctx.fillStyle = "rgba(94, 154, 168, 0.45)";
+      ctx.fillRect(x, mid - hi * waveH * 0.48, 1, Math.max(1, (hi - lo) * waveH * 0.48));
+      ctx.fillStyle = "rgba(130, 205, 224, 0.78)";
+      ctx.fillRect(x, mid - rms * waveH * 0.45, 1, Math.max(1, rms * waveH * 0.9));
+    }
+  }
+
+  // Ruler
+  ctx.fillStyle = "#1a1c21"; ctx.fillRect(0, 0, tlW, RULER_H);
+  ctx.fillStyle = "#8e939e"; ctx.font = "600 9px monospace"; ctx.fillText("EBENEN (ALT+CLICK = MASK)", 10, 14);
+  for (let t = firstT; t <= state.tlEnd; t += step) {
+    if (t < 0) continue;
+    const x = timeToX(t); if (x < HDR_W) continue;
+    const isBar = Math.abs((t / (beatSec * 4)) - Math.round(t / (beatSec * 4))) < 0.02;
+    ctx.strokeStyle = isBar ? "#505561" : "#2e323b"; ctx.beginPath(); ctx.moveTo(x + 0.5, isBar ? 8 : 15); ctx.lineTo(x + 0.5, RULER_H); ctx.stroke();
+    if (isBar && (step / (state.tlEnd - state.tlStart)) * (tlW - HDR_W) * 4 > 34) {
+      ctx.fillStyle = "#9da1aa"; ctx.font = "9px monospace"; ctx.fillText(`${Math.round(t/(beatSec*4))+1} · ${formatShort(t)}`, x + 3, 12);
+    }
+  }
+  ctx.strokeStyle = "#323640"; ctx.beginPath();
+  ctx.moveTo(HDR_W + 0.5, 0); ctx.lineTo(HDR_W + 0.5, tlH);
+  ctx.moveTo(0, RULER_H + 0.5); ctx.lineTo(tlW, RULER_H + 0.5);
+  ctx.moveTo(0, RULER_H + AUDIO_H + 0.5); ctx.lineTo(tlW, RULER_H + AUDIO_H + 0.5);
+  ctx.stroke();
+
+  // Playhead
+  const px = timeToX(state.time);
+  if (px >= HDR_W && px <= tlW) {
+    ctx.strokeStyle = "#e8862e"; ctx.lineWidth = 1.5; ctx.beginPath(); ctx.moveTo(px + 0.5, 0); ctx.lineTo(px + 0.5, tlH); ctx.stroke();
+    ctx.fillStyle = "#e8862e"; ctx.beginPath(); ctx.moveTo(px - 5, 0); ctx.lineTo(px + 6, 0); ctx.lineTo(px + 0.5, 9); ctx.closePath(); ctx.fill();
+  }
+}
+
+function findTimelineHit(x, y) {
+  if (y <= RULER_H + AUDIO_H && x >= HDR_W) return { kind: "ruler" };
+  for (const row of tlRows) {
+    if (y >= row.y + row.h - 4 && y <= row.y + row.h + 4 && x < HDR_W && row.kind === "track") {
+      return { kind: "resize_track", track: row.track };
+    }
+    if (y < row.y || y > row.y + row.h) continue;
+    if (row.kind === "track") {
+      if (x < HDR_W) {
+        if (x < 26) return { kind: "expand", track: row.track };
+        if (x >= HDR_W - 44 && x <= HDR_W - 24) return { kind: "mute", track: row.track };
+        if (x >= HDR_W - 23) return { kind: "solo", track: row.track };
+        return { kind: "track_hdr", track: row.track };
+      }
+      for (const clip of row.track.clips) {
+        const cx0 = timeToX(clip.start_s), cx1 = timeToX(clip.end_s);
+        if (x >= cx0 - 4 && x <= cx1 + 4) {
+          const edge = Math.min(8, (cx1 - cx0) * 0.25);
+          if (x <= cx0 + edge) return { kind: "trim_l", track: row.track, clip };
+          if (x >= cx1 - edge) return { kind: "trim_r", track: row.track, clip };
+          return { kind: "clip", track: row.track, clip };
+        }
+      }
+      return { kind: "empty_track", track: row.track };
+    } else if (row.kind === "kf" && x >= HDR_W) {
+      for (const clip of row.track.clips) {
+        for (const kf of (clip.keyframes || [])) {
+          if (kf.param !== row.param) continue;
+          if (Math.abs(x - timeToX(clip.start_s + kf.t_s)) <= 7) return { kind: "kf", track: row.track, clip, kf };
+        }
+      }
+    }
+  }
+  return null;
+}
+
+function bindTimelineEvents() {
+  tlCanvas.addEventListener("pointerdown", e => {
+    if (e.button === 2) return;
+    hideCtxMenu();
+    const r = tlCanvas.getBoundingClientRect(), x = e.clientX - r.left, y = e.clientY - r.top;
+    const hit = findTimelineHit(x, y);
+    if (!hit) return;
+
+    if (hit.kind === "resize_track") {
+      tlDrag = { mode: "resize_track", track: hit.track, y0: y, origH: hit.track.height || 36 };
+      tlCanvas.setPointerCapture(e.pointerId);
+    } else if (hit.kind === "ruler") {
+      seekTo(clamp(xToTime(x), 0, state.show.duration_s));
+      tlDrag = { mode: "scrub" }; tlCanvas.setPointerCapture(e.pointerId);
+    } else if (hit.kind === "expand") {
+      hit.track.expanded = !hit.track.expanded;
+    } else if (hit.kind === "mute") {
+      pushUndo("Mute Track"); hit.track.muted = !hit.track.muted; renderInspector();
+    } else if (hit.kind === "solo") {
+      pushUndo("Solo Track"); hit.track.solo = !hit.track.solo; renderInspector();
+    } else if (hit.kind === "track_hdr") {
+      if (e.altKey) {
+        // Photoshop-style Alt+Click Clipping Mask onto layer below!
+        const idx = state.show.tracks.findIndex(t => t.id === hit.track.id);
+        if (idx >= state.show.tracks.length - 1) { toast("Keine Ebene darunter für Clipping-Maske", "warn"); return; }
+        pushUndo("Alt-Click Clipping Mask");
+        hit.track.clippedToBelow = !hit.track.clippedToBelow;
+        toast(hit.track.clippedToBelow ? `"${hit.track.name}" auf darunterliegende Ebene maskiert` : "Clipping-Maske gelöst", "ok");
+        renderInspector();
+      } else {
+        state.selType = "track"; state.selTrackId = hit.track.id; state.selKfId = null; renderInspector();
+      }
+    } else if (hit.kind === "kf") {
+      state.selType = "clip"; state.selClipId = hit.clip.id; state.selTrackId = hit.track.id; state.selKfId = hit.kf.id;
+      tlDrag = { mode: "kf", clip: hit.clip, kf: hit.kf, mutated: false }; tlCanvas.setPointerCapture(e.pointerId); renderInspector();
+    } else if (hit.kind === "clip" || hit.kind === "trim_l" || hit.kind === "trim_r") {
+      state.selType = "clip"; state.selClipId = hit.clip.id; state.selTrackId = hit.track.id; state.selKfId = null;
+      tlDrag = { mode: hit.kind, track: hit.track, clip: hit.clip, x0: x, origS: hit.clip.start_s, origE: hit.clip.end_s, mutated: false };
+      tlCanvas.setPointerCapture(e.pointerId); renderInspector();
+    } else if (hit.kind === "empty_track") {
+      state.selTrackId = hit.track.id; seekTo(clamp(xToTime(x), 0, state.show.duration_s));
+      tlDrag = { mode: "scrub" }; tlCanvas.setPointerCapture(e.pointerId);
+    }
+  });
+
+  tlCanvas.addEventListener("pointermove", e => {
+    const r = tlCanvas.getBoundingClientRect(), x = e.clientX - r.left, y = e.clientY - r.top;
+    if (!tlDrag) {
+      const hover = findTimelineHit(x, y);
+      tlCanvas.style.cursor = hover && hover.kind === "resize_track" ? "row-resize" : (hover && (hover.kind === "trim_l" || hover.kind === "trim_r") ? "ew-resize" : "default");
+      return;
+    }
+    if (tlDrag.mode === "resize_track") {
+      tlDrag.track.height = clamp(tlDrag.origH + (y - tlDrag.y0), 24, 140);
+      return;
+    }
+    if (tlDrag.mode === "scrub") { seekTo(clamp(xToTime(x), 0, state.show.duration_s)); return; }
+    if (!tlDrag.mutated) { pushUndo("Timeline Edit"); tlDrag.mutated = true; }
+    if (tlDrag.mode === "kf") {
+      tlDrag.kf.t_s = clamp(snapT(xToTime(x), e.altKey) - tlDrag.clip.start_s, 0, tlDrag.clip.end_s - tlDrag.clip.start_s);
+      renderInspector();
+    } else if (tlDrag.mode === "clip") {
+      const dt = ((x - tlDrag.x0) / Math.max(1, tlW - HDR_W)) * (state.tlEnd - state.tlStart);
+      const len = tlDrag.origE - tlDrag.origS;
+      const ns = snapT(clamp(tlDrag.origS + dt, 0, Math.max(0, state.show.duration_s - len)), e.altKey);
+      tlDrag.clip.start_s = ns; tlDrag.clip.end_s = ns + len;
+      const overRow = tlRows.find(row => row.kind === "track" && y >= row.y && y <= row.y + row.h);
+      if (overRow && overRow.track.id !== tlDrag.track.id) {
+        tlDrag.track.clips = tlDrag.track.clips.filter(c => c.id !== tlDrag.clip.id);
+        overRow.track.clips.push(tlDrag.clip);
+        tlDrag.track = overRow.track; state.selTrackId = overRow.track.id;
+      }
+      renderInspector();
+    } else if (tlDrag.mode === "trim_l") {
+      tlDrag.clip.start_s = clamp(snapT(xToTime(x), e.altKey), 0, tlDrag.clip.end_s - 0.25); renderInspector();
+    } else if (tlDrag.mode === "trim_r") {
+      tlDrag.clip.end_s = clamp(snapT(xToTime(x), e.altKey), tlDrag.clip.start_s + 0.25, state.show.duration_s); renderInspector();
+    }
+  });
+  tlCanvas.addEventListener("pointerup", () => { tlDrag = null; });
+
+  tlCanvas.addEventListener("contextmenu", e => {
+    e.preventDefault();
+    const r = tlCanvas.getBoundingClientRect(), hit = findTimelineHit(e.clientX - r.left, e.clientY - r.top);
+    if (!hit) return;
+    if (hit.kind === "clip" || hit.kind === "trim_l" || hit.kind === "trim_r") {
+      state.selType = "clip"; state.selClipId = hit.clip.id; state.selTrackId = hit.track.id; renderInspector();
+      showCtxMenu(e.clientX, e.clientY, [
+        { label: "Split am Playhead", key: "S", fn: () => splitSelectedClip() },
+        { label: "Duplizieren", fn: () => duplicateClip(hit.track, hit.clip) },
+        { label: "Clip löschen", danger: true, fn: () => deleteClip(hit.track, hit.clip.id) },
+      ]);
+    } else if (hit.kind === "track_hdr") {
+      showCtxMenu(e.clientX, e.clientY, [
+        { label: "Ebenen-Einstellungen", fn: () => { state.selType = "track"; state.selTrackId = hit.track.id; renderInspector(); } },
+        { label: hit.track.clippedToBelow ? "Clipping-Maske lösen" : "Als Clipping-Maske auf Ebene darunter (Alt+Klick)", fn: () => { pushUndo("Toggle Clipping Mask"); hit.track.clippedToBelow = !hit.track.clippedToBelow; } },
+        { label: "Unterebene hier einfügen", fn: () => addSubLayer(hit.track.id) },
+        { label: "Ebene löschen", danger: true, fn: () => deleteTrack(hit.track.id) },
+      ]);
+    }
+  });
+
+  // Wheel Zoom (Ctrl+Wheel) & Alt+Wheel Track Height Scaling (Shift+Alt = All Tracks!)
+  tlCanvas.addEventListener("wheel", e => {
+    e.preventDefault();
+    const r = tlCanvas.getBoundingClientRect(), x = e.clientX - r.left, y = e.clientY - r.top;
+    if (e.altKey) {
+      const delta = e.deltaY > 0 ? -4 : 4;
+      if (e.shiftKey) {
+        state.show.tracks.forEach(tr => { tr.height = clamp((tr.height || 36) + delta, 24, 140); });
+      } else {
+        const hit = findTimelineHit(x, y);
+        const targetTr = (hit && hit.track) ? hit.track : state.show.tracks.find(t => t.id === state.selTrackId);
+        if (targetTr) targetTr.height = clamp((targetTr.height || 36) + delta, 24, 140);
+      }
+      return;
+    }
+    if (e.ctrlKey || e.metaKey || e.shiftKey) {
+      zoomTimeline(e.deltaY > 0 ? 1.18 : 0.84, xToTime(x));
+    } else {
+      const span = state.tlEnd - state.tlStart;
+      const shift = (e.deltaY > 0 ? 1 : -1) * span * 0.08;
+      state.tlStart = clamp(state.tlStart + shift, 0, Math.max(0, state.show.duration_s - span));
+      state.tlEnd = state.tlStart + span;
+    }
+  }, { passive: false });
+
+  // Drag & Drop Presets / Filters
+  const wrap = document.getElementById("tl-wrap");
+  wrap.addEventListener("dragover", e => { e.preventDefault(); wrap.classList.add("drag-over"); });
+  wrap.addEventListener("dragleave", () => wrap.classList.remove("drag-over"));
+  wrap.addEventListener("drop", e => {
+    e.preventDefault(); wrap.classList.remove("drag-over");
+    const raw = e.dataTransfer.getData("application/x-hueme-fx");
+    if (!raw) return;
+    const item = JSON.parse(raw);
+    const r = tlCanvas.getBoundingClientRect(), x = e.clientX - r.left, y = e.clientY - r.top;
+    const hit = findTimelineHit(x, y);
+    if (item.kind === "filter") {
+      const selFound = findClipById(state.selClipId);
+      const targetClip = (hit && hit.clip) ? hit.clip : (selFound ? selFound.clip : null);
+      if (!targetClip) { toast("Filter direkt auf einen Clip ziehen", "warn"); return; }
+      pushUndo(`Add Filter: ${FILTERS[item.id].name}`);
+      targetClip.filters.push({ id: "f_" + Date.now().toString(36), type: item.id, enabled: true, open: true, params: defaultFilterParams(item.id) });
+      state.selType = "clip"; state.selClipId = targetClip.id; renderInspector();
+      toast(`${FILTERS[item.id].name} hinzugefügt`, "ok");
+    } else if (item.kind === "preset") {
+      const row = tlRows.find(rw => rw.kind === "track" && y >= rw.y && y <= rw.y + rw.h) || tlRows.find(rw => rw.kind === "track");
+      if (!row) return;
+      pushUndo(`Drop Preset: ${PRESETS[item.id].name}`);
+      const start = snapT(clamp(xToTime(Math.max(HDR_W, x)), 0, Math.max(0, state.show.duration_s - 2)));
+      const end = Math.min(state.show.duration_s, start + (60 / state.show.bpm) * 16);
+      const clip = { id: "c_" + Date.now().toString(36), name: PRESETS[item.id].name, start_s: start, end_s: end, fade_in_s: 0.2, fade_out_s: 0.2, preset: item.id, opacity: 1.0, snap_zcl: false, params: defaultPresetParams(item.id), expressions: {}, mask: { kind: "none" }, filters: [], keyframes: [] };
+      row.track.clips.push(clip);
+      state.selType = "clip"; state.selClipId = clip.id; state.selTrackId = row.track.id; state.selKfId = null;
+      renderInspector(); toast(`${clip.name} auf ${row.track.name} eingefügt`, "ok");
+    }
+  });
+}
+
+function zoomTimeline(factor, anchor) {
+  const cur = state.tlEnd - state.tlStart;
+  const span = clamp(cur * factor, 4, Math.max(4, state.show.duration_s));
+  const ratio = (anchor - state.tlStart) / Math.max(0.1, cur);
+  state.tlStart = clamp(anchor - ratio * span, 0, Math.max(0, state.show.duration_s - span));
+  state.tlEnd = state.tlStart + span;
+}
+
+/* ── 12. SIDEBARS & INSPECTOR (HIERARCHICAL RIG + EXPRESSIONS + CUSTOM SLIDERS) */
+function renderFxCatalog() {
+  const q = (document.getElementById("fx-search").value || "").trim().toLowerCase();
+  const host = document.getElementById("fx-catalog"); host.innerHTML = "";
+  for (const cat of PRESET_CATS) {
+    const items = Object.values(PRESETS).filter(p => p.cat === cat && (!q || p.name.toLowerCase().includes(q) || cat.toLowerCase().includes(q)));
+    if (!items.length) continue;
+    const box = document.createElement("div"); box.className = "cat-group";
+    box.innerHTML = `<button class="cat-head" type="button">${ico("chev","sm chev")}<span>${cat}</span><span class="spacer"></span><span class="mono muted">${items.length}</span></button><div class="cat-body"></div>`;
+    box.querySelector(".cat-head").onclick = () => box.classList.toggle("closed");
+    const body = box.querySelector(".cat-body");
+    for (const p of items) {
+      const row = document.createElement("div"); row.className = "fx-item"; row.draggable = true;
+      row.innerHTML = `<span class="fx-dot" style="background:${p.swatch}"></span><span class="fx-name">${p.name}</span><span class="fx-tag">DRAG</span>`;
+      row.addEventListener("dragstart", e => e.dataTransfer.setData("application/x-hueme-fx", JSON.stringify({ kind: "preset", id: p.id })));
+      row.onclick = () => {
+        const tr = state.show.tracks.find(t => t.id === state.selTrackId) || state.show.tracks[0]; if (!tr) return;
+        pushUndo(`Insert ${p.name}`);
+        const s = snapT(state.time), eT = Math.min(state.show.duration_s, s + (60/state.show.bpm)*16);
+        const clip = { id: "c_"+Date.now().toString(36), name: p.name, start_s: s, end_s: eT, fade_in_s: 0.2, fade_out_s: 0.2, preset: p.id, opacity: 1, snap_zcl: false, params: defaultPresetParams(p.id), expressions: {}, mask: { kind: "none" }, filters: [], keyframes: [] };
+        tr.clips.push(clip); state.selType = "clip"; state.selClipId = clip.id; state.selTrackId = tr.id; renderInspector();
+      };
+      body.appendChild(row);
+    }
+    host.appendChild(box);
+  }
+  const fItems = Object.values(FILTERS).filter(f => !q || f.name.toLowerCase().includes(q) || "filter".includes(q));
+  if (fItems.length) {
+    const box = document.createElement("div"); box.className = "cat-group";
+    box.innerHTML = `<button class="cat-head" type="button">${ico("chev","sm chev")}<span>Filters (Auf Clip ziehen)</span><span class="spacer"></span><span class="mono muted">${fItems.length}</span></button><div class="cat-body"></div>`;
+    box.querySelector(".cat-head").onclick = () => box.classList.toggle("closed");
+    const body = box.querySelector(".cat-body");
+    for (const f of fItems) {
+      const row = document.createElement("div"); row.className = "fx-item"; row.draggable = true;
+      row.innerHTML = `<span class="fx-dot" style="background:#9b7fb5"></span><span class="fx-name">${f.name}</span><span class="fx-tag">FX</span>`;
+      row.addEventListener("dragstart", e => e.dataTransfer.setData("application/x-hueme-fx", JSON.stringify({ kind: "filter", id: f.id })));
+      row.onclick = () => {
+        const found = findClipById(state.selClipId); if (!found) { toast("Clip auswählen oder Filter draufziehen", "warn"); return; }
+        pushUndo(`Add Filter ${f.name}`);
+        found.clip.filters.push({ id: "f_"+Date.now().toString(36), type: f.id, enabled: true, open: true, params: defaultFilterParams(f.id) });
+        renderInspector();
+      };
+      body.appendChild(row);
+    }
+    host.appendChild(box);
+  }
+}
+
+function renderRigPanel() {
+  const sel = document.getElementById("rig-select");
+  sel.innerHTML = Object.values(RIG_PRESETS).map(r => `<option value="${r.id}" ${r.id===state.rigId?"selected":""}>${r.name}</option>`).join("");
+  document.getElementById("rig-voxel-count").textContent = `${state.compiled.count} vox`;
+
+  // Proxy Requirement Box
+  const pRes = evaluateProxyRequirements(state.rig);
+  const pBox = document.getElementById("proxy-health-box");
+  pBox.className = `proxy-banner ${pRes.ok ? "ok" : "err"}`;
+  if (pRes.ok) {
+    pBox.innerHTML = `<div style="display:flex;align-items:center;justify-content:space-between"><b>Hue Proxy-Check OK</b><span class="mono">${pRes.hueCount} Birnen · ${pRes.activeProxyCount}/${Math.max(1,pRes.requiredProxies)} Proxies</span></div>`;
+  } else {
+    const reasons = [];
+    if (pRes.activeProxyCount < pRes.requiredProxies) reasons.push(`Mind. ${pRes.requiredProxies} Proxies nötig (1 pro 10 Hue-Lampen)`);
+    if (pRes.overloaded.length) reasons.push(`Überlastet (>10): ${pRes.overloaded.map(x=>x[0]).join(", ")}`);
+    if (pRes.unassigned.length) reasons.push(`${pRes.unassigned.length} ohne Proxy`);
+    pBox.innerHTML = `<div style="color:var(--danger);font-weight:700">${ico("warn","sm")} Proxy-Pflicht verletzt!</div><div class="muted" style="margin-top:2px">${reasons.join(" · ")}</div>`;
+  }
+
+  // Hierarchical Folder Tree (like After Effects / Photoshop Layers)
+  const hHost = document.getElementById("rig-hierarchy"); hHost.innerHTML = "";
+  for (const fld of (state.rig.folders || [])) {
+    const children = state.rig.fixtures.filter(f => f.folderId === fld.id);
+    const box = document.createElement("div");
+    box.className = `tree-folder ${fld.collapsed ? "collapsed" : ""}`;
+    const isFldSel = state.selFolderId === fld.id;
+    box.innerHTML = `
+      <div class="tree-folder-hdr ${isFldSel ? "selected" : ""}">
+        <span class="fld-tog">${ico("chev","sm")}</span>
+        ${ico("folder","sm")}
+        <span style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${fld.name}</span>
+        <span class="mono muted" style="font-size:9px">${children.length}</span>
+      </div>
+      <div class="tree-children"></div>
+    `;
+    const hdr = box.querySelector(".tree-folder-hdr");
+    hdr.querySelector(".fld-tog").onclick = (e) => { e.stopPropagation(); fld.collapsed = !fld.collapsed; box.classList.toggle("collapsed"); };
+    hdr.onclick = () => {
+      state.selFolderId = fld.id; state.selSmartId = null;
+      state.selFixtures = new Set(children.map(f => f.id));
+      state.selType = "group";
+      renderRigPanel(); renderInspector();
+    };
+
+    const cHost = box.querySelector(".tree-children");
+    for (const f of children) {
+      const missing = validateFixtureMinimal(f);
+      const isIncomplete = missing.length > 0;
+      const row = document.createElement("div");
+      row.className = `list-row ${state.selFixtures.has(f.id) ? "selected" : ""} ${isIncomplete ? "incomplete" : ""}`;
+      row.title = isIncomplete ? `Unvollständiges Setup: ${missing.join(", ")}` : `${f.name} (${f.proxy || f.host || ""})`;
+      row.innerHTML = `
+        <button class="btn icon sm eye-btn" style="border:0;background:transparent;color:${f.enabled?"var(--text-1)":"var(--text-2)"}">${ico(f.enabled?"eye":"eyeOff","sm")}</button>
+        ${isIncomplete ? `<span style="color:var(--danger)" title="Fehlt: ${missing.join(", ")}">${ico("warn","sm")}</span>` : `<span class="badge ${f.protocol==="wled_ddp"?"ddp":"hue"}">${f.protocol==="wled_ddp"?"DDP":"HUE"}</span>`}
+        <span class="name">${f.name}</span>
+        <span class="mono muted" style="font-size:9px">${f.protocol==="hue_z2m" ? (f.proxy ? f.proxy.slice(-2) : "NO-PRX") : f.pixels+"px"}</span>
+      `;
+      row.querySelector(".eye-btn").onclick = e => { e.stopPropagation(); f.enabled = !f.enabled; compileRig(); renderRigPanel(); };
+      row.onclick = e => {
+        state.selFolderId = null; state.selSmartId = null;
+        if (!e.shiftKey) state.selFixtures.clear();
+        if (e.shiftKey && state.selFixtures.has(f.id)) state.selFixtures.delete(f.id);
+        else state.selFixtures.add(f.id);
+        state.selType = state.selFixtures.size > 1 ? "group" : "fixture";
+        renderRigPanel(); renderInspector();
+      };
+      cHost.appendChild(row);
+    }
+    hHost.appendChild(box);
+  }
+
+  // Visually Distinct Smart Selection Pills (Quick Selections)
+  const sHost = document.getElementById("rig-smart-groups"); sHost.innerHTML = "";
+  for (const sg of (state.rig.smartGroups || [])) {
+    const pill = document.createElement("button");
+    pill.className = `smart-pill ${state.selSmartId === sg.id ? "selected" : ""}`;
+    pill.textContent = `# ${sg.name}`;
+    pill.onclick = () => {
+      state.selSmartId = sg.id; state.selFolderId = null;
+      state.selFixtures = new Set(state.rig.fixtures.filter(f => matchSmartGroup(sg, f)).map(f => f.id));
+      state.selType = "group";
+      renderRigPanel(); renderInspector();
+    };
+    sHost.appendChild(pill);
+  }
+}
+
+function renderMarkerPanel() {
+  const host = document.getElementById("marker-list"); host.innerHTML = "";
+  [...state.show.markers].sort((a,b) => a.t_s - b.t_s).forEach((m, idx) => {
+    const row = document.createElement("div"); row.className = "list-row";
+    row.innerHTML = `<span class="fx-dot" style="background:${m.color || "#5e9aa8"}"></span><span class="name">${m.name}</span><span class="mono muted">${formatShort(m.t_s)}</span><button class="btn icon sm rm-m" style="border:0;background:transparent;color:var(--text-2)">${ico("trash","sm")}</button>`;
+    row.onclick = () => seekTo(m.t_s);
+    row.querySelector(".rm-m").onclick = e => { e.stopPropagation(); pushUndo("Delete Marker"); state.show.markers.splice(idx, 1); renderMarkerPanel(); };
+    host.appendChild(row);
+  });
+}
+
+function findClipById(id) {
+  for (const tr of state.show.tracks) { const c = tr.clips.find(x => x.id === id); if (c) return { track: tr, clip: c }; }
+  return null;
+}
+
+function toggleKeyframe(clip, param, currentVal) {
+  const localT = clamp(state.time - clip.start_s, 0, clip.end_s - clip.start_s);
+  pushUndo(`Keyframe: ${param}`);
+  const idx = clip.keyframes.findIndex(k => k.param === param && Math.abs(k.t_s - localT) < 0.08);
+  if (idx >= 0) { clip.keyframes.splice(idx, 1); state.selKfId = null; }
+  else {
+    const kf = { id: "kf_"+Date.now().toString(36), t_s: Number(localT.toFixed(3)), param, value: deepClone(currentVal), easing: "linear" };
+    clip.keyframes.push(kf); state.selKfId = kf.id;
+    const found = findClipById(clip.id); if (found) found.track.expanded = true;
+  }
+  renderInspector();
+}
+
+function makeParamControlRow(label, val, min, max, step, onChange, kfInfo = null) {
+  const container = document.createElement("div");
+  const row = document.createElement("div");
+  row.className = kfInfo ? "param-row" : "param-row no-kf";
+  const lbl = document.createElement("label"); lbl.textContent = label; lbl.title = label;
+
+  let sliderEl = null, numEl = null;
+  sliderEl = createCustomSlider(val, min, max, step, (v) => { if (numEl) numEl._setValue(v); onChange(v, false); }, (v) => onChange(v, true));
+  numEl = createStepperNumber(val, min, max, step, (v) => { if (sliderEl) sliderEl._setVisual(v); onChange(v, true); });
+
+  if (kfInfo) {
+    const actions = document.createElement("div"); actions.className = "param-actions";
+    const localT = state.time - kfInfo.clip.start_s;
+    const hasAny = (kfInfo.clip.keyframes || []).some(k => k.param === kfInfo.param);
+    const isAt = (kfInfo.clip.keyframes || []).some(k => k.param === kfInfo.param && Math.abs(k.t_s - localT) < 0.08);
+    const kfBtn = document.createElement("button");
+    kfBtn.className = `kf-btn ${isAt ? "active" : (hasAny ? "has-kf" : "")}`;
+    kfBtn.title = "Keyframe am Playhead setzen/löschen";
+    kfBtn.innerHTML = ico("diamond", "sm");
+    kfBtn.onclick = () => toggleKeyframe(kfInfo.clip, kfInfo.param, val);
+
+    const hasExpr = kfInfo.clip.expressions && kfInfo.clip.expressions[kfInfo.param] && kfInfo.clip.expressions[kfInfo.param].trim();
+    const exprBtn = document.createElement("button");
+    exprBtn.className = `expr-btn ${hasExpr ? "active" : ""}`;
+    exprBtn.title = "Funktionsgenerator / Expression (After Effects Style)";
+    exprBtn.textContent = "ƒ";
+    exprBtn.onclick = () => {
+      const key = `${kfInfo.clip.id}:${kfInfo.param}`;
+      state.openExprParam = (state.openExprParam === key) ? null : key;
+      renderInspector();
+    };
+    actions.append(kfBtn, exprBtn);
+    row.append(lbl, sliderEl, numEl, actions);
+    container.appendChild(row);
+
+    // Inline Function Generator / Expression Editor with Presets & Intellisense Chips
+    if (state.openExprParam === `${kfInfo.clip.id}:${kfInfo.param}`) {
+      if (!kfInfo.clip.expressions) kfInfo.clip.expressions = {};
+      const box = document.createElement("div"); box.className = "expr-box";
+      box.innerHTML = `
+        <div style="display:flex;justify-content:space-between;align-items:center;font-size:9px;color:#9ad0dc;font-weight:600">
+          <span>FUNKTIONSGENERATOR · ${kfInfo.param.toUpperCase()}</span>
+          <button type="button" class="btn sm danger" id="ex-clr" style="height:17px;padding:0 5px">Aus</button>
+        </div>
+        <div class="expr-presets">${EXPRESSION_PRESETS.map(p => `<button type="button" class="expr-chip" data-code="${p.code}">${p.label}</button>`).join("")}</div>
+        <input type="text" class="expr-input" id="ex-inp" placeholder="z.B. 0.5 + 0.5 * sin(t * TAU)" value="${kfInfo.clip.expressions[kfInfo.param] || ""}">
+        <div class="expr-hints">${EXPR_TOKENS.map(tk => `<span data-tk="${tk}">${tk}</span>`).join("")}</div>
+      `;
+      const inp = box.querySelector("#ex-inp");
+      inp.oninput = () => { kfInfo.clip.expressions[kfInfo.param] = inp.value; exprBtn.classList.toggle("active", Boolean(inp.value.trim())); };
+      box.querySelector("#ex-clr").onclick = () => { delete kfInfo.clip.expressions[kfInfo.param]; state.openExprParam = null; renderInspector(); };
+      box.querySelectorAll(".expr-chip").forEach(b => { b.onclick = () => { inp.value = b.dataset.code; kfInfo.clip.expressions[kfInfo.param] = inp.value; exprBtn.classList.add("active"); }; });
+      box.querySelectorAll(".expr-hints span").forEach(sp => { sp.onclick = () => { inp.value = (inp.value ? inp.value + " " : "") + sp.dataset.tk; kfInfo.clip.expressions[kfInfo.param] = inp.value; inp.focus(); exprBtn.classList.add("active"); }; });
+      container.appendChild(box);
+    }
+  } else {
+    const wrap = document.createElement("div"); wrap.style.cssText = "display:flex;gap:5px;align-items:center";
+    wrap.append(sliderEl, numEl);
+    row.append(lbl, wrap);
+    container.appendChild(row);
+  }
+  return container;
+}
+
+function renderInspector() {
+  const body = document.getElementById("ins-body"), title = document.getElementById("ins-title"), sub = document.getElementById("ins-sub");
+  body.innerHTML = "";
+
+  // 1. GROUP / FOLDER BLOCK INSPECTOR
+  if (state.selType === "group" && state.selFixtures.size > 0) {
+    const fld = (state.rig.folders || []).find(g => g.id === state.selFolderId);
+    title.innerHTML = `${ico("folder","sm")} ${fld ? fld.name : "Block-Auswahl"}`;
+    sub.textContent = `${state.selFixtures.size} LAMPEN`;
+    const sec = document.createElement("div"); sec.className = "ins-sec";
+    sec.innerHTML = `<div class="ins-sec-title"><span>3D Gruppen-Verschiebung</span><span class="mono">METER</span></div>`;
+    [{k:"X",idx:0,c:"#e05a5a"},{k:"Y",idx:1,c:"#58a66b"},{k:"Z",idx:2,c:"#5e9aa8"}].forEach(ax => {
+      const r = document.createElement("div"); r.className = "nudge-grid";
+      r.innerHTML = `<span class="mono" style="color:${ax.c};font-weight:700">${ax.k}</span><button class="btn sm" data-d="-0.25">-0.25</button><div class="sl-slot"></div><button class="btn sm" data-d="0.25">+0.25</button><span class="mono muted" style="font-size:9px;text-align:right">Block</span>`;
+      r.querySelectorAll("button").forEach(b => { b.onclick = () => { const d = parseFloat(b.dataset.d), v = [0,0,0]; v[ax.idx] = d; moveSelectedFixtures(v[0], v[1], v[2]); }; });
+      let lastV = 0;
+      const sl = createCustomSlider(0, -1, 1, 0.05, cur => { const delta = cur - lastV; lastV = cur; const v = [0,0,0]; v[ax.idx] = delta; moveSelectedFixtures(v[0], v[1], v[2]); }, () => { sl._setVisual(0); lastV = 0; });
+      r.querySelector(".sl-slot").appendChild(sl);
+      sec.appendChild(r);
+    });
+    body.appendChild(sec);
+    return;
+  }
+
+  // 2. SINGLE FIXTURE INSPECTOR (Includes Hue Proxy & Minimal-Setup Validation!)
+  if (state.selType === "fixture" && state.selFixtures.size === 1) {
+    const f = state.rig.fixtures.find(x => x.id === [...state.selFixtures][0]);
+    if (f) {
+      const missing = validateFixtureMinimal(f);
+      title.innerHTML = `${ico("cube","sm")} ${f.name}`;
+      sub.textContent = missing.length ? "UNVOLLSTÄNDIG" : f.protocol.toUpperCase();
+      const sec = document.createElement("div"); sec.className = "ins-sec";
+      if (missing.length) {
+        sec.innerHTML += `<div class="proxy-banner err"><b>Setup unvollständig:</b> ${missing.join(", ")}</div>`;
+      }
+      sec.innerHTML += `
+        <div class="ins-sec-title"><span>Hardware &amp; Proxy-Zuweisung</span></div>
+        <div class="param-row no-kf"><label>Name</label><input id="fx-name" class="input sm" value="${f.name}"></div>
+        <div class="param-row no-kf"><label>Ordner</label><select id="fx-fld" class="select sm">${(state.rig.folders||[]).map(fl=>`<option value="${fl.id}" ${fl.id===f.folderId?"selected":""}>${fl.name}</option>`).join("")}</select></div>
+        <div class="param-row no-kf"><label>Protokoll</label><select id="fx-prot" class="select sm"><option value="hue_z2m" ${f.protocol==="hue_z2m"?"selected":""}>Hue Z2M (0xFC01)</option><option value="wled_ddp" ${f.protocol==="wled_ddp"?"selected":""}>WLED DDP (UDP)</option></select></div>
+      `;
+      if (f.protocol === "hue_z2m") {
+        sec.innerHTML += `
+          <div class="param-row no-kf"><label>16-Bit Addr</label><input id="fx-addr" class="input sm mono" placeholder="0x8B3C" value="${f.address || ""}"></div>
+          <div class="param-row no-kf"><label>Hue Proxy *</label><input id="fx-proxy" class="input sm" placeholder="z.B. Deckenstrahler 2" value="${f.proxy || ""}"></div>
+        `;
+      } else {
+        sec.innerHTML += `<div class="param-row no-kf"><label>WLED Host *</label><input id="fx-host" class="input sm mono" placeholder="192.168.10.40:4048" value="${f.host || ""}"></div>`;
+      }
+      sec.querySelector("#fx-name").onchange = e => { f.name = e.target.value; renderRigPanel(); renderInspector(); };
+      sec.querySelector("#fx-fld").onchange = e => { f.folderId = e.target.value; compileRig(); renderRigPanel(); };
+      sec.querySelector("#fx-prot").onchange = e => { f.protocol = e.target.value; compileRig(); renderRigPanel(); renderInspector(); };
+      if (sec.querySelector("#fx-addr")) sec.querySelector("#fx-addr").onchange = e => { f.address = e.target.value.trim(); renderRigPanel(); renderInspector(); };
+      if (sec.querySelector("#fx-proxy")) sec.querySelector("#fx-proxy").onchange = e => { f.proxy = e.target.value.trim(); compileRig(); renderRigPanel(); renderInspector(); };
+      if (sec.querySelector("#fx-host")) sec.querySelector("#fx-host").onchange = e => { f.host = e.target.value.trim(); renderRigPanel(); renderInspector(); };
+
+      if (f.type === "point") {
+        sec.appendChild(makeParamControlRow("X (Width)", f.pos[0], 0, 6.5, 0.05, v => { f.pos[0] = v; compileRig(); }));
+        sec.appendChild(makeParamControlRow("Y (Depth)", f.pos[1], 0, 8.0, 0.05, v => { f.pos[1] = v; compileRig(); }));
+        sec.appendChild(makeParamControlRow("Z (Height)", f.pos[2], 0, 5.1, 0.05, v => { f.pos[2] = v; compileRig(); }));
+      }
+      body.appendChild(sec);
+      return;
+    }
+  }
+
+  // 3. TRACK / LAYER INSPECTOR (Supports All Fixtures, Folders, Smart Groups AND Individual Lamps!)
+  if (state.selType === "track") {
+    const tr = state.show.tracks.find(t => t.id === state.selTrackId);
+    if (tr) {
+      title.innerHTML = `${ico("layers","sm")} Ebenen-Routing`;
+      sub.textContent = tr.kind.toUpperCase();
+      const sec = document.createElement("div"); sec.className = "ins-sec";
+      const targetOpts = [
+        `<optgroup label="Global"><option value="all" ${tr.target_id==="all"?"selected":""}>Alle Lampen (Global)</option></optgroup>`,
+        `<optgroup label="Ordner-Gruppen">${(state.rig.folders||[]).map(fl=>`<option value="${fl.id}" ${tr.target_id===fl.id?"selected":""}>${fl.name}</option>`).join("")}</optgroup>`,
+        `<optgroup label="Smart-Auswahl">${(state.rig.smartGroups||[]).filter(s=>s.id!=="all").map(sg=>`<option value="${sg.id}" ${tr.target_id===sg.id?"selected":""}># ${sg.name}</option>`).join("")}</optgroup>`,
+        `<optgroup label="Einzelne Lampen">${state.rig.fixtures.map(fx=>`<option value="${fx.id}" ${tr.target_id===fx.id?"selected":""}>• ${fx.name}</option>`).join("")}</optgroup>`,
+      ].join("");
+
+      sec.innerHTML = `
+        <div class="ins-sec-title"><span>Ziel &amp; Mischmodus</span></div>
+        <div class="param-row no-kf"><label>Name</label><input id="ti-name" class="input sm" value="${tr.name}"></div>
+        <div class="param-row no-kf"><label>Ziel (Gruppe/Lampe)</label><select id="ti-tgt" class="select sm">${targetOpts}</select></div>
+        <div class="param-row no-kf"><label>Blend Mode</label><select id="ti-blend" class="select sm">${["normal","add","max","multiply","override"].map(m=>`<option value="${m}" ${m===tr.blend_mode?"selected":""}>${m.toUpperCase()}</option>`).join("")}</select></div>
+        <div class="param-row no-kf"><label>Alt-Clipping Maske</label><label class="switch"><input type="checkbox" id="ti-clip" ${tr.clippedToBelow?"checked":""}><span></span></label></div>
+      `;
+      sec.appendChild(makeParamControlRow("Deckkraft", tr.opacity, 0, 1, 0.01, (v, c) => { if (c) pushUndo("Track Opacity"); tr.opacity = v; }));
+      sec.appendChild(makeParamControlRow("Spurhöhe (px)", tr.height || 36, 24, 140, 2, v => { tr.height = v; }));
+      sec.querySelector("#ti-name").onchange = e => { pushUndo("Rename Track"); tr.name = e.target.value || tr.name; };
+      sec.querySelector("#ti-tgt").onchange = e => { pushUndo("Track Target"); tr.target_id = e.target.value; };
+      sec.querySelector("#ti-blend").onchange = e => { pushUndo("Blend Mode"); tr.blend_mode = e.target.value; };
+      sec.querySelector("#ti-clip").onchange = e => { pushUndo("Clipping Mask"); tr.clippedToBelow = e.target.checked; };
+      body.appendChild(sec);
+      return;
+    }
+  }
+
+  // 4. CLIP INSPECTOR
+  const found = findClipById(state.selClipId);
+  if (!found) {
+    title.innerHTML = `${ico("sliders","sm")} ShowDoc`; sub.textContent = `${state.show.bpm} BPM`;
+    const sec = document.createElement("div"); sec.className = "ins-sec";
+    sec.appendChild(makeParamControlRow("BPM", state.show.bpm, 60, 200, 0.5, v => { state.show.bpm = v; }));
+    sec.appendChild(makeParamControlRow("Dauer (s)", state.show.duration_s, 10, 600, 1, v => { state.show.duration_s = v; }));
+    body.appendChild(sec);
+    return;
+  }
+
+  const { track, clip } = found, pDef = PRESETS[clip.preset] || PRESETS.solid;
+  title.innerHTML = `${ico("sliders","sm")} ${clip.name || pDef.name}`; sub.textContent = track.name;
+
+  const tSec = document.createElement("div"); tSec.className = "ins-sec";
+  tSec.innerHTML = `
+    <div class="ins-sec-title"><span>Clip &amp; Preset</span></div>
+    <div class="param-row no-kf"><label>Preset</label><select id="ci-preset" class="select sm">${Object.values(PRESETS).map(p=>`<option value="${p.id}" ${p.id===clip.preset?"selected":""}>${p.cat}: ${p.name}</option>`).join("")}</select></div>
+    <div class="param-row no-kf"><label>ZCL 5ms Snap</label><label class="switch"><input type="checkbox" id="ci-snap" ${clip.snap_zcl?"checked":""}><span></span></label></div>
+  `;
+  tSec.appendChild(makeParamControlRow("Deckkraft", clip.opacity, 0, 1, 0.01, (v, c) => { if (c) pushUndo("Opacity"); clip.opacity = v; }, { clip, param: "opacity" }));
+  tSec.appendChild(makeParamControlRow("Fade In (s)", clip.fade_in_s, 0, 8, 0.05, v => { clip.fade_in_s = Math.min(v, clip.end_s - clip.start_s); }));
+  tSec.appendChild(makeParamControlRow("Fade Out (s)", clip.fade_out_s, 0, 8, 0.05, v => { clip.fade_out_s = Math.min(v, clip.end_s - clip.start_s); }));
+  tSec.querySelector("#ci-preset").onchange = e => { pushUndo("Preset"); clip.preset = e.target.value; clip.name = PRESETS[clip.preset].name; clip.params = defaultPresetParams(clip.preset); renderInspector(); };
+  tSec.querySelector("#ci-snap").onchange = e => { pushUndo("ZCL Snap"); clip.snap_zcl = e.target.checked; };
+  body.appendChild(tSec);
+
+  const pSec = document.createElement("div"); pSec.className = "ins-sec";
+  pSec.innerHTML = `<div class="ins-sec-title"><span>Parameter</span><span class="mono">◇ KF · ƒ GEN</span></div>`;
+  for (const spec of pDef.params) {
+    const val = clip.params[spec.k] ?? spec.d;
+    if (spec.t === "range") {
+      pSec.appendChild(makeParamControlRow(spec.l, val, spec.min, spec.max, spec.step, (v, c) => { if (c) pushUndo(spec.l); clip.params[spec.k] = v; }, { clip, param: spec.k }));
+    } else if (spec.t === "color") {
+      const row = document.createElement("div"); row.className = "param-row color-row";
+      const lbl = document.createElement("label"); lbl.textContent = spec.l;
+      const sw = document.createElement("input"); sw.type = "color"; sw.className = "swatch"; sw.value = rgbToHex(val);
+      const hex = document.createElement("input"); hex.type = "text"; hex.className = "input mono sm"; hex.value = rgbToHex(val);
+      sw.oninput = () => { hex.value = sw.value; clip.params[spec.k] = hexToRgb(sw.value); };
+      hex.onchange = () => { if (/^#[0-9a-fA-F]{6}$/.test(hex.value)) { sw.value = hex.value; clip.params[spec.k] = hexToRgb(hex.value); } };
+      const act = document.createElement("div"); act.className = "param-actions";
+      const kfBtn = document.createElement("button"); kfBtn.className = "kf-btn"; kfBtn.innerHTML = ico("diamond", "sm"); kfBtn.onclick = () => toggleKeyframe(clip, spec.k, val);
+      act.appendChild(kfBtn);
+      row.append(lbl, sw, hex, act); pSec.appendChild(row);
+    } else if (spec.t === "select") {
+      const row = document.createElement("div"); row.className = "param-row no-kf";
+      row.innerHTML = `<label>${spec.l}</label><select class="select sm">${spec.opts.map(o=>`<option value="${o[0]}" ${o[0]===val?"selected":""}>${o[1]}</option>`).join("")}</select>`;
+      row.querySelector("select").onchange = e => { pushUndo(spec.l); clip.params[spec.k] = e.target.value; };
+      pSec.appendChild(row);
+    }
+  }
+  body.appendChild(pSec);
+
+  // Filter Stack
+  const fSec = document.createElement("div"); fSec.className = "ins-sec";
+  fSec.innerHTML = `<div class="ins-sec-title"><span>Filter Stack (${(clip.filters||[]).length})</span></div>`;
+  (clip.filters || []).forEach((flt, fi) => {
+    const fDef = FILTERS[flt.type]; if (!fDef) return;
+    const card = document.createElement("div"); card.className = `filter-card ${flt.open ? "" : "collapsed"}`;
+    card.innerHTML = `<div class="filter-card-head"><button class="btn icon sm tog-open" style="border:0;background:transparent">${ico("chev","sm")}</button><label class="switch"><input type="checkbox" class="flt-en" ${flt.enabled?"checked":""}><span></span></label><span style="flex:1;font-weight:600">${fDef.name}</span><button class="btn icon sm flt-del" style="border:0;background:transparent;color:var(--danger)">${ico("trash","sm")}</button></div><div class="filter-card-body"></div>`;
+    card.querySelector(".tog-open").onclick = () => { flt.open = !flt.open; card.classList.toggle("collapsed"); };
+    card.querySelector(".flt-en").onchange = e => { flt.enabled = e.target.checked; };
+    card.querySelector(".flt-del").onclick = () => { pushUndo("Remove Filter"); clip.filters.splice(fi, 1); renderInspector(); };
+    const fBody = card.querySelector(".filter-card-body");
+    for (const spec of fDef.params) {
+      const v = flt.params[spec.k] ?? spec.d;
+      if (spec.t === "range") fBody.appendChild(makeParamControlRow(spec.l, v, spec.min, spec.max, spec.step, nv => { flt.params[spec.k] = nv; }));
+      else if (spec.t === "select") {
+        const r = document.createElement("div"); r.className = "param-row no-kf";
+        r.innerHTML = `<label>${spec.l}</label><select class="select sm">${spec.opts.map(o=>`<option value="${o[0]}" ${o[0]===v?"selected":""}>${o[1]}</option>`).join("")}</select>`;
+        r.querySelector("select").onchange = e => { flt.params[spec.k] = e.target.value; };
+        fBody.appendChild(r);
+      }
+    }
+    fSec.appendChild(card);
+  });
+  body.appendChild(fSec);
+}
+
+/* ── 13. TOP MENUS, TIMELINE HELPERS, TRANSPORT & BOOTSTRAP ──────────────── */
+function addGlobalLayer() {
+  pushUndo("Add Global Layer");
+  const id = "trk_glob_" + Date.now().toString(36);
+  state.show.tracks.unshift({ id, name: "Global Adjustment", kind: "global", parentId: null, clippedToBelow: false, target_id: "all", blend_mode: "multiply", opacity: 1, height: 32, muted: false, solo: false, expanded: false, clips: [] });
+  state.selType = "track"; state.selTrackId = id; renderInspector();
+  toast("Globale Ebene ganz oben eingefügt", "ok");
+}
+
+function addSubLayer(parentId) {
+  const idx = state.show.tracks.findIndex(t => t.id === parentId);
+  const parent = state.show.tracks[idx];
+  if (!parent) return;
+  pushUndo("Add Sub-Layer");
+  const id = "trk_sub_" + Date.now().toString(36);
+  state.show.tracks.splice(idx + 1, 0, { id, name: `└ ${parent.name} Sub`, kind: "sub", parentId: parent.id, clippedToBelow: false, target_id: parent.target_id, blend_mode: "add", opacity: 1, height: 30, muted: false, solo: false, expanded: false, clips: [] });
+  state.selType = "track"; state.selTrackId = id; renderInspector();
+  toast("Unterebene eingefügt", "ok");
+}
+
+function openTopMenu(menuKey, btnEl) {
+  const dd = document.getElementById("menu-dropdown");
+  const menus = {
+    file: [
+      { label: "Neue ShowDoc erstellen...", fn: () => createNewShowModal() },
+      { label: "ShowDoc JSON kopieren", fn: () => { const ta = document.createElement("textarea"); ta.value = JSON.stringify(state.show, null, 2); document.body.appendChild(ta); ta.select(); document.execCommand("copy"); ta.remove(); toast("ShowDoc JSON in Zwischenablage", "ok"); } },
+      { sep: true },
+      { label: "Rig: Hueme Loft laden", fn: () => { state.rigId = "hueme_loft"; state.rig = deepClone(RIG_PRESETS.hueme_loft); compileRig(); renderRigPanel(); } },
+      { label: "Rig: Empty Loft laden", fn: () => { state.rigId = "empty_loft"; state.rig = deepClone(RIG_PRESETS.empty_loft); compileRig(); renderRigPanel(); } },
+    ],
+    edit: [
+      { label: "Rückgängig", key: "Ctrl+Z", fn: doUndo },
+      { label: "Wiederherstellen", key: "Ctrl+Y", fn: doRedo },
+      { sep: true },
+      { label: "Clip am Playhead teilen", key: "S", fn: splitSelectedClip },
+      { label: "Marker & Dauer aus Audio syncen", fn: syncMarkersFromAudio },
+    ],
+    layer: [
+      { label: "Globale Ebene (über allem) einfügen", fn: addGlobalLayer },
+      { label: "Neue Lampen-/Gruppenebene", fn: () => document.getElementById("tl-add-track").click() },
+      { label: "Unterebene in aktuelle Ebene", fn: () => addSubLayer(state.selTrackId) },
+      { sep: true },
+      { label: "Alt+Klick Clipping-Maske umschalten", fn: () => { const tr = state.show.tracks.find(t=>t.id===state.selTrackId); if (tr) { pushUndo("Clipping Mask"); tr.clippedToBelow = !tr.clippedToBelow; } } },
+    ],
+    fx: [
+      { label: "Preset: 3D Gradient einfügen", fn: () => insertPresetQuick("gradient_3d") },
+      { label: "Preset: 3D Particles einfügen", fn: () => insertPresetQuick("particles_3d") },
+      { label: "Preset: Strobe / Blinder einfügen", fn: () => insertPresetQuick("strobe_blinder") },
+      { sep: true },
+      { label: "Filter: Spatial Blur auf Clip", fn: () => addFilterQuick("spatial_blur") },
+      { label: "Filter: Grain / Noise auf Clip", fn: () => addFilterQuick("grain_noise") },
+    ],
+    view: [
+      { label: "Workspace: Compose (4-Panel)", fn: () => document.querySelector('[data-ws="compose"]').click() },
+      { label: "Workspace: Stage (Großer 3D Viewport)", fn: () => document.querySelector('[data-ws="stage"]').click() },
+      { sep: true },
+      { label: "Alle Spurhöhen zurücksetzen (36px)", fn: () => state.show.tracks.forEach(t => { t.height = 36; }) },
+      { label: "Zeitanzeige-Modus wechseln (Zeit/FPS/Takt)", fn: cycleTimecodeMode },
+    ],
+    help: [
+      { label: "Shortcuts & Bedienung anzeigen", fn: () => showHelpModal() },
+      { label: "Hue Proxy-Pflicht prüfen", fn: () => showProxyModal() },
+    ],
+  };
+
+  const items = menus[menuKey] || [];
+  dd.innerHTML = "";
+  for (const it of items) {
+    if (it.sep) { const s = document.createElement("div"); s.className = "menu-sep"; dd.appendChild(s); continue; }
+    const b = document.createElement("button"); b.className = "menu-item";
+    b.innerHTML = `<span>${it.label}</span>${it.key ? `<span class="mono muted">${it.key}</span>` : ""}`;
+    b.onclick = () => { closeTopMenus(); it.fn(); };
+    dd.appendChild(b);
+  }
+  const rect = btnEl.getBoundingClientRect();
+  dd.style.left = rect.left + "px";
+  dd.classList.remove("hidden");
+  document.querySelectorAll(".menu-btn").forEach(b => b.classList.toggle("open", b === btnEl));
+}
+function closeTopMenus() {
+  document.getElementById("menu-dropdown").classList.add("hidden");
+  document.querySelectorAll(".menu-btn").forEach(b => b.classList.remove("open"));
+}
+
+function insertPresetQuick(id) {
+  const tr = state.show.tracks.find(t => t.id === state.selTrackId) || state.show.tracks[0]; if (!tr) return;
+  pushUndo(`Insert ${PRESETS[id].name}`);
+  const s = snapTime(state.time), eT = Math.min(state.show.duration_s, s + (60/state.show.bpm)*16);
+  const clip = { id: "c_"+Date.now().toString(36), name: PRESETS[id].name, start_s: s, end_s: eT, fade_in_s: 0.2, fade_out_s: 0.2, preset: id, opacity: 1, snap_zcl: false, params: defaultPresetParams(id), expressions: {}, mask: { kind: "none" }, filters: [], keyframes: [] };
+  tr.clips.push(clip); state.selType = "clip"; state.selClipId = clip.id; renderInspector();
+}
+function addFilterQuick(id) {
+  const found = findClipById(state.selClipId); if (!found) { toast("Bitte zuerst einen Clip auswählen", "warn"); return; }
+  pushUndo(`Add Filter ${FILTERS[id].name}`);
+  found.clip.filters.push({ id: "f_"+Date.now().toString(36), type: id, enabled: true, open: true, params: defaultFilterParams(id) });
+  renderInspector();
+}
+
+function showHelpModal() {
+  const dlg = document.createElement("dialog");
+  dlg.innerHTML = `
+    <div class="dlg-head">Hueme Studio — Bedienung &amp; Shortcuts</div>
+    <div class="dlg-body">
+      <div><b>Leertaste:</b> Play / Pause · <b>S:</b> Clip teilen · <b>Ctrl+Z / Ctrl+Y:</b> Undo / Redo</div>
+      <div><b>Zeitanzeige anklicken:</b> Wechselt zwischen <code>mm:ss.mmm</code>, <code>Frames (@30 FPS)</code> und <code>Bar.Beat</code>.</div>
+      <div><b>Spurhöhe anpassen:</b> Unten am Spur-Header ziehen oder <code>Alt + Mausrad</code> (mit <code>Shift</code> alle Spuren gleichzeitig).</div>
+      <div><b>Photoshop Clipping-Maske:</b> <code>Alt + Klick</code> auf eine Spur-Kopfzeile maskiert sie auf die Ebene darunter (<code>↴</code>).</div>
+      <div><b>Funktionsgeneratoren (ƒ):</b> Neben jedem Parameter auf <code>ƒ</code> klicken für Sinus-, Beat-Pulse- oder Wiggle-Expressions.</div>
+      <div><b>Hue Proxy-Pflicht:</b> Zigbee2MQTT Entertainment benötigt mind. <b>1 Proxy-Lampe pro 10 Hue-Birnen</b>. Unvollständige Lampen sind rot markiert.</div>
+    </div>
+    <div class="dlg-foot"><button class="btn accent" id="h-ok">Verstanden</button></div>
+  `;
+  dlg.querySelector("#h-ok").onclick = () => dlg.close();
+  dlg.addEventListener("close", () => dlg.remove());
+  document.body.appendChild(dlg); dlg.showModal();
+}
+
+function showProxyModal() {
+  const p = evaluateProxyRequirements(state.rig);
+  const dlg = document.createElement("dialog");
+  const rows = Object.entries(p.proxyCounts).map(([name, cnt]) => `<div class="mono">• ${name}: <b>${cnt}/10</b> Hue-Lampen</div>`).join("") || `<div class="muted">Keine Proxies konfiguriert.</div>`;
+  dlg.innerHTML = `
+    <div class="dlg-head">Zigbee2MQTT Hue Proxy-Prüfung</div>
+    <div class="dlg-body">
+      <div>Aktive Hue-Lampen: <b>${p.hueCount}</b> · Erforderliche Proxies (1 pro 10 Lampen): <b>${p.requiredProxies}</b></div>
+      ${rows}
+      <div class="muted" style="margin-top:4px">Jede Hue-Lampe benötigt im Rig-Manager eine 16-Bit-Adresse (<code>0xXXXX</code>) und einen zugewiesenen Proxy.</div>
+    </div>
+    <div class="dlg-foot"><button class="btn accent" id="p-ok">Schließen</button></div>
+  `;
+  dlg.querySelector("#p-ok").onclick = () => dlg.close();
+  dlg.addEventListener("close", () => dlg.remove());
+  document.body.appendChild(dlg); dlg.showModal();
+}
+
+function createNewShowModal() {
+  const dlg = document.createElement("dialog");
+  dlg.innerHTML = `
+    <form method="dialog">
+      <div class="dlg-head">Neue ShowDoc erstellen</div>
+      <div class="dlg-body">
+        <div class="param-row no-kf"><label>Show Name</label><input id="ns-name" class="input" value="Neue Loft Show" required></div>
+        <div class="param-row no-kf"><label>BPM</label><input id="ns-bpm" type="number" class="input" value="124" min="40" max="240" step="0.5"></div>
+        <div class="param-row no-kf"><label>Dauer (s)</label><input id="ns-dur" type="number" class="input" value="120" min="10" max="600"></div>
+      </div>
+      <div class="dlg-foot"><button type="button" class="btn" id="ns-cancel">Abbrechen</button><button type="submit" class="btn accent">Erstellen</button></div>
+    </form>
+  `;
+  dlg.querySelector("#ns-cancel").onclick = () => dlg.close();
+  dlg.querySelector("form").onsubmit = e => {
+    e.preventDefault();
+    const name = dlg.querySelector("#ns-name").value.trim() || "Unbenannt";
+    const bpm = clamp(parseFloat(dlg.querySelector("#ns-bpm").value) || 124, 40, 240);
+    const dur = clamp(parseFloat(dlg.querySelector("#ns-dur").value) || 120, 10, 600);
+    const id = "show_" + Date.now().toString(36);
+    SHOWS[id] = { id, name, duration_s: dur, bpm, beat_offset_s: 0, markers: [{ t_s: 0, name: "Intro", kind: "section", color: "#5e9aa8" }], tracks: [{ id: "trk_1", name: "Base Atmosphere", kind: "layer", parentId: null, clippedToBelow: false, target_id: "all", blend_mode: "normal", opacity: 1, height: 38, muted: false, solo: false, expanded: false, clips: [] }] };
+    state.showId = id; state.show = SHOWS[id]; state.time = 0; state.tlStart = 0; state.tlEnd = Math.min(dur, 75);
+    buildProceduralWaveform(dur); renderAllUI(); dlg.close();
+  };
+  dlg.addEventListener("close", () => dlg.remove());
+  document.body.appendChild(dlg); dlg.showModal();
+}
+
+function cycleTimecodeMode() {
+  const order = ["time", "frames", "bars"];
+  state.tcDisplayMode = order[(order.indexOf(state.tcDisplayMode) + 1) % order.length];
+  updateTimeReadout();
+}
+
+function updateTimeReadout() {
+  const tcEl = document.getElementById("tc-time"), tagEl = document.getElementById("tc-mode-tag");
+  if (state.tcDisplayMode === "frames") {
+    const totalFrames = Math.floor(state.time * state.fps);
+    tcEl.textContent = `${String(totalFrames).padStart(5, "0")} F`;
+    tagEl.textContent = `${state.fps} FPS`;
+  } else if (state.tcDisplayMode === "bars") {
+    const bf = Math.max(0, (state.time - state.show.beat_offset_s) / (60 / (state.show.bpm || 128)));
+    const bar = Math.floor(bf / 4) + 1, beat = (Math.floor(bf) % 4) + 1, sub = Math.floor((bf % 1) * 4) + 1;
+    tcEl.textContent = `${String(bar).padStart(3,"0")}.${beat}.${sub}`;
+    tagEl.textContent = `${state.show.bpm} BPM`;
+  } else {
+    tcEl.textContent = formatTime(state.time);
+    tagEl.textContent = "ZEIT";
+  }
+  document.getElementById("live-time").textContent = formatTime(state.time);
+  let sec = state.show.markers[0] || { name: "Timeline", color: "#e8862e" };
+  for (const m of state.show.markers) if (state.time >= m.t_s) sec = m;
+  document.getElementById("vp-section").innerHTML = `<span class="led" style="background:${sec.color}"></span><span>${sec.name}</span>`;
+  document.getElementById("live-section-name").textContent = sec.name;
+}
+
+function startAudioPlayback() {
+  stopAudioPlayback();
+  if (!state.audioBuffer || !state.audioCtx) return;
+  if (state.audioCtx.state === "suspended") state.audioCtx.resume();
+  const src = state.audioCtx.createBufferSource(); src.buffer = state.audioBuffer;
+  const g = state.audioCtx.createGain(); g.gain.value = state.audioVol;
+  src.connect(g).connect(state.audioCtx.destination);
+  src.start(0, clamp(state.time, 0, Math.max(0, state.audioBuffer.duration - 0.05)));
+  state.audioSource = src; state.audioGain = g;
+}
+function stopAudioPlayback() { if (state.audioSource) { try { state.audioSource.stop(); } catch {} state.audioSource = null; } }
+function togglePlay() {
+  state.playing = !state.playing; state.lastFrameMs = performance.now();
+  if (state.playing) startAudioPlayback(); else stopAudioPlayback();
+  updateTransportButtons();
+}
+function seekTo(t) { state.time = clamp(t, 0, state.show.duration_s); if (state.playing) startAudioPlayback(); updateTimeReadout(); }
+function updateTransportButtons() {
+  document.getElementById("tl-play").innerHTML = `${ico(state.playing ? "pause" : "play", "sm")}<span>${state.playing ? "PAUSE" : "PLAY"}</span>`;
+  document.getElementById("live-play").textContent = state.playing ? "PAUSE" : "PLAY";
+  document.getElementById("tl-loop").classList.toggle("accent", state.loop);
+}
+
+function splitSelectedClip() {
+  const found = findClipById(state.selClipId); if (!found) { toast("Clip zum Teilen auswählen", "warn"); return; }
+  const { track, clip } = found;
+  if (state.time <= clip.start_s + 0.1 || state.time >= clip.end_s - 0.1) { toast("Playhead in den Clip bewegen", "warn"); return; }
+  pushUndo("Split Clip");
+  const right = deepClone(clip); right.id = "c_" + Date.now().toString(36); right.start_s = state.time;
+  clip.end_s = state.time; track.clips.push(right); state.selClipId = right.id; renderInspector();
+}
+function duplicateClip(track, clip) {
+  pushUndo("Duplicate Clip");
+  const copy = deepClone(clip), dur = clip.end_s - clip.start_s;
+  copy.id = "c_" + Date.now().toString(36); copy.start_s = Math.min(state.show.duration_s - dur, clip.end_s); copy.end_s = copy.start_s + dur;
+  track.clips.push(copy); state.selClipId = copy.id; renderInspector();
+}
+function deleteClip(track, clipId) {
+  pushUndo("Delete Clip"); track.clips = track.clips.filter(c => c.id !== clipId);
+  if (state.selClipId === clipId) { state.selClipId = null; state.selKfId = null; } renderInspector();
+}
+function deleteTrack(trackId) {
+  if (state.show.tracks.length <= 1) return;
+  pushUndo("Delete Track"); state.show.tracks = state.show.tracks.filter(t => t.id !== trackId); state.selType = "show"; renderInspector();
+}
+function syncMarkersFromAudio() {
+  if (!state.wfRms) return;
+  pushUndo("Sync Markers");
+  const dur = state.audioBuffer ? state.audioBuffer.duration : state.show.duration_s;
+  state.show.duration_s = Number(dur.toFixed(2));
+  const N = state.wfRms.length, segs = 8, segLen = Math.floor(N / segs);
+  const labels = ["Intro", "Verse 1", "Build 1", "Drop 1", "Breakdown", "Build 2", "Drop 2", "Outro"];
+  const colors = ["#5e9aa8", "#6d78b8", "#c9a34a", "#d06b4a", "#9b7fb5", "#c9a34a", "#c45a52", "#58a66b"];
+  const m = [];
+  for (let i = 0; i < segs; i++) {
+    let avg = 0; for (let k = i*segLen; k < (i+1)*segLen; k++) avg += state.wfRms[k]; avg /= segLen;
+    m.push({ t_s: Number(((i / segs) * dur).toFixed(2)), name: labels[i], kind: avg > 0.35 ? "drop" : "section", color: colors[i] });
+  }
+  state.show.markers = m; state.tlStart = 0; state.tlEnd = Math.min(dur, 75); renderMarkerPanel();
+  toast(`Synced ${m.length} Marker (${formatShort(dur)})`, "ok");
+}
+
+function showCtxMenu(x, y, items) {
+  const m = document.getElementById("ctx-menu"); m.innerHTML = "";
+  for (const it of items) {
+    const b = document.createElement("button"); b.className = `ctx-item ${it.danger ? "danger" : ""}`;
+    b.innerHTML = `<span>${it.label}</span>${it.key ? `<span class="mono muted">${it.key}</span>` : ""}`;
+    b.onclick = () => { hideCtxMenu(); it.fn(); }; m.appendChild(b);
+  }
+  m.style.left = Math.min(window.innerWidth - 195, x) + "px"; m.style.top = Math.min(window.innerHeight - 130, y) + "px";
+  m.classList.remove("hidden");
+}
+function hideCtxMenu() { document.getElementById("ctx-menu").classList.add("hidden"); }
+
+function logMcp(tool, ms, msg, ok = true) {
+  state.mcpCalls++; if (!ok) state.mcpErrors++; state.mcpLatencies.push(ms);
+  document.getElementById("mcp-calls").textContent = state.mcpCalls;
+  document.getElementById("mcp-errors").textContent = state.mcpErrors;
+  const sorted = [...state.mcpLatencies].sort((a,b)=>a-b);
+  document.getElementById("mcp-p50").textContent = `${sorted[Math.floor(sorted.length/2)].toFixed(1)}ms`;
+  const box = document.getElementById("mcp-log"), d = document.createElement("div");
+  d.className = `mcp-entry ${ok ? "ok" : "err"}`;
+  d.innerHTML = `<span class="muted">${new Date().toTimeString().slice(0,8)}</span> <span class="tool">${tool}</span> (${ms.toFixed(1)}ms) ${msg}`;
+  box.appendChild(d); box.scrollTop = box.scrollHeight;
+}
+
+function bindSplitters() {
+  const root = document.documentElement;
+  const dragSplit = (el, onMove) => {
+    el.addEventListener("pointerdown", e => {
+      el.classList.add("dragging"); el.setPointerCapture(e.pointerId);
+      const move = ev => { onMove(ev); resizeCanvases(); };
+      const up = () => { el.classList.remove("dragging"); window.removeEventListener("pointermove", move); };
+      window.addEventListener("pointermove", move); window.addEventListener("pointerup", up, { once: true });
+    });
+  };
+  dragSplit(document.getElementById("split-left"), e => root.style.setProperty("--left-w", clamp(e.clientX, 220, 460) + "px"));
+  dragSplit(document.getElementById("split-right"), e => root.style.setProperty("--right-w", clamp(window.innerWidth - e.clientX, 260, 520) + "px"));
+  dragSplit(document.getElementById("split-bottom"), e => root.style.setProperty("--tl-h", clamp(window.innerHeight - e.clientY, 185, window.innerHeight * 0.7) + "px"));
+}
+
+function resizeCanvases() {
+  const dpr = Math.min(2, window.devicePixelRatio || 1);
+  const vr = vpCanvas.getBoundingClientRect();
+  if (vr.width > 0 && vr.height > 0) { vpW = vr.width; vpH = vr.height; vpCanvas.width = Math.round(vpW * dpr); vpCanvas.height = Math.round(vpH * dpr); vpCtx.setTransform(dpr, 0, 0, dpr, 0, 0); }
+  const tr = tlCanvas.getBoundingClientRect();
+  if (tr.width > 0 && tr.height > 0) { tlW = tr.width; tlH = tr.height; tlCanvas.width = Math.round(tlW * dpr); tlCanvas.height = Math.round(tlH * dpr); tlCtx.setTransform(dpr, 0, 0, dpr, 0, 0); }
+}
+
+function renderShowSelect() {
+  const sel = document.getElementById("show-select");
+  sel.innerHTML = Object.values(SHOWS).map(s => `<option value="${s.id}" ${s.id===state.showId?"selected":""}>${s.name}</option>`).join("");
+  document.getElementById("live-show-name").textContent = state.show.name;
+}
+function renderAllUI() {
+  renderShowSelect(); renderFxCatalog(); renderRigPanel(); renderMarkerPanel(); renderInspector();
+  updateUndoUI(); updateTransportButtons(); updateTimeReadout();
+}
+
+function hydrateIconsAndBindings() {
+  document.getElementById("btn-mcp").innerHTML = `${ico("cpu","sm")}<span>MCP</span>`;
+  document.getElementById("btn-live-view").innerHTML = `${ico("sliders","sm")}<span>Live Deck</span>`;
+  document.getElementById("ltab-fx").innerHTML = `${ico("sliders","sm")}<span>FX</span>`;
+  document.getElementById("ltab-rig").innerHTML = `${ico("cube","sm")}<span>Rig &amp; Ordner</span>`;
+  document.getElementById("ltab-markers").innerHTML = `${ico("flag","sm")}<span>Marker</span>`;
+  document.getElementById("fx-search-ico").innerHTML = ico("search", "sm");
+  document.getElementById("btn-add-spot").innerHTML = `${ico("plus","sm")}<span>Spot</span>`;
+  document.getElementById("btn-add-strip").innerHTML = `${ico("plus","sm")}<span>Strip</span>`;
+  document.getElementById("btn-add-marker").innerHTML = `${ico("flag","sm")}<span>Marker am Playhead</span>`;
+  document.getElementById("tl-start").innerHTML = ico("start", "sm");
+  document.getElementById("tl-end").innerHTML = ico("end", "sm");
+  document.getElementById("tl-loop").innerHTML = ico("loop", "sm");
+  document.getElementById("tl-add-global").innerHTML = `${ico("globe","sm")}<span>+ Global</span>`;
+  document.getElementById("tl-add-track").innerHTML = `${ico("plus","sm")}<span>Ebene</span>`;
+  document.getElementById("tl-add-sub").innerHTML = `${ico("maskDown","sm")}<span>+ Unterebene</span>`;
+  document.getElementById("tl-split").innerHTML = `${ico("split","sm")}<span>Split</span>`;
+  document.getElementById("ico-upload").innerHTML = ico("upload", "sm");
+  document.getElementById("tl-sync-markers").innerHTML = `${ico("sync","sm")}<span>Sync</span>`;
+  document.getElementById("ico-vol").innerHTML = ico("vol", "sm");
+  document.getElementById("tl-zoom-out").innerHTML = ico("minus", "sm");
+  document.getElementById("tl-zoom-in").innerHTML = ico("plus", "sm");
+  document.getElementById("ico-blackout").innerHTML = ico("bolt", "lg");
+
+  // Custom Sliders for Volume & Live Master
+  document.getElementById("tl-vol-mount").appendChild(createCustomSlider(state.audioVol, 0, 1, 0.02, v => { state.audioVol = v; if (state.audioGain) state.audioGain.gain.value = v; }));
+  document.getElementById("live-master-mount").appendChild(createCustomSlider(state.masterBrightness, 0, 1, 0.01, v => { state.masterBrightness = v; document.getElementById("live-master-val").textContent = `${Math.round(v*100)}%`; }));
+
+  // Top Menu Bar
+  document.querySelectorAll(".menu-btn").forEach(btn => {
+    btn.onclick = e => {
+      e.stopPropagation();
+      if (btn.classList.contains("open")) closeTopMenus();
+      else openTopMenu(btn.dataset.menu, btn);
+    };
+  });
+  window.addEventListener("click", e => {
+    if (!e.target.closest("#menu-dropdown") && !e.target.closest(".menu-btn")) closeTopMenus();
+    if (!e.target.closest("#ctx-menu")) hideCtxMenu();
+  });
+
+  // Timecode Click Mode Switcher (Zeit -> Frames -> Bar.Beat)
+  document.getElementById("tc-box").onclick = cycleTimecodeMode;
+
+  document.getElementById("btn-proxy-status").onclick = showProxyModal;
+
+  document.getElementById("show-select").onchange = e => {
+    const id = e.target.value; if (!SHOWS[id]) return;
+    stopAudioPlayback(); state.playing = false; state.showId = id; state.show = SHOWS[id]; state.time = 0; state.tlStart = 0; state.tlEnd = Math.min(state.show.duration_s, 75);
+    buildProceduralWaveform(state.show.duration_s); renderAllUI();
+  };
+
+  document.querySelectorAll("#ws-switch [data-ws]").forEach(btn => {
+    btn.onclick = () => {
+      document.querySelectorAll("#ws-switch [data-ws]").forEach(b => b.classList.remove("active"));
+      btn.classList.add("active"); state.workspace = btn.dataset.ws;
+      document.getElementById("app").classList.toggle("stage-mode", state.workspace === "stage");
+      if (state.workspace === "stage") switchLeftTab("rig");
+      setTimeout(resizeCanvases, 20);
+    };
+  });
+
+  const hwBtn = document.getElementById("btn-hw"), hwLed = document.getElementById("hw-led");
+  hwBtn.onclick = () => {
+    const pRes = evaluateProxyRequirements(state.rig);
+    if (!state.hwEnabled && !pRes.ok) { toast("Warnung: Hue Proxy-Anforderung nicht erfüllt!", "warn"); }
+    state.hwEnabled = !state.hwEnabled;
+    hwBtn.classList.toggle("live-on", state.hwEnabled); hwLed.classList.toggle("ok", state.hwEnabled);
+    toast(state.hwEnabled ? "Hardware Output LIVE (Hue Z2M + WLED DDP)" : "Hardware Output stumm (Preview)", state.hwEnabled ? "ok" : "info");
+  };
+
+  const syncMaUI = () => {
+    const maBtn = document.getElementById("btn-ma-sync"), maLed = document.getElementById("ma-led"), maLbl = document.getElementById("ma-label");
+    maBtn.classList.toggle("live-on", state.maSyncEnabled); maLed.className = `led ${state.maSyncEnabled ? "ok" : ""}`;
+    maLbl.textContent = state.maSyncEnabled ? "MA LOCK" : "MA OFF";
+    document.getElementById("live-auto-sync").checked = state.maSyncEnabled;
+  };
+  document.getElementById("btn-ma-sync").onclick = () => { state.maSyncEnabled = !state.maSyncEnabled; syncMaUI(); };
+  document.getElementById("live-auto-sync").onchange = e => { state.maSyncEnabled = e.target.checked; syncMaUI(); };
+  syncMaUI();
+
+  document.getElementById("btn-undo").onclick = doUndo;
+  document.getElementById("btn-redo").onclick = doRedo;
+
+  const mcpDrawer = document.getElementById("mcp-drawer");
+  document.getElementById("btn-mcp").onclick = () => mcpDrawer.classList.toggle("open");
+  document.getElementById("mcp-close").onclick = () => mcpDrawer.classList.remove("open");
+  document.getElementById("mcp-act-strobe").onclick = () => { const t0 = performance.now(); insertPresetQuick("strobe_blinder"); logMcp("batch_apply_edits", performance.now()-t0, "Inserted Strobe clip"); };
+  document.getElementById("mcp-act-lint").onclick = () => { const t0 = performance.now(); const p = evaluateProxyRequirements(state.rig); logMcp("lint_show", performance.now()-t0, `ProxyCheck=${p.ok} · Tracks=${state.show.tracks.length}`); };
+  document.getElementById("mcp-act-telem").onclick = () => { const t0 = performance.now(); evaluateCompositor(state.time); logMcp("render_telemetry_strip", performance.now()-t0, `t=${state.time.toFixed(2)}s · snap=${state.lastSnap}`); };
+
+  const liveBtn = document.getElementById("btn-live-view");
+  liveBtn.onclick = () => {
+    const toLive = state.viewMode === "studio"; state.viewMode = toLive ? "live" : "studio";
+    document.getElementById("studio-view").classList.toggle("hidden", toLive);
+    document.getElementById("live-view").classList.toggle("hidden", !toLive);
+    liveBtn.classList.toggle("accent", toLive);
+    liveBtn.innerHTML = `${ico("sliders","sm")}<span>${toLive ? "Studio" : "Live Deck"}</span>`;
+    if (!toLive) setTimeout(resizeCanvases, 20);
+  };
+
+  function switchLeftTab(tab) {
+    state.leftTab = tab;
+    document.querySelectorAll(".pane-tab").forEach(b => b.classList.toggle("active", b.dataset.ltab === tab));
+    ["fx", "rig", "markers"].forEach(k => document.getElementById(`panel-${k}`).classList.toggle("hidden", k !== tab));
+  }
+  document.querySelectorAll(".pane-tab").forEach(b => { b.onclick = () => switchLeftTab(b.dataset.ltab); });
+  document.getElementById("fx-search").oninput = renderFxCatalog;
+
+  document.getElementById("rig-select").onchange = e => {
+    const id = e.target.value; if (!RIG_PRESETS[id]) return;
+    state.rigId = id; state.rig = deepClone(RIG_PRESETS[id]); state.selFixtures.clear(); state.selFolderId = null;
+    compileRig(); renderRigPanel(); renderInspector();
+  };
+  document.getElementById("btn-add-spot").onclick = () => {
+    const id = "spot_" + Date.now().toString(36), folderId = (state.rig.folders[0] && state.rig.folders[0].id) || "fld_galerie";
+    // Intentionally leaves address/proxy empty so user immediately sees the incomplete setup warning!
+    state.rig.fixtures.push({ id, name: `Neue Hue Birne ${state.rig.fixtures.length + 1}`, type: "point", folderId, protocol: "hue_z2m", enabled: true, address: "", proxy: "", zcl_snap: true, pos: [3.25, 4.0, 4.2], aim: [0, 0, -1], beam_deg: 45 });
+    state.selFixtures = new Set([id]); state.selFolderId = null; state.selType = "fixture";
+    compileRig(); renderRigPanel(); renderInspector();
+    toast("Hue-Lampe hinzugefügt — bitte Adresse & Proxy im Inspector ergänzen!", "warn");
+  };
+  document.getElementById("btn-add-strip").onclick = () => {
+    const id = "strip_" + Date.now().toString(36), folderId = (state.rig.folders[state.rig.folders.length-1] && state.rig.folders[state.rig.folders.length-1].id) || "fld_strip";
+    state.rig.fixtures.push({ id, name: `SK6812 Strip ${state.rig.fixtures.length + 1}`, type: "line", folderId, protocol: "wled_ddp", enabled: true, host: "192.168.10.41:4048", zcl_snap: false, start: [1.0, 2.5, 3.2], end: [5.5, 2.5, 3.2], pixels: 90, aim: [0, 0, -1], beam_deg: 120 });
+    state.selFixtures = new Set([id]); state.selFolderId = null; state.selType = "fixture";
+    compileRig(); renderRigPanel(); renderInspector();
+  };
+  document.getElementById("btn-add-marker").onclick = () => {
+    pushUndo("Add Marker"); state.show.markers.push({ t_s: Number(state.time.toFixed(2)), name: `Cue ${state.show.markers.length + 1}`, kind: "cue", color: "#e8862e" }); renderMarkerPanel();
+  };
+
+  document.getElementById("tl-play").onclick = togglePlay;
+  document.getElementById("tl-start").onclick = () => seekTo(0);
+  document.getElementById("tl-end").onclick = () => seekTo(state.show.duration_s);
+  document.getElementById("tl-loop").onclick = () => { state.loop = !state.loop; updateTransportButtons(); };
+  document.getElementById("tl-add-global").onclick = addGlobalLayer;
+  document.getElementById("tl-add-track").onclick = () => {
+    pushUndo("Add Track"); const id = "trk_" + Date.now().toString(36);
+    state.show.tracks.push({ id, name: `Ebene ${state.show.tracks.length + 1}`, kind: "layer", parentId: null, clippedToBelow: false, target_id: "all", blend_mode: "add", opacity: 1, height: 36, muted: false, solo: false, expanded: false, clips: [] });
+    state.selType = "track"; state.selTrackId = id; renderInspector();
+  };
+  document.getElementById("tl-add-sub").onclick = () => addSubLayer(state.selTrackId);
+  document.getElementById("tl-split").onclick = splitSelectedClip;
+  document.getElementById("tl-snap").onchange = e => { state.snapBeats = parseFloat(e.target.value); };
+  document.getElementById("tl-zoom-in").onclick = () => zoomTimeline(0.7, (state.tlStart + state.tlEnd) * 0.5);
+  document.getElementById("tl-zoom-out").onclick = () => zoomTimeline(1.4, (state.tlStart + state.tlEnd) * 0.5);
+  document.getElementById("tl-zoom-fit").onclick = () => { state.tlStart = 0; state.tlEnd = state.show.duration_s; };
+  document.getElementById("tl-sync-markers").onclick = syncMarkersFromAudio;
+
+  document.getElementById("audio-input").onchange = async e => {
+    const file = e.target.files && e.target.files[0]; e.target.value = ""; if (!file) return;
+    try {
+      if (!state.audioCtx) state.audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+      const buf = await state.audioCtx.decodeAudioData(await file.arrayBuffer());
+      state.audioBuffer = buf; state.audioName = file.name;
+      document.getElementById("audio-lbl").textContent = file.name.slice(0, 12);
+      buildWaveformFromAudioBuffer(buf); syncMarkersFromAudio();
+      if (state.playing) startAudioPlayback();
+    } catch (err) { toast("Audio-Fehler: " + err.message, "danger"); }
+  };
+
+  document.getElementById("live-play").onclick = togglePlay;
+  document.getElementById("live-back").onclick = () => seekTo(state.time - 10);
+  document.getElementById("live-fwd").onclick = () => seekTo(state.time + 10);
+  const blk = document.getElementById("live-blackout"), setBlk = on => { state.blackoutHold = on; blk.classList.toggle("active", on); };
+  blk.addEventListener("pointerdown", e => { e.preventDefault(); blk.setPointerCapture(e.pointerId); setBlk(true); });
+  blk.addEventListener("pointerup", () => setBlk(false)); blk.addEventListener("pointercancel", () => setBlk(false));
+
+  window.addEventListener("keydown", e => {
+    if (e.target.matches("input, textarea, select")) return;
+    const mod = e.ctrlKey || e.metaKey;
+    if (e.code === "Space") { e.preventDefault(); togglePlay(); }
+    else if (mod && e.key.toLowerCase() === "z") { e.preventDefault(); if (e.shiftKey) doRedo(); else doUndo(); }
+    else if (mod && e.key.toLowerCase() === "y") { e.preventDefault(); doRedo(); }
+    else if (!mod && e.key.toLowerCase() === "s") { e.preventDefault(); splitSelectedClip(); }
+    else if (e.key === "Home") { e.preventDefault(); seekTo(0); }
+    else if (e.key === "End") { e.preventDefault(); seekTo(state.show.duration_s); }
+    else if ((e.key === "Delete" || e.key === "Backspace") && state.selType === "clip" && state.selClipId) {
+      e.preventDefault(); const found = findClipById(state.selClipId); if (found) deleteClip(found.track, found.clip.id);
+    }
+  });
+}
+
+function mainLoop(now) {
+  const dt = Math.min(0.1, (now - state.lastFrameMs) / 1000);
+  state.lastFrameMs = now;
+  if (dt > 0) state.fpsSmooth = state.fpsSmooth * 0.9 + (1 / dt) * 0.1;
+  if (state.playing) {
+    state.time += dt;
+    if (state.time >= state.show.duration_s) {
+      if (state.loop) { state.time = 0; startAudioPlayback(); }
+      else { state.time = state.show.duration_s; state.playing = false; stopAudioPlayback(); updateTransportButtons(); }
+    }
+  }
+  evaluateCompositor(state.time);
+  if (state.viewMode === "studio") { drawViewport(); drawTimeline(); }
+  updateTimeReadout();
+  document.getElementById("vp-fps").textContent = `${Math.round(state.fpsSmooth)} FPS`;
+  requestAnimationFrame(mainLoop);
+}
+
+window.onload = function () {
+  compileRig();
+  buildProceduralWaveform(state.show.duration_s);
+  hydrateIconsAndBindings();
+  bindSplitters();
+  bindViewportEvents();
+  bindTimelineEvents();
+  renderAllUI();
+  resizeCanvases();
+  window.addEventListener("resize", resizeCanvases);
+  requestAnimationFrame(mainLoop);
+};
+</script>
+</body>
+</html>

@@ -72,6 +72,7 @@ def test_discovery_and_state_topics_are_published():
         "hueme_studio/playback/set",
         "hueme_studio/show/set",
         "hueme_studio/gain/set",
+        "hueme_studio/auto_show/set",
     }
 
     configs = {
@@ -83,6 +84,8 @@ def test_discovery_and_state_topics_are_published():
         "homeassistant/select/studio_show/config",
         "homeassistant/number/studio_gain/config",
         "homeassistant/sensor/studio_status/config",
+        "homeassistant/switch/studio_auto_show/config",
+        "homeassistant/binary_sensor/studio_show_available/config",
     }
     assert configs["homeassistant/switch/studio_playback/config"][
         "command_topic"
@@ -189,3 +192,42 @@ def test_runtime_applies_ha_commands_and_exposes_status(tmp_path):
 
         runtime._publish_ha(force=True)
         assert fake.payloads("hueme_studio/gain")[-1] == "55"
+
+
+def test_state_publishing_is_diffed_and_auto_show_entities_are_wired():
+    fake = FakeMqtt()
+    bridge = HomeAssistantBridge(HaSettings(enabled=True), mqtt_client=fake)
+    bridge.start()
+    bridge._on_connect(fake, None, {}, 0)
+    state = {
+        "transport": {
+            "playing": False,
+            "show_id": "dance_loft_v1",
+            "gain": 1.0,
+            "time_s": 0.0,
+            "duration_s": 10.0,
+        },
+        "shows": [{"id": "dance_loft_v1"}],
+        "sync": {"enabled": True, "matched_show_id": "dance_loft_v1"},
+    }
+    bridge.publish_state(**state)
+    first = len(fake.published)
+    bridge.publish_state(**state)
+    assert len(fake.published) == first
+    assert fake.payloads("hueme_studio/auto_show")[-1] == "ON"
+    assert fake.payloads("hueme_studio/show_available")[-1] == "ON"
+
+    bridge._on_message(
+        fake,
+        None,
+        SimpleNamespace(topic="hueme_studio/auto_show/set", payload=b"OFF"),
+    )
+    assert bridge.drain_commands() == [{"entity": "auto_show", "value": False}]
+
+    configs = {
+        topic
+        for topic, _payload, _retain in fake.published
+        if topic.startswith("homeassistant/") and topic.endswith("/config")
+    }
+    assert "homeassistant/switch/studio_auto_show/config" in configs
+    assert "homeassistant/binary_sensor/studio_show_available/config" in configs

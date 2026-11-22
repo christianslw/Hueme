@@ -110,8 +110,31 @@ class ShowMatcher:
             if track_key and track_key in keys:
                 base = 1.0
             elif artist_key and title_key:
-                # Both known but no key match: never guess from the title alone.
-                base = 0.0
+                # Both known but no exact key: allow a conservative title
+                # extension/suffix match for "(Live)", "VIP Mix", remaster tags
+                # etc. A conflicting artist never falls through; a multi-artist
+                # MA credit ("Slayyyter, Guest") still matches its subset.
+                artist_tokens = set(artist_key.split())
+                show_artist_tokens = set(show_artist.split()) if show_artist else set()
+                artist_ok = bool(
+                    show_artist_tokens
+                    and (
+                        show_artist_tokens.issubset(artist_tokens)
+                        or artist_tokens.issubset(show_artist_tokens)
+                    )
+                )
+                if artist_ok and show_title:
+                    shorter, longer = sorted(
+                        (title_key, show_title), key=len
+                    )
+                    if shorter == longer or longer.startswith(shorter + " "):
+                        base = 0.9
+                    else:
+                        left, right = set(title_key.split()), set(show_title.split())
+                        overlap = len(left & right) / max(1, len(left | right))
+                        base = 0.85 if overlap >= 0.75 else 0.0
+                else:
+                    base = 0.0
             elif title_key and title_key == show_title:
                 if artist_key and show_artist and artist_key != show_artist:
                     base = 0.5
@@ -145,6 +168,7 @@ class ShowMatcher:
         title: str = "",
         duration_s: float = 0.0,
         item_id: str | None = None,
+        prefer_show_id: str | None = None,
     ) -> str | None:
         scored: list[tuple[float, str]] = []
         for show in shows:
@@ -166,6 +190,14 @@ class ShowMatcher:
         scored.sort(key=lambda item: (-item[0], item[1]))
         best_score, best_id = scored[0]
         if len(scored) > 1 and abs(scored[1][0] - best_score) < 1e-9:
+            # Two variants of the same track (e.g. a smooth and a peak version)
+            # are intentionally ambiguous. Keep the show that is already active
+            # instead of flapping to an arbitrary alphabetical winner.
+            if prefer_show_id and any(
+                show_id == prefer_show_id and abs(score - best_score) < 1e-9
+                for score, show_id in scored
+            ):
+                return prefer_show_id
             return None
         return best_id
 
@@ -279,11 +311,22 @@ class MaSync:
             self._state = "waiting" if enabled else "off"
             self._status = self._base_status()
 
+    def reset_link(self) -> None:
+        """Forget the current match/PLL after a source reconnect."""
+        self._matched_show = None
+        self._track_key = None
+        self._had_track = False
+        self.pll.reset()
+        self._state = "waiting" if self.enabled else "off"
+        self._status = self._base_status()
+
     def set_offset_s(self, offset_s: float) -> None:
         value = float(offset_s)
         if not math.isfinite(value):
             raise ValueError("offset must be finite")
-        self.offset_s = max(-2.0, min(2.0, value))
+        # Speaker chains with big lip-sync/zone buffers can exceed 2 s; allow a
+        # generous trim. Positive delays the lights relative to the track.
+        self.offset_s = max(-20.0, min(20.0, value))
         self._status["offset_s"] = self.offset_s
 
     def state_key(self) -> tuple[str, str | None, str | None]:
@@ -313,6 +356,9 @@ class MaSync:
             "locked": False,
             "snaps": self.pll.snaps,
             "last_error": getattr(source, "last_error", None) if source else None,
+            "pairing_token": getattr(source, "pairing_token", None) if source else None,
+            "client_id": getattr(source, "client_id", None) if source else None,
+            "paired": bool(getattr(source, "paired", False)) if source else False,
         }
 
     def status(self) -> dict[str, Any]:
@@ -329,6 +375,9 @@ class MaSync:
             "duration_s": float(getattr(source, "track_duration_s", 0.0) or 0.0),
             "progress_s": float(getattr(source, "track_progress_s", 0.0) or 0.0),
             "playing": bool(getattr(source, "track_playing", True)),
+            "item_id": getattr(source, "track_item_id", None),
+            "meta_lead_s": round(float(getattr(source, "meta_lead_s", 0.0) or 0.0), 4),
+            "audio_lead_s": round(float(getattr(source, "play_lead_s", 0.0) or 0.0), 4),
         }
 
     def _show_limit(self, show_id: str | None, track_duration: float) -> float:
@@ -429,6 +478,7 @@ class MaSync:
                 title=title,
                 duration_s=duration,
                 item_id=getattr(source, "track_item_id", None),
+                prefer_show_id=current_show_id,
             )
             self.pll.reset()
 

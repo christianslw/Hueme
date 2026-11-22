@@ -37,6 +37,16 @@ Rules, in order:
 The show list is refreshed at 1 Hz while sync is enabled, so new/renamed shows
 are picked up without restarting.
 
+## Latency trim
+
+Sendspin metadata carries a server timestamp for the reported progress; the
+source maps it through the client clock to local playback time before the PLL
+sees it. That is the automatic part. If the MA speaker chain still has a fixed
+delay, open a show's **Show** tab → **Music Assistant** → **Sync-Offset**:
+positive delays the lights, negative advances them; the value is kept in the
+browser and re-applied on load. `--sync-offset-ms` remains available for a
+fixed startup offset.
+
 ## Playhead lock
 
 `hueme_studio/sync.py` contains two small deterministic pieces:
@@ -106,18 +116,28 @@ normal `/ws/preview` invalidation bus (`scope: "sync"`).
 ## CLI
 
 ```bash
-# URL from config/gateway.json -> audio.sendspin.url
-python3 -m hueme_studio --gateway config/gateway.json --sync
+# gateway.json is loaded automatically; a configured audio.sendspin.url
+# enables MA auto-show by default.
+python3 -m hueme_studio
 
 # Explicit URL (implies sync)
 python3 -m hueme_studio --sendspin-url ws://ma.local:8927/sendspin
 
+# Keep auto-show off for this run
+python3 -m hueme_studio --no-sync
+
 # Calibrate: positive delays lights
-python3 -m hueme_studio --sendspin-url ... --sync-offset-ms 40
+python3 -m hueme_studio --sync-offset-ms 40
 ```
 
-Without `--sync`/`--sendspin-url`, `/api/sync` reports `configured: false`
-and playback stays fully manual. This is the default and keeps CI offline-safe.
+Without a Sendspin URL, `/api/sync` reports `configured: false` and playback
+stays fully manual. Code paths that call `create_app()` in tests never connect
+to a remote MA server.
+
+The Sendspin client must be paired in Music Assistant. Studio → **Hilfe →
+Sendspin Pairing-Token** shows the token; paste it in Music Assistant under the
+`Hueme-Visualizer` player → Setup required → Pair device. The token is stable
+for the persisted identity/pairing file.
 
 ## Deliberate limits
 

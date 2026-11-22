@@ -3,7 +3,7 @@
 This file is the durable handoff. A new session should read this first, then
 continue at the first unchecked item. Do **not** re-do completed work.
 
-Last updated: 2026-11-21 (Sprint 4, checkpoint 1)
+Last updated: 2026-11-22 (Sprint 5, UI phase 1)
 
 ## Ground rules
 
@@ -129,6 +129,49 @@ Sprint 2 deviations, both documented in `docs/studio-server.md`:
 - [x] Tests: 128 passed, 3 skipped; headless Chromium verified play, seek and
   audio playback; stale-page regression verified.
 
+### Sprint 5 — UI phase 1 — COMPLETE
+
+Requested direction: AE/Premiere-like editing, free effect adjustment, user
+palettes, fixture-free FX preview, automatic layer names, layer context menus,
+and one icon language.  Phase 2 (richer expression vocabulary and new particle
+systems) is intentionally separate.
+
+- [x] `hueme_studio/palettes.py` — global palette library. Seven built-in
+  cosine palettes plus user palettes in `config/palettes.json`, atomic writes,
+  Oklab interpolation, built-ins protected from overwrite/delete.
+- [x] Preset palette params changed from a fixed `select` to `ParamSpec(type=
+  "palette")`; custom palettes flow through `PresetUtils.gradient`.
+- [x] REST: `GET/POST/DELETE /api/palettes`; palettes included in
+  `/api/studio/state`. MCP gains `palette_list`, `palette_save` and
+  `palette_delete`.
+- [x] `hueme_studio/fxpreview.py` — fixture-free front-plane preset/filter
+  renderer and dependency-free PNG encoder. One preview render at a time and a
+  small cache prevent O(n²) spatial filters from ballooning memory.
+- [x] REST: `GET /api/presets/{id}/preview.png`, `GET /api/filters/{id}/
+  preview.png`, `POST /api/preview/effect`. Library thumbnails now use real
+  effect renders, not isometric rig point clouds.
+- [x] Studio viewport **FX** toggle: front view of the selected/active clip with
+  no fixture glyphs or cones, refreshed while scrubbing/playing.
+- [x] Filter Stack inspector: every filter parameter is editable, filters can be
+  enabled, reset, reordered and removed.
+- [x] Palette section in the library and palette picker in effect parameters;
+  create/edit/copy/delete palettes and apply to the selected clip.
+- [x] Auto naming: clip display name follows its preset unless manually named;
+  `Track.name_auto` follows the first clip's manual name or preset; manual
+  rename freezes it. A toggle exposes both behaviours.
+- [x] Layer context menu: copy, cut, paste, duplicate, rename, blend-mode
+  submenu with checkmarks, mute/solo, clipping, sub-layer and delete. Clip
+  context menu has the same copy/cut/paste/duplicate/rename/delete set.
+- [x] Unified Material Design Icons subset in `static/icons.js`; all transport,
+  menu, filter, palette and context-menu glyphs use it.
+- [x] Tests: `tests/test_studio_palettes.py` adds palette CRUD, auto-name and
+  PNG preview coverage. Stale demo-show/rig assertions were made data-driven so
+  user-authored `config/shows` and `config/rigs` stay runtime data.
+- [x] Headless Chromium verified: clip selection, filter parameter edit, palette
+  creation/apply, FX preview changes with playhead, layer context submenu, and
+  track auto-name following a preset change.
+- [x] Full suite: **161 passed, 6 subtests passed** with `-W error`.
+
 ## Decisions already made
 
 - Coordinates metres, Z up. Room defaults to `[6.5, 8.0, 5.1]` only in the
@@ -179,23 +222,47 @@ Sprint 2 deviations, both documented in `docs/studio-server.md`:
 - The Studio container serves port 8090 and mounts config at `/app/config`;
   credentials, pairing state, caches and logs are excluded from the image.
 
+- Custom palettes are global user data in `config/palettes.json`, not shown
+  data. Built-in palettes are cosine gradients; custom palettes are discrete
+  stops interpolated in Oklab. Built-ins can be copied but not overwritten.
+- FX preview renders a flat front plane at the room's mid-depth through the
+  preset and filter stack. It is an editor preview; it is not the hardware
+  output path and has no fixture glyphs.
+- Preview PNGs are serialized through one lock and cached by
+  preset/filter/time/size. Spatial filters are O(n²), so the filter preview
+  defaults to 48×27 and FX-with-filters to 48×27; the UI upscales the image.
+- Clip names are automatic while `clip.name` is null. A manual clip name wins
+  and also feeds an auto-named track. `Track.name_auto` is explicit; legacy
+  tracks default to `false` so loading an old show does not rename rows.
+- Auto naming runs inside `ShowStore` commits, so REST, MCP and UI edits share
+  the same result. A manual track rename sets `name_auto=false`.
+- The Studio may live at `/root/Hueme/test` in the current workspace; commands
+  below use that project root.
+
 ## Open questions / external values to confirm
 
-- Real LAN IP of the WLED/SK6812 controller (placeholder `192.168.10.40:4048`).
-- Whether the strip is wired 4-channel RGBW or 3-channel RGB. Rig says
-  `rgb_amber_1800k`; HAL emits 4-channel DDP when using the amber path.
+- WLED/SK6812 controller confirmed at `192.168.10.246:4048` (WLED 16.0.1).
+  DDP works natively; `21324` is WLED's UDP sync port, not DDP.
+- Strip confirmed 4-channel RGBW (`/json` reports `rgbw: true`), so
+  `rgb_amber_1800k` and 4-channel DDP are correct. WLED's first bus is exactly
+  290 SK6812 RGBW pixels; the rig matches. Two extra single LEDs are separate
+  buses, so do not raise the rig to 292.
+- DDP colour type must be `0x1B` for RGBW (`0x0B` for RGB). WLED only switches
+  its 4-bytes-per-pixel parser when `(dtype & 0x38) >> 3 == 0b011`; `0x03`
+  silently falls back to RGB24 and shifts every amber byte into the next pixel.
 - `config/gateway.json` contains live credentials; never commit it.
 
 ## Verification commands
 
 ```bash
-cd /root/Hueme
+cd /root/Hueme/test
 python3 -m pytest tests/test_studio_*.py -q -W error
 python3 -m pytest -q -W error
 python3 -m compileall -q hueme_studio
 node --check hueme_studio/static/client.js
 node --check hueme_studio/static/studio.js
 node --check hueme_studio/static/live.js
+node --check hueme_studio/static/icons.js
 python3 -m hueme_studio --host 127.0.0.1 --port 8090
 curl -s localhost:8090/mcp -H 'Content-Type: application/json' \
   -d '{"jsonrpc":"2.0","id":1,"method":"tools/list"}'
@@ -203,8 +270,19 @@ curl -s localhost:8090/mcp -H 'Content-Type: application/json' \
 
 ## Next session start point
 
-Sprint 4 is complete. Read `docs/PROGRESS.md`, `docs/ma-sync.md`,
-`docs/home-assistant.md` and `docs/deployment.md` first.
+Sprint 5 UI phase 1 is complete. Read `docs/PROGRESS.md`,
+`docs/checkpoints/2026-11-22-sprint5.md`, `docs/ui-system.md` and
+`docs/studio-server.md` first.
+
+Phase 2, not started:
+
+- Richer expression vocabulary and audio variables (`bass`, `mid`, `high`,
+  `amp`, `rms`, `harmonic`, `pulse`, subdivision helpers, `smoothstep`, `mix`,
+  `map`, `pulse`, `saw`, `tri`, `decay`), expression templates and live preview.
+- New basic/particle presets with expression-addressable emitter position,
+  spawn rate, spread, gravity, turbulence and lifetime.
+- Filter parameter keyframes (only static values + presets are animatable now).
+- Optional blueprint-backed FX preview (currently synthetic envelope).
 
 Remaining external verification, not code work:
 

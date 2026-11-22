@@ -42,12 +42,51 @@ from pydantic import (
     model_validator,
 )
 
+from hueme_studio.expressions import (
+    ExpressionError,
+    compile_expression,
+    evaluate_expression,
+    expression_names,
+)
+
+EXPRESSION_VARIABLES = {
+    "t",
+    "local_t",
+    "beat",
+    "beatPhase",
+    "barPos",
+    "bpm",
+    "kick",
+    "snare",
+    "hat",
+    "energy",
+    "val",
+}
+
 log = logging.getLogger("hueme_studio.showdoc")
 
 Easing = Literal["linear", "hold", "ease_in", "ease_out", "ease_in_out", "exp_decay"]
 BlendMode = Literal["normal", "add", "max", "multiply", "override"]
 MaskKind = Literal["none", "plane_sweep", "sphere_narrow", "box", "parity"]
-FilterKind = Literal["mirror_symmetry", "beat_gate", "dim2warm", "inertia", "audio_mod"]
+FilterKind = Literal[
+    "spatial_blur",
+    "grain_noise",
+    "beat_gate",
+    "dim2warm",
+    "mirror_symmetry",
+    "color_grade",
+    "strobe_shutter",
+    "invert_color",
+    "inertia",
+    "audio_mod",
+    "hue_rotate",
+    "saturation",
+    "brightness_curve",
+    "scanline",
+    "posterize",
+    "bloom",
+]
+TrackKind = Literal["global", "layer", "sub"]
 MarkerKind = Literal["section", "cue", "drop", "custom"]
 
 
@@ -190,6 +229,10 @@ class Timing(Model):
     def _fill_grid(self) -> "Timing":
         if self.beat_grid_s <= 0.0:
             self.beat_grid_s = 60.0 / float(self.bpm)
+        elif abs(self.beat_grid_s - float(self.bpm)) <= 0.05:
+            # Repair the old blueprint-sync bug that wrote BPM into the
+            # seconds-per-beat field. The signature is exact (grid == bpm).
+            self.beat_grid_s = 60.0 / float(self.bpm)
         return self
 
     def grid_interval(self, division: str = "1/4") -> float:
@@ -230,6 +273,7 @@ class Timing(Model):
         return {
             "bpm": float(self.bpm),
             "beat_grid_s": grid,
+            "beat_offset_s": float(self.beat_offset_s),
             "beat_index": beat_index,
             "beat_count": beat_index,
             "beat_phase": phase,
@@ -357,12 +401,33 @@ class Clip(Model):
     preset: str = Field(default="solid", min_length=1)
     opacity: Normalized = 1.0
     params: dict[str, Any] = Field(default_factory=dict)
+    expressions: dict[str, str] = Field(default_factory=dict)
     keyframes: list[Keyframe] = Field(default_factory=list)
     spatial_mask: SpatialMask = Field(default_factory=SpatialMask)
     filters: list[FilterSpec] = Field(default_factory=list)
     snap_zcl: bool = False
     name: str | None = None
     color: str | None = None
+
+    @field_validator("expressions")
+    @classmethod
+    def _check_expressions(cls, value: dict[str, str]) -> dict[str, str]:
+        cleaned: dict[str, str] = {}
+        for key, expression in value.items():
+            text = str(expression or "").strip()
+            if not text:
+                continue
+            try:
+                compile_expression(text)
+            except ExpressionError as exc:
+                raise ValueError(f"expression for '{key}': {exc}") from exc
+            unknown = expression_names(text) - EXPRESSION_VARIABLES
+            if unknown:
+                raise ValueError(
+                    f"expression for '{key}' uses unknown symbols: {sorted(unknown)}"
+                )
+            cleaned[str(key)] = text
+        return cleaned
 
     @model_validator(mode="after")
     def _check(self) -> "Clip":
@@ -400,13 +465,33 @@ class Clip(Model):
             alpha *= x * x * (3.0 - 2.0 * x)
         return max(0.0, min(1.0, alpha))
 
-    def effective_params(self, local_t: float) -> dict[str, Any]:
+    def effective_params(
+        self, local_t: float, context: dict[str, Any] | None = None
+    ) -> dict[str, Any]:
         params = dict(self.params)
         params.update(evaluate_keyframes(self.keyframes, local_t))
+        if self.expressions:
+            eval_context = dict(context or {})
+            eval_context.setdefault("local_t", float(local_t))
+            for param, expression in self.expressions.items():
+                current = params.get(param, self.opacity if param == "opacity" else 0.0)
+                if isinstance(current, (list, tuple)):
+                    continue
+                eval_context["val"] = float(current or 0.0)
+                try:
+                    params[param] = float(
+                        evaluate_expression(expression, eval_context)
+                    )
+                except ExpressionError:
+                    # Keep a valid frame on screen; lint reports the bad
+                    # expression and saving rejects it before it reaches disk.
+                    continue
         return params
 
-    def effective_opacity(self, local_t: float) -> float:
-        params = self.effective_params(local_t)
+    def effective_opacity(
+        self, local_t: float, context: dict[str, Any] | None = None
+    ) -> float:
+        params = self.effective_params(local_t, context)
         raw = params.get("opacity", self.opacity)
         if isinstance(raw, list):
             raise ValueError("opacity keyframes must be scalar")
@@ -416,11 +501,16 @@ class Clip(Model):
 class Track(Model):
     id: str = Field(pattern=r"^[A-Za-z0-9][A-Za-z0-9_.-]*$")
     name: str = Field(min_length=1)
+    name_auto: bool = False
     target_group: str = Field(default="all", min_length=1)
     blend_mode: BlendMode = "normal"
     opacity: Normalized = 1.0
     muted: bool = False
     solo: bool = False
+    kind: TrackKind = "layer"
+    parent_id: str | None = None
+    clipped_to_below: bool = False
+    height_px: int = Field(default=36, ge=24, le=240)
     clips: list[Clip] = Field(default_factory=list)
 
     @model_validator(mode="after")
@@ -428,6 +518,8 @@ class Track(Model):
         ids = [c.id for c in self.clips]
         if len(ids) != len(set(ids)):
             raise ValueError("clip ids must be unique inside a track")
+        if self.parent_id == self.id:
+            raise ValueError("a track cannot be its own parent")
         return self
 
     def active_clips(self, t: float) -> list[Clip]:
@@ -460,6 +552,29 @@ class ShowDoc(Model):
                     )
         if len(clip_ids) != len(set(clip_ids)):
             raise ValueError("clip ids must be unique across the whole show")
+        known_tracks = {track.id for track in self.tracks}
+        for track in self.tracks:
+            if track.parent_id and track.parent_id not in known_tracks:
+                raise ValueError(
+                    f"track '{track.id}' references unknown parent "
+                    f"'{track.parent_id}'"
+                )
+            if track.kind == "sub" and not track.parent_id:
+                raise ValueError(f"sub track '{track.id}' needs a parent_id")
+        # Reject parent cycles.
+        for track in self.tracks:
+            seen: set[str] = set()
+            current = track
+            while current.parent_id:
+                if current.id in seen:
+                    raise ValueError(
+                        f"track parent cycle at '{current.id}'"
+                    )
+                seen.add(current.id)
+                parent = self.find_track(current.parent_id)
+                if parent is None:
+                    break
+                current = parent
         for marker in self.timing.markers:
             if marker.t_s > self.duration_s + 1e-6:
                 raise ValueError(f"marker '{marker.name}' lies after show duration")
@@ -479,11 +594,55 @@ class ShowDoc(Model):
     def all_clips(self) -> list[tuple[Track, Clip]]:
         return [(track, clip) for track in self.tracks for clip in track.clips]
 
+    def refresh_auto_names(self) -> None:
+        """Keep tracks marked ``name_auto`` in sync with their first clip.
+
+        A manual clip name wins over the preset name, so renaming a clip also
+        renames its auto-named row.  Tracks with no clips keep their last name.
+        """
+        # Imported lazily: presets import ShowDoc, so a module-level import
+        # would close the cycle.
+        from hueme_studio.presets import get_preset
+
+        for track in self.tracks:
+            if not track.name_auto or not track.clips:
+                continue
+            first = min(track.clips, key=lambda clip: (clip.start_s, clip.id))
+            if first.name:
+                track.name = first.name
+                continue
+            try:
+                track.name = get_preset(first.preset).name
+            except KeyError:
+                track.name = first.preset
+
     def active_tracks(self) -> list[Track]:
         solos = [t for t in self.tracks if t.solo and not t.muted]
         if solos:
             return solos
         return [t for t in self.tracks if not t.muted]
+
+    def evaluation_order(self) -> list[Track]:
+        """Bottom-to-top order: layers, their sub-layers, then globals last."""
+        active = [track for track in self.active_tracks() if track.kind != "global"]
+        by_id = {track.id: track for track in active}
+        ordered: list[Track] = []
+        emitted: set[str] = set()
+
+        def emit(track: Track) -> None:
+            if track.id in emitted:
+                return
+            if track.parent_id and track.parent_id in by_id:
+                emit(by_id[track.parent_id])
+            emitted.add(track.id)
+            ordered.append(track)
+
+        for track in active:
+            emit(track)
+        ordered.extend(
+            track for track in self.active_tracks() if track.kind == "global"
+        )
+        return ordered
 
     def beat_context(self, t: float) -> dict[str, float | int | bool]:
         return self.timing.beat_context(t)
@@ -729,7 +888,9 @@ class ShowStore:
         with self._lock:
             if doc.id in self._docs:
                 raise ShowStoreError(f"show '{doc.id}' already exists")
-            self._docs[doc.id] = doc.model_copy(deep=True)
+            doc = doc.model_copy(deep=True)
+            doc.refresh_auto_names()
+            self._docs[doc.id] = doc
             self._undo[doc.id] = deque(maxlen=self.history_limit)
             self._redo[doc.id] = deque(maxlen=self.history_limit)
             self._persist_doc(doc)
@@ -759,6 +920,7 @@ class ShowStore:
         # Validate a round-trip so manually constructed model instances cannot
         # sneak in values that JSON persistence would reject.
         validated = ShowDoc.model_validate(new_doc.model_dump(mode="json"))
+        validated.refresh_auto_names()
         old = self._docs[show_id]
         self._undo.setdefault(show_id, deque(maxlen=self.history_limit)).append(
             Snapshot(
