@@ -1258,12 +1258,100 @@ dialog::backdrop {
 }
 
 dialog.effect-builder {
-  width: min(820px, calc(100vw - 24px));
+  width: min(1180px, calc(100vw - 24px));
+  height: min(840px, calc(100vh - 32px));
+  max-height: calc(100vh - 32px);
 }
 
-.builder-body {
-  max-height: min(68vh, 720px);
+.effect-builder form {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  margin: 0;
+}
+
+.builder-head {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 12px;
+  border-bottom: 1px solid var(--line);
+}
+
+.builder-title {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  min-width: 0;
+}
+
+.builder-title strong {
+  font-size: 11px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+.builder-target {
+  overflow: hidden;
+  color: var(--text-2);
+  font-family: var(--mono);
+  font-size: 9px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.builder-head-actions {
+  display: flex;
+  gap: 4px;
+  margin-left: auto;
+}
+
+.builder-shell {
+  display: grid;
+  grid-template-columns: 228px minmax(0, 1fr) 300px;
+  flex: 1;
+  min-height: 0;
+}
+
+.builder-rail,
+.builder-inspector {
   overflow: auto;
+  padding: 8px;
+  background: var(--bg-0);
+}
+
+.builder-rail {
+  border-right: 1px solid var(--line);
+}
+
+.builder-inspector {
+  border-left: 1px solid var(--line);
+}
+
+.builder-stage {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-width: 0;
+  padding: 10px;
+  overflow: hidden;
+}
+
+.builder-preview-wrap {
+  display: flex;
+  flex: 1;
+  align-items: center;
+  justify-content: center;
+  min-height: 0;
+  border: 1px solid var(--line-strong);
+  background: #08090b;
+}
+
+.builder-preview {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
 }
 
 .builder-transport {
@@ -1276,50 +1364,224 @@ dialog.effect-builder {
   flex: 1;
 }
 
-.builder-preview {
-  display: block;
-  width: 100%;
-  aspect-ratio: 16 / 9;
-  border: 1px solid var(--line-strong);
-  background: #08090b;
-  object-fit: contain;
-}
-
-.builder-columns {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
-  gap: 12px;
-}
-
-.builder-column {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-  min-width: 0;
-}
-
-.builder-column h4 {
-  margin: 0 0 2px;
-  color: var(--text-2);
+.builder-time {
+  min-width: 108px;
   font-size: 9px;
-  font-weight: 600;
-  letter-spacing: 0.08em;
+  text-align: right;
+}
+
+.builder-pipe {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 5px;
+  color: var(--text-2);
+  font-family: var(--mono);
+  font-size: 9px;
+}
+
+.builder-pipe-step {
+  padding: 2px 5px;
+  border: 1px solid var(--line);
+  background: var(--bg-1);
+  white-space: nowrap;
+}
+
+.builder-pipe-arrow {
+  color: #4a4e56;
+}
+
+.builder-section-title {
+  margin: 10px 0 5px;
+  color: var(--text-2);
+  font-family: var(--mono);
+  font-size: 8px;
+  letter-spacing: 0.1em;
   text-transform: uppercase;
 }
 
-.builder-column .field-row {
-  grid-template-columns: 82px minmax(0, 1fr);
+.builder-section-title:first-child {
+  margin-top: 0;
 }
 
-.builder-save {
-  display: flex;
+.builder-module {
+  display: grid;
+  grid-template-columns: 26px minmax(0, 1fr) 8px;
+  align-items: center;
   gap: 6px;
-  padding: 8px 12px;
-  border-top: 1px solid var(--line);
+  width: 100%;
+  margin-bottom: 3px;
+  padding: 5px 6px;
+  border: 1px solid var(--line);
+  background: var(--bg-1);
+  color: var(--text-1);
+  text-align: left;
+  cursor: pointer;
 }
 
-.builder-save .input {
+.builder-module:hover {
+  border-color: var(--line-strong);
+  background: var(--bg-2);
+}
+
+.builder-module.active {
+  border-color: var(--accent-dim);
+  background: #211a13;
+}
+
+.module-tag {
+  padding: 1px 2px;
+  border: 1px solid var(--line);
+  color: var(--text-2);
+  font-family: var(--mono);
+  font-size: 8px;
+  text-align: center;
+}
+
+.builder-module.active .module-tag {
+  border-color: var(--accent-dim);
+  color: var(--accent);
+}
+
+.module-copy {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  min-width: 0;
+}
+
+.module-name {
+  overflow: hidden;
+  font-size: 10px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.module-sub {
+  overflow: hidden;
+  color: var(--text-2);
+  font-family: var(--mono);
+  font-size: 8px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.module-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--accent);
+}
+
+.module-dot.off {
+  background: #3a3e46;
+}
+
+.builder-add-filter {
+  width: 100%;
+  margin-top: 2px;
+}
+
+.builder-save-row {
+  display: flex;
+  gap: 4px;
+}
+
+.builder-save-row .input {
   flex: 1;
+  min-width: 0;
+}
+
+.builder-looks {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin-top: 4px;
+}
+
+.builder-look {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  width: 100%;
+  padding: 4px 5px;
+  border: 1px solid transparent;
+  background: transparent;
+  color: var(--text-1);
+  text-align: left;
+  cursor: pointer;
+}
+
+.builder-look:hover {
+  border-color: var(--line);
+  background: var(--bg-2);
+}
+
+.builder-look strong {
+  overflow: hidden;
+  font-size: 10px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.builder-look .muted {
+  font-size: 8px;
+}
+
+.builder-inspector-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 6px;
+  margin-bottom: 6px;
+  padding-bottom: 5px;
+  border-bottom: 1px solid var(--line);
+}
+
+.builder-inspector-head strong {
+  font-size: 10px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.builder-inspector-head .muted {
+  font-family: var(--mono);
+  font-size: 8px;
+  text-align: right;
+}
+
+.builder-inspector .field-row {
+  grid-template-columns: 78px minmax(0, 1fr);
+}
+
+.builder-inspector .param-row {
+  grid-template-columns: 78px minmax(0, 1fr) auto;
+}
+
+.builder-module-tools {
+  display: flex;
+  gap: 3px;
+  margin-bottom: 6px;
+}
+
+.builder-module-tools .button {
+  height: 20px;
+}
+
+.builder-note {
+  margin: 6px 0 0;
+  color: var(--text-2);
+  font-family: var(--mono);
+  font-size: 8px;
+  line-height: 1.45;
+}
+
+.builder-note.danger {
+  color: #c45a52;
+}
+
+.builder-actions {
+  flex: none;
 }
 
 /* ------------------------------------------------------------------ live */

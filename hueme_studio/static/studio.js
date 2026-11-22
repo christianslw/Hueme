@@ -4147,20 +4147,22 @@ function addParamKeyframe(clip, param, value) {
   });
 }
 
-function expressionContext(clip, value) {
-  const time = currentTime();
-  const env = envelopeAt(time);
+function expressionContext(clip, value, at = currentTime()) {
+  const env = envelopeAt(at);
   return {
     ...env,
-    t: time,
-    local_t: clamp(time - clip.start_s, 0, Math.max(0, clip.end_s - clip.start_s)),
+    t: at,
+    local_t: clamp(at - clip.start_s, 0, Math.max(0, clip.end_s - clip.start_s)),
     val: Number(value) || 0,
     beat: env.beatPos,
   };
 }
 
-function openExpressionDialog(clip, param, value, onSaved = null) {
-  const current = clip.expressions?.[param] || "";
+function openExpressionDialog(clip, param, value, onSaved = null, options = {}) {
+  const at = options.time ?? currentTime();
+  const contextClip = options.contextClip || clip;
+  const current = (options.expressions || clip.expressions || {})[param] || "";
+  const context = () => expressionContext(contextClip, value, at);
   const dialog = document.createElement("dialog");
   const form = document.createElement("form");
   form.method = "dialog";
@@ -4204,8 +4206,8 @@ function openExpressionDialog(clip, param, value, onSaved = null) {
       return true;
     }
     try {
-      const result = evalUiExpression(text, expressionContext(clip, value));
-      live.textContent = `val = ${Number(value).toFixed(3)} → ${Number(result).toFixed(4)} at ${currentTime().toFixed(2)}s`;
+      const result = evalUiExpression(text, context());
+      live.textContent = `val = ${Number(value).toFixed(3)} → ${Number(result).toFixed(4)} at ${at.toFixed(2)}s`;
       diagnostic.textContent = "";
       diagnostic.classList.remove("danger");
       return true;
@@ -4224,7 +4226,7 @@ function openExpressionDialog(clip, param, value, onSaved = null) {
       try {
         const check = await client.post("/api/expressions/validate", {
           expression: trimmed,
-          context: expressionContext(clip, value),
+          context: context(),
         });
         if (!check.ok) {
           diagnostic.textContent = check.error || "expression failed";
@@ -4237,11 +4239,15 @@ function openExpressionDialog(clip, param, value, onSaved = null) {
         return;
       }
     }
-    await commitClip(clip.id, trimmed ? `expression ${param}` : `clear expression ${param}`, (target) => {
-      target.expressions = { ...(target.expressions || {}) };
-      if (trimmed) target.expressions[param] = trimmed;
-      else delete target.expressions[param];
-    });
+    if (options.commit) {
+      await options.commit(trimmed);
+    } else {
+      await commitClip(clip.id, trimmed ? `expression ${param}` : `clear expression ${param}`, (target) => {
+        target.expressions = { ...(target.expressions || {}) };
+        if (trimmed) target.expressions[param] = trimmed;
+        else delete target.expressions[param];
+      });
+    }
     if (onSaved) onSaved();
     dialog.close("apply");
   };
@@ -6926,6 +6932,29 @@ async function deleteGroup(group) {
 }
 
 /* ----------------------------------------------------------------- builder */
+const MASK_DEFAULTS = {
+  kind: "none",
+  axis: "x",
+  position: 0.5,
+  width: 0.25,
+  center: [0.5, 0.5, 0.5],
+  radius: 0.3,
+  box_min: [0.0, 0.0, 0.0],
+  box_max: [1.0, 1.0, 1.0],
+  modulo: 2,
+  remainder: 0,
+  softness: 0.08,
+  invert: false,
+};
+
+const MASK_LABELS = {
+  none: "Keine",
+  plane_sweep: "Plane Sweep",
+  sphere_narrow: "Kugel",
+  box: "Box",
+  parity: "Parity",
+};
+
 function openEffectBuilder() {
   const doc = showDoc();
   if (!doc) {
@@ -6933,57 +6962,99 @@ function openEffectBuilder() {
     return;
   }
   const selected = findClip();
-  const presetId = selected?.clip.preset || "solid";
+  const target = selected?.clip || null;
+  const targetTrack = selected?.track || null;
+  const previewStart = Number(target?.start_s || 0);
+  const previewEnd = Number(target?.end_s || Math.max(2, Math.min(12, Number(doc.duration_s) || 8)));
+  const previewDuration = Math.max(0.5, previewEnd - previewStart);
+  const initialPreset = target?.preset || "gradient_3d";
   const recipe = {
-    preset: presetId,
-    params: deepClone(selected?.clip.params || defaultParams(presetId)),
-    spatial_mask: deepClone(selected?.clip.spatial_mask || { kind: "none", softness: 0.08, invert: false }),
-    filters: deepClone(selected?.clip.filters || []),
-    keyframes: deepClone(selected?.clip.keyframes || []),
-    expressions: deepClone(selected?.clip.expressions || {}),
-    opacity: selected?.clip.opacity ?? 1,
+    preset: initialPreset,
+    params: deepClone(target?.params || defaultParams(initialPreset)),
+    spatial_mask: deepClone({ ...MASK_DEFAULTS, ...(target?.spatial_mask || {}) }),
+    filters: deepClone(target?.filters || []),
+    keyframes: deepClone(target?.keyframes || []),
+    expressions: deepClone(target?.expressions || {}),
+    opacity: target?.opacity ?? 1,
   };
-  const targetId = selected?.clip.id || null;
-  const dialog = document.createElement("dialog");
-  dialog.className = "effect-builder";
-  let time = currentTime();
+  const startTime = target ? clamp(currentTime() - previewStart, 0, previewDuration) : 0.65;
+  let time = startTime > 0.2 ? startTime : Math.min(0.65, previewDuration);
   let playing = false;
   let timer = 0;
   let previewBusy = false;
+  let previewQueued = false;
   let previewUrl = "";
   let filterSeq = 0;
-  const preview = el("img", { class: "builder-preview", alt: "Effect Builder preview" });
+  let activeModule = "generator";
+
+  const contextClip = { start_s: previewStart, end_s: previewEnd };
+  const localTime = () => clamp(time, 0, previewDuration);
+  const previewTime = () => previewStart + localTime();
+  const pseudoClip = () => ({
+    id: "builder_preview",
+    start_s: previewStart,
+    end_s: previewEnd,
+    expressions: recipe.expressions,
+    keyframes: recipe.keyframes,
+  });
+
+  const dialog = document.createElement("dialog");
+  dialog.className = "effect-builder";
+  const preview = el("img", { class: "builder-preview", alt: "Effect Builder Vorschau" });
+  const previewNote = el("div", { class: "builder-note", text: "Vorschau 320×180 · clip-lokal" });
   const timeSlider = el("input", {
     class: "slider",
     type: "range",
     min: 0,
-    max: Math.max(0.1, duration()),
+    max: previewDuration,
     step: 0.01,
     value: time,
-    "aria-label": "Preview time",
+    "aria-label": "Vorschauzeit",
   });
-  const timeReadout = el("span", { class: "mono muted", text: `${time.toFixed(2)} s` });
-  const playButton = el("button", { class: "button small", type: "button", text: "Play" });
-  const body = el("div", { class: "dialog-body builder-body" });
+  const timeReadout = el("span", { class: "mono muted builder-time", text: "" });
+  const playButton = el("button", {
+    class: "button small icon-button",
+    type: "button",
+    title: "Play",
+    "aria-label": "Play",
+  });
+  const railBody = el("div", { class: "builder-rail-body" });
+  const inspectorBody = el("div", { class: "builder-inspector-body" });
+  const looksBody = el("div", { class: "builder-looks" });
+  const pipe = el("div", { class: "builder-pipe" });
+  const nameInput = el("input", {
+    class: "input",
+    type: "text",
+    value: `${presetName(recipe.preset)} Look`,
+    placeholder: "Name des Looks",
+    "aria-label": "Look-Name",
+  });
 
-  const currentTarget = () => (targetId ? findClip(targetId)?.clip || null : null);
-  const syncAutomation = () => {
-    const clip = currentTarget();
-    if (!clip) return;
-    recipe.params = deepClone(clip.params || recipe.params);
-    recipe.keyframes = deepClone(clip.keyframes || []);
-    recipe.expressions = deepClone(clip.expressions || {});
-    render();
-    refreshPreview();
-  };
-  const previewClip = () => ({
-    ...deepClone(recipe),
-    id: "builder_preview",
-    start_s: 0,
-    end_s: Math.max(1, duration()),
-  });
+  const maskObject = () => ({ ...MASK_DEFAULTS, ...(recipe.spatial_mask || {}) });
+  const currentTarget = () => (target ? findClip(target.id)?.clip || target : null);
+
+  function updateTimeReadout() {
+    timeReadout.textContent = `${formatTime(localTime())} / ${formatTime(previewDuration)}`;
+  }
+
+  function previewClip() {
+    return {
+      ...deepClone(recipe),
+      id: "builder_preview",
+      name: null,
+      start_s: previewStart,
+      end_s: previewEnd,
+      fade_in_s: 0,
+      fade_out_s: 0,
+      snap_zcl: false,
+    };
+  }
+
   async function refreshPreview() {
-    if (previewBusy) return;
+    if (previewBusy) {
+      previewQueued = true;
+      return;
+    }
     previewBusy = true;
     try {
       const response = await fetch("/api/preview/effect", {
@@ -6991,60 +7062,243 @@ function openEffectBuilder() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           clip: previewClip(),
-          t: Number(time.toFixed(3)),
-          timing: showDoc()?.timing,
+          t: Number(previewTime().toFixed(3)),
+          timing: doc.timing,
           width: 320,
           height: 180,
         }),
       });
-      if (response.ok) {
-        const url = URL.createObjectURL(await response.blob());
-        if (previewUrl) URL.revokeObjectURL(previewUrl);
-        previewUrl = url;
-        preview.src = url;
+      if (!response.ok) {
+        throw new Error((await response.text()) || `Preview HTTP ${response.status}`);
       }
-    } catch {
-      // The preview is an editor aid; a failed frame must not close the dialog.
+      const url = URL.createObjectURL(await response.blob());
+      if (previewUrl) URL.revokeObjectURL(previewUrl);
+      previewUrl = url;
+      preview.src = url;
+      previewNote.textContent = "Vorschau 320×180 · clip-lokal";
+      previewNote.classList.remove("danger");
+    } catch (error) {
+      previewNote.textContent = `Vorschau fehlgeschlagen: ${error.message || error}`;
+      previewNote.classList.add("danger");
     } finally {
       previewBusy = false;
+      if (previewQueued) {
+        previewQueued = false;
+        refreshPreview();
+      }
     }
   }
-  const setTime = (next) => {
-    time = clamp(Number(next) || 0, 0, Math.max(0, duration()));
+
+  function setTime(next) {
+    time = clamp(Number(next) || 0, 0, previewDuration);
     timeSlider.value = String(time);
-    timeReadout.textContent = `${time.toFixed(2)} s`;
+    updateTimeReadout();
     refreshPreview();
-  };
-  const stop = () => {
-    playing = false;
+  }
+
+  function setPlaying(next) {
+    playing = next;
+    playButton.replaceChildren(icon(playing ? "pause" : "play"));
+    playButton.title = playing ? "Pause" : "Play";
+    playButton.setAttribute("aria-label", playing ? "Pause" : "Play");
+  }
+
+  function stop() {
     if (timer) window.clearInterval(timer);
     timer = 0;
-    playButton.textContent = "Play";
-  };
-  const togglePlay = () => {
+    setPlaying(false);
+  }
+
+  function togglePlay() {
     if (playing) {
       stop();
       return;
     }
-    playing = true;
-    playButton.textContent = "Pause";
+    setPlaying(true);
     timer = window.setInterval(() => {
-      const next = time + 0.1;
-      setTime(next > duration() ? 0 : next);
+      const next = localTime() + 0.1;
+      setTime(next > previewDuration ? 0 : next);
     }, 120);
-  };
-  playButton.addEventListener("click", togglePlay);
-  timeSlider.addEventListener("input", () => setTime(timeSlider.value));
+  }
 
-  function builderParamControl(spec) {
-    const value = recipe.params?.[spec.key] ?? spec.default;
-    const update = (next) => {
-      recipe.params = { ...recipe.params, [spec.key]: next };
+  function keyframeValue(value) {
+    if (
+      Array.isArray(value) &&
+      [3, 4].includes(value.length) &&
+      value.every((part) => Number.isFinite(Number(part)))
+    ) {
+      return value.map(Number);
+    }
+    const numeric = Number(value);
+    return Number.isFinite(numeric) ? numeric : null;
+  }
+
+  function keyframesFor(param) {
+    return (recipe.keyframes || [])
+      .filter((keyframe) => keyframe.param === param)
+      .sort((a, b) => a.t_s - b.t_s);
+  }
+
+  function keyframeAt(param) {
+    const at = localTime();
+    return keyframesFor(param).find((keyframe) => Math.abs(keyframe.t_s - at) <= 0.08);
+  }
+
+  function toggleKeyframe(param, value) {
+    const at = localTime();
+    const existing = keyframeAt(param);
+    const next = (recipe.keyframes || []).filter(
+      (keyframe) => !(keyframe.param === param && Math.abs(keyframe.t_s - at) <= 1e-4)
+    );
+    if (!existing) {
+      const stored = keyframeValue(value);
+      if (stored === null) {
+        toast("Keyframes brauchen einen numerischen oder Farbwert.", "info");
+        return;
+      }
+      next.push({
+        t_s: Number(at.toFixed(4)),
+        param,
+        value: stored,
+        easing: "linear",
+      });
+    }
+    recipe.keyframes = next.sort((a, b) => a.t_s - b.t_s);
+    renderInspector();
+    refreshPreview();
+  }
+
+  function jumpKeyframe(param, direction) {
+    const frames = keyframesFor(param);
+    const at = localTime();
+    const targetFrame = direction < 0
+      ? [...frames].reverse().find((keyframe) => keyframe.t_s < at - 1e-3)
+      : frames.find((keyframe) => keyframe.t_s > at + 1e-3);
+    if (targetFrame) setTime(targetFrame.t_s);
+  }
+
+  function removeExpression(param) {
+    recipe.expressions = { ...(recipe.expressions || {}) };
+    delete recipe.expressions[param];
+    renderInspector();
+    refreshPreview();
+  }
+
+  function editExpression(param, value) {
+    openExpressionDialog(pseudoClip(), param, value, () => {
+      renderInspector();
       refreshPreview();
-    };
+    }, {
+      time: previewTime(),
+      contextClip,
+      expressions: recipe.expressions,
+      commit: async (text) => {
+        recipe.expressions = { ...(recipe.expressions || {}) };
+        if (text) recipe.expressions[param] = text;
+        else delete recipe.expressions[param];
+      },
+    });
+  }
+
+  function expressionRow(param, value) {
+    const text = recipe.expressions?.[param];
+    if (!text) return null;
+    let live = "–";
+    try {
+      const result = evalUiExpression(text, expressionContext(contextClip, value, previewTime()));
+      live = Number.isFinite(Number(result)) ? Number(result).toFixed(3) : String(result);
+    } catch {
+      live = "error";
+    }
+    return el(
+      "div",
+      { class: "expression-row" },
+      el(
+        "button",
+        {
+          class: "expression-chip mono",
+          type: "button",
+          title: `${text}\nKlick: bearbeiten`,
+          onclick: () => editExpression(param, value),
+        },
+        icon("function"),
+        el("span", { text })
+      ),
+      el("span", { class: "mono muted expression-value", text: `= ${live}` })
+    );
+  }
+
+  function builderParamRow(param, labelText, control, value, options = {}) {
+    const expression = Boolean(recipe.expressions?.[param]);
+    const keyed = Boolean(keyframeAt(param));
+    const frames = keyframesFor(param);
+    const at = localTime();
+    const previousKey = [...frames].reverse().find((keyframe) => keyframe.t_s < at - 1e-3);
+    const nextKey = frames.find((keyframe) => keyframe.t_s > at + 1e-3);
+    const actions = el(
+      "div",
+      { class: "param-actions" },
+      frames.length
+        ? el("button", {
+            class: "button small icon-button key-nav",
+            type: "button",
+            title: "Vorheriger Keyframe",
+            "aria-label": `Previous keyframe ${param}`,
+            disabled: !previousKey,
+            onclick: () => jumpKeyframe(param, -1),
+          }, icon("chevronLeft"))
+        : null,
+      frames.length
+        ? el("button", {
+            class: "button small icon-button key-nav",
+            type: "button",
+            title: "Nächster Keyframe",
+            "aria-label": `Next keyframe ${param}`,
+            disabled: !nextKey,
+            onclick: () => jumpKeyframe(param, 1),
+          }, icon("chevronRight"))
+        : null,
+      el("button", {
+        class: `button small${keyed ? " keyed" : ""}`,
+        type: "button",
+        title: keyed ? `Keyframe ${param} entfernen` : `Keyframe ${param} setzen`,
+        "aria-label": keyed ? `Remove keyframe ${param}` : `Keyframe ${param}`,
+        "aria-pressed": String(keyed),
+        onclick: () => toggleKeyframe(param, value),
+      }, icon("keyframe")),
+      options.noExpression
+        ? null
+        : el("button", {
+            class: `button small${expression ? " active" : ""}`,
+            type: "button",
+            title: expression ? `Ausdruck für ${param} (Alt+Klick entfernt ihn)` : `Ausdruck für ${param}`,
+            "aria-label": `Expression ${param}`,
+            onclick: (event) => {
+              if (event.altKey && expression) {
+                event.preventDefault();
+                removeExpression(param);
+                return;
+              }
+              editExpression(param, value);
+            },
+          }, icon("function"))
+    );
+    return el(
+      "div",
+      { class: "param-row" },
+      el("label", {
+        text: labelText,
+        title: `${labelText} — ◇ Keyframe · ƒ Ausdruck`,
+      }),
+      control,
+      actions
+    );
+  }
+
+  function paramControl(spec, value, update) {
     if (spec.type === "color") return colorField(value, update);
     if (spec.type === "palette") {
-      return selectInput(String(value), (state?.palettes || []).map((item) => [item.id, item.name]), update);
+      return selectInput(String(value), (state.palettes || []).map((item) => [item.id, item.name]), update);
     }
     if (spec.type === "vec3") {
       return vec3Field(spec.label, value, update, { step: spec.step ?? 0.01 }).querySelector(".triple");
@@ -7058,6 +7312,9 @@ function openEffectBuilder() {
     if (spec.type === "select") {
       return selectInput(String(value), spec.options || [], update);
     }
+    if (spec.type === "number") {
+      return numberInput(value, update, { step: spec.step ?? 0.01, min: spec.min, max: spec.max });
+    }
     return rangeControl(value, update, {
       min: spec.min ?? 0,
       max: spec.max ?? 1,
@@ -7065,202 +7322,415 @@ function openEffectBuilder() {
     });
   }
 
-  function renderPresetSection() {
+  function inspectorHead(title, subtitle) {
+    return el(
+      "div",
+      { class: "builder-inspector-head" },
+      el("strong", { text: title }),
+      el("span", { class: "muted", text: subtitle })
+    );
+  }
+
+  function renderGenerator() {
     const preset = presetById(recipe.preset);
     const rows = [
-      fieldRow("Preset", selectInput(recipe.preset, (state.presets || []).map((item) => [item.id, item.name]), (next) => {
-        recipe.preset = next;
-        recipe.params = defaultParams(next);
-        render();
-        refreshPreview();
-      })),
-      toggleRow("Enabled", recipe.opacity > 0.001, (enabled) => {
+      fieldRow("Preset", selectInput(recipe.preset, (state.presets || []).map((item) => [
+        item.id,
+        `${item.category || "Preset"}: ${item.name}`,
+      ]), changePreset)),
+      toggleRow("Aktiv", recipe.opacity > 0.001, (enabled) => {
         recipe.opacity = enabled ? 1 : 0;
+        renderRail();
         refreshPreview();
       }),
     ];
-    const target = currentTarget();
     for (const spec of preset?.params || []) {
-      const control = builderParamControl(spec);
-      if (target && ["range", "number", "color"].includes(spec.type)) {
-        rows.push(paramRow(target, spec.key, spec.label, control, recipe.params?.[spec.key] ?? spec.default));
+      const value = recipe.params?.[spec.key] ?? spec.default;
+      const control = paramControl(spec, value, (next) => {
+        recipe.params = { ...recipe.params, [spec.key]: next };
+        refreshPreview();
+      });
+      if (["range", "number", "color"].includes(spec.type)) {
+        rows.push(builderParamRow(spec.key, spec.label, control, value, {
+          noExpression: spec.type === "color",
+        }));
+        if (spec.type !== "color") {
+          const expression = expressionRow(spec.key, value);
+          if (expression) rows.push(expression);
+        }
       } else {
         rows.push(fieldRow(spec.label, control));
       }
     }
-    return el("div", { class: "builder-column" }, el("h4", { text: "Preset / Parameter" }), ...rows);
+    return el(
+      "div",
+      { class: "builder-inspector-content" },
+      inspectorHead("Generator", presetName(recipe.preset)),
+      ...rows,
+      el("p", { class: "builder-note", text: "Farbe und Zahl lassen sich hier keyframen; der Verlauf bleibt am Preset." })
+    );
   }
 
-  function addFilter(filterId) {
-    filterSeq += 1;
-    recipe.filters.push({
-      type: filterId,
-      enabled: true,
-      params: {},
-      uid: `builder_${filterSeq}_${filterId}`,
-    });
-    render();
+  function renderMask() {
+    const mask = maskObject();
+    const set = (patch, rerender = false) => {
+      recipe.spatial_mask = { ...mask, ...patch };
+      refreshPreview();
+      if (rerender) {
+        renderRail();
+        renderInspector();
+        renderPipeline();
+      }
+    };
+    const rows = [
+      fieldRow("Form", selectInput(mask.kind, [
+        ["none", "Keine"],
+        ["plane_sweep", "Plane Sweep"],
+        ["sphere_narrow", "Kugel"],
+        ["box", "Box"],
+        ["parity", "Parity"],
+      ], (kind) => set({ kind }, true))),
+    ];
+    if (mask.kind === "plane_sweep") {
+      rows.push(fieldRow("Achse", selectInput(mask.axis, [["x", "X"], ["y", "Y"], ["z", "Z"]], (axis) => set({ axis }))));
+      rows.push(fieldRow("Position", rangeControl(mask.position, (value) => set({ position: value }), { min: 0, max: 1, step: 0.01 })));
+      rows.push(fieldRow("Breite", rangeControl(mask.width, (value) => set({ width: value }), { min: 0.01, max: 1, step: 0.01 })));
+    } else if (mask.kind === "sphere_narrow") {
+      rows.push(vec3Field("Zentrum", mask.center, (value) => set({ center: value }), { step: 0.01 }));
+      rows.push(fieldRow("Radius", rangeControl(mask.radius, (value) => set({ radius: value }), { min: 0.01, max: 3, step: 0.01 })));
+    } else if (mask.kind === "box") {
+      rows.push(vec3Field("Min", mask.box_min, (value) => set({ box_min: value }), { step: 0.01 }));
+      rows.push(vec3Field("Max", mask.box_max, (value) => set({ box_max: value }), { step: 0.01 }));
+    } else if (mask.kind === "parity") {
+      rows.push(fieldRow("Modulo", numberInput(mask.modulo, (value) => set({ modulo: Math.round(value) }), { step: 1, min: 2, max: 64 }), { scrub: true }));
+      rows.push(fieldRow("Rest", numberInput(mask.remainder, (value) => set({ remainder: Math.round(value) }), { step: 1, min: 0, max: 63 }), { scrub: true }));
+    }
+    if (mask.kind !== "none") {
+      rows.push(fieldRow("Weich", rangeControl(mask.softness, (value) => set({ softness: value }), { min: 0, max: 1, step: 0.01 })));
+      rows.push(toggleRow("Invertieren", mask.invert, (value) => set({ invert: value })));
+    }
+    return el(
+      "div",
+      { class: "builder-inspector-content" },
+      inspectorHead("Maske", MASK_LABELS[mask.kind] || mask.kind),
+      ...rows,
+      el("p", { class: "builder-note", text: "Die Maske begrenzt den Generator räumlich; sie wird mit dem Look auf den Clip geschrieben." })
+    );
+  }
+
+  function filterIndexForUid(uid) {
+    return recipe.filters.findIndex((filter) => filter.uid === uid);
+  }
+
+  function filterAutomation(uid) {
+    const prefix = `filter:${uid}:`;
+    recipe.keyframes = (recipe.keyframes || []).filter((keyframe) => !keyframe.param.startsWith(prefix));
+    recipe.expressions = Object.fromEntries(
+      Object.entries(recipe.expressions || {}).filter(([param]) => !param.startsWith(prefix))
+    );
+  }
+
+  function removeFilter(uid) {
+    const index = filterIndexForUid(uid);
+    if (index < 0) return;
+    recipe.filters.splice(index, 1);
+    filterAutomation(uid);
+    if (activeModule === `filter:${uid}`) activeModule = "generator";
+    renderRail();
+    renderInspector();
+    renderPipeline();
     refreshPreview();
   }
 
-  function filterCard(filter, index) {
-    const info = state.filters?.find((item) => item.id === filter.type);
+  function moveFilter(uid, direction) {
+    const index = filterIndexForUid(uid);
+    const nextIndex = index + direction;
+    if (index < 0 || nextIndex < 0 || nextIndex >= recipe.filters.length) return;
+    const [filter] = recipe.filters.splice(index, 1);
+    recipe.filters.splice(nextIndex, 0, filter);
+    renderRail();
+    renderInspector();
+    renderPipeline();
+    refreshPreview();
+  }
+
+  function renderFilter(uid) {
+    const index = filterIndexForUid(uid);
+    if (index < 0) return renderGenerator();
+    const filter = recipe.filters[index];
+    const info = (state.filters || []).find((item) => item.id === filter.type);
     const rows = [];
     for (const spec of info?.params || []) {
+      const param = `filter:${filter.uid}:${spec.key}`;
       const value = filter.params?.[spec.key] ?? spec.default;
       const update = (next) => {
         filter.params = { ...(filter.params || {}), [spec.key]: next };
         refreshPreview();
       };
-      if (spec.type === "color") rows.push(fieldRow(spec.label, colorField(value, update)));
-      else if (spec.type === "bool") rows.push(toggleRow(spec.label, Boolean(value), update));
-      else if (spec.type === "select") rows.push(fieldRow(spec.label, selectInput(String(value), spec.options || [], update)));
-      else {
-        rows.push(fieldRow(spec.label, rangeControl(value, update, {
+      if (spec.type === "color") {
+        rows.push(builderParamRow(param, spec.label, colorField(value, update), value, {
+          noExpression: true,
+        }));
+      } else if (spec.type === "vec3") {
+        rows.push(fieldRow(spec.label, vec3Field(spec.label, value, update, { step: spec.step ?? 0.01 }).querySelector(".triple")));
+      } else if (spec.type === "bool") {
+        rows.push(toggleRow(spec.label, Boolean(value), update));
+      } else if (spec.type === "select") {
+        rows.push(fieldRow(spec.label, selectInput(String(value), spec.options || [], update)));
+      } else {
+        rows.push(builderParamRow(param, spec.label, rangeControl(value, update, {
           min: spec.min ?? 0,
           max: spec.max ?? 1,
           step: spec.step ?? 0.01,
-        })));
+        }), value));
+        const expression = expressionRow(param, value);
+        if (expression) rows.push(expression);
       }
     }
     return el(
       "div",
-      { class: `filter-card${filter.enabled ? " enabled" : ""}` },
+      { class: "builder-inspector-content" },
+      inspectorHead(info?.name || filter.type, `Filter ${index + 1}`),
       el(
         "div",
-        { class: "filter-card-head" },
+        { class: "builder-module-tools" },
         el("button", {
-          class: "button small icon-button", type: "button",
-          title: filter.enabled ? "Filter ausschalten" : "Filter einschalten",
-          "aria-label": "Toggle filter",
-          onclick: () => { filter.enabled = !filter.enabled; render(); refreshPreview(); },
-        }, icon(filter.enabled ? "eye" : "eyeOff")),
-        el("span", { class: "filter-card-title" }, el("strong", { text: info?.name || filter.type })),
-        el("button", {
-          class: "button small icon-button", type: "button", title: "Nach oben",
-          "aria-label": "Move filter up", disabled: index === 0,
+          class: "button small",
+          type: "button",
+          text: filter.enabled ? "Aktiv" : "Aus",
           onclick: () => {
-            const [item] = recipe.filters.splice(index, 1);
-            recipe.filters.splice(index - 1, 0, item);
-            render(); refreshPreview();
+            filter.enabled = !filter.enabled;
+            renderRail();
+            renderInspector();
+            refreshPreview();
           },
-        }, (() => { const node = icon("chevron"); node.style.transform = "rotate(-90deg)"; return node; })()),
+        }),
         el("button", {
-          class: "button small icon-button", type: "button", title: "Nach unten",
-          "aria-label": "Move filter down", disabled: index === recipe.filters.length - 1,
-          onclick: () => {
-            const [item] = recipe.filters.splice(index, 1);
-            recipe.filters.splice(index + 1, 0, item);
-            render(); refreshPreview();
-          },
-        }, (() => { const node = icon("chevron"); node.style.transform = "rotate(90deg)"; return node; })()),
+          class: "button small icon-button",
+          type: "button",
+          title: "Nach oben",
+          "aria-label": "Filter nach oben",
+          disabled: index === 0,
+          onclick: () => moveFilter(uid, -1),
+        }, icon("chevronLeft")),
         el("button", {
-          class: "button small icon-button danger", type: "button", title: "Filter entfernen",
-          "aria-label": "Remove filter",
-          onclick: () => { recipe.filters.splice(index, 1); render(); refreshPreview(); },
+          class: "button small icon-button",
+          type: "button",
+          title: "Nach unten",
+          "aria-label": "Filter nach unten",
+          disabled: index === recipe.filters.length - 1,
+          onclick: () => moveFilter(uid, 1),
+        }, icon("chevronRight")),
+        el("button", {
+          class: "button small icon-button danger",
+          type: "button",
+          title: "Filter entfernen",
+          "aria-label": "Filter entfernen",
+          onclick: () => removeFilter(uid),
         }, icon("delete"))
       ),
-      el("div", { class: "filter-card-body" }, ...rows)
+      ...rows,
+      el("p", { class: "builder-note", text: "Parameter-Automation wird beim Anwenden und Einsetzen mitgeschrieben." })
     );
   }
 
-  function renderRecipeSections() {
-    const preset = el(
-      "div",
-      { class: "builder-column" },
-      renderPresetSection()
-    );
-    const stack = el(
-      "div",
-      { class: "builder-column" },
-      el("h4", { text: "Recipe" }),
-      fieldRow("Maske", selectInput(recipe.spatial_mask.kind || "none", [
-        ["none", "None"], ["plane_sweep", "Plane Sweep"], ["sphere_narrow", "Sphere"],
-        ["box", "Box"], ["parity", "Parity"],
-      ], (kind) => {
-        recipe.spatial_mask = { ...recipe.spatial_mask, kind };
-        render();
-        refreshPreview();
-      })),
-      fieldRow("Softness", rangeControl(recipe.spatial_mask.softness ?? 0.08, (next) => {
-        recipe.spatial_mask = { ...recipe.spatial_mask, softness: next };
-        refreshPreview();
-      }, { min: 0, max: 1, step: 0.01 })),
-      toggleRow("Invert", Boolean(recipe.spatial_mask.invert), (next) => {
-        recipe.spatial_mask = { ...recipe.spatial_mask, invert: next };
-        refreshPreview();
-      }),
-      fieldRow("Filter hinzufügen", selectInput("", [
-        ["", "—"],
-        ...Object.values(state.filters || {}).map((info) => [info.id, info.name]),
-      ], (filterId) => { if (filterId) addFilter(filterId); })),
-      recipe.filters.length
-        ? el("div", { class: "filter-stack" }, ...recipe.filters.map(filterCard))
-        : el("p", { class: "empty-state", text: "Noch keine Filter im Rezept." })
-    );
-    return el("div", { class: "builder-columns" }, preset, stack);
+  function renderInspector() {
+    if (activeModule === "mask") {
+      inspectorBody.replaceChildren(renderMask());
+    } else if (activeModule.startsWith("filter:")) {
+      inspectorBody.replaceChildren(renderFilter(activeModule.slice("filter:".length)));
+    } else {
+      inspectorBody.replaceChildren(renderGenerator());
+    }
+    inspectorBody.scrollTop = 0;
   }
 
-  function render() {
-    body.replaceChildren(
-      el("div", { class: "builder-transport" },
-        playButton,
-        el("button", { class: "button small", type: "button", text: "Start", onclick: () => { stop(); setTime(0); } }),
-        timeSlider,
-        timeReadout
+  function selectModule(next) {
+    activeModule = next;
+    renderRail();
+    renderInspector();
+  }
+
+  function moduleButton(tag, name, subtitle, active, enabled, onclick) {
+    return el(
+      "button",
+      {
+        class: `builder-module${active ? " active" : ""}`,
+        type: "button",
+        "aria-pressed": String(active),
+        onclick,
+      },
+      el("span", { class: "module-tag", text: tag }),
+      el("span", { class: "module-copy" },
+        el("span", { class: "module-name", text: name }),
+        el("span", { class: "module-sub", text: subtitle })
       ),
-      preview,
-      renderRecipeSections()
+      el("span", { class: `module-dot${enabled ? "" : " off"}` })
     );
   }
 
-  const nameInput = el("input", {
-    class: "input",
-    type: "text",
-    value: `${presetName(recipe.preset)} Look`,
-    placeholder: "Name des Looks",
-  });
-  const save = async () => {
+  function renderLooks() {
+    const looks = state.user_presets || [];
+    if (!looks.length) {
+      looksBody.replaceChildren(el("p", { class: "builder-note", text: "Noch keine gespeicherten Looks." }));
+      return;
+    }
+    looksBody.replaceChildren(...looks.map((look) => el(
+      "button",
+      {
+        class: "builder-look",
+        type: "button",
+        title: `Look laden: ${look.name}`,
+        onclick: () => loadLook(look),
+      },
+      el("strong", { text: look.name }),
+      el("span", { class: "mono muted", text: presetName(look.preset) })
+    )));
+  }
+
+  function renderRail() {
+    const mask = maskObject();
+    railBody.replaceChildren(
+      el("div", { class: "builder-section-title", text: "Pipeline" }),
+      moduleButton("G", presetName(recipe.preset), "Generator", activeModule === "generator", recipe.opacity > 0.001, () => selectModule("generator")),
+      moduleButton("M", "Maske", MASK_LABELS[mask.kind] || mask.kind, activeModule === "mask", mask.kind !== "none", () => selectModule("mask")),
+      ...recipe.filters.map((filter, index) => moduleButton(
+        `FX${index + 1}`,
+        (state.filters || []).find((item) => item.id === filter.type)?.name || filter.type,
+        filter.enabled ? "Filter · an" : "Filter · aus",
+        activeModule === `filter:${filter.uid}`,
+        filter.enabled,
+        () => selectModule(`filter:${filter.uid}`)
+      )),
+      el(
+        "select",
+        {
+          class: "select builder-add-filter",
+          "aria-label": "Filter hinzufügen",
+          onchange: (event) => {
+            const filterId = event.target.value;
+            event.target.value = "";
+            if (filterId) addFilter(filterId);
+          },
+        },
+        el("option", { value: "", text: "Filter hinzufügen…" }),
+        ...(state.filters || []).map((info) => el("option", { value: info.id, text: info.name }))
+      ),
+      el("div", { class: "builder-section-title", text: "Looks" }),
+      el("div", { class: "builder-save-row" },
+        nameInput,
+        el("button", { class: "button small", type: "button", text: "Save Look", onclick: saveLook })
+      ),
+      looksBody
+    );
+    renderLooks();
+  }
+
+  function addFilter(filterId) {
+    let uid = "";
+    do {
+      filterSeq += 1;
+      uid = `builder_${filterSeq}_${filterId}`;
+    } while (recipe.filters.some((filter) => filter.uid === uid));
+    recipe.filters.push({ type: filterId, enabled: true, params: {}, uid });
+    activeModule = `filter:${uid}`;
+    renderRail();
+    renderInspector();
+    renderPipeline();
+    refreshPreview();
+  }
+
+  function renderPipeline() {
+    const mask = maskObject();
+    pipe.replaceChildren(
+      el("span", { class: "builder-pipe-step", text: `Generator · ${presetName(recipe.preset)}` }),
+      el("span", { class: "builder-pipe-arrow", text: "→" }),
+      el("span", { class: "builder-pipe-step", text: `Maske · ${MASK_LABELS[mask.kind] || mask.kind}` }),
+      el("span", { class: "builder-pipe-arrow", text: "→" }),
+      el("span", { class: "builder-pipe-step", text: `${recipe.filters.length} Filter` })
+    );
+  }
+
+  function changePreset(next) {
+    const hadAutomation = (recipe.keyframes || []).length || Object.keys(recipe.expressions || {}).length;
+    recipe.preset = next;
+    recipe.params = defaultParams(next);
+    recipe.keyframes = [];
+    recipe.expressions = {};
+    nameInput.value = `${presetName(next)} Look`;
+    activeModule = "generator";
+    renderRail();
+    renderInspector();
+    renderPipeline();
+    refreshPreview();
+    if (hadAutomation) toast("Preset gewechselt — Automation zurückgesetzt.", "info", 2200);
+  }
+
+  function loadLook(look) {
+    recipe.preset = look.preset;
+    recipe.params = deepClone(look.params || defaultParams(look.preset));
+    recipe.spatial_mask = deepClone({ ...MASK_DEFAULTS, ...(look.spatial_mask || {}) });
+    recipe.filters = deepClone(look.filters || []);
+    recipe.keyframes = [];
+    recipe.expressions = {};
+    recipe.opacity = 1;
+    nameInput.value = look.name;
+    activeModule = "generator";
+    renderRail();
+    renderInspector();
+    renderPipeline();
+    refreshPreview();
+    toast(`Look geladen: ${look.name}`, "info", 1600);
+  }
+
+  async function saveLook() {
+    const name = nameInput.value.trim() || `${presetName(recipe.preset)} Look`;
     try {
       const saved = await client.post("/api/user-presets", {
-        name: nameInput.value.trim() || `${presetName(recipe.preset)} Look`,
+        name,
         preset: recipe.preset,
         params: recipe.params,
-        spatial_mask: recipe.spatial_mask,
+        spatial_mask: maskObject(),
         filters: recipe.filters,
       });
       state.user_presets = [...(state.user_presets || []), saved];
+      nameInput.value = saved.name;
+      renderLooks();
       toast(`Look gespeichert: ${saved.name}`, "success");
     } catch (error) {
       toast(error.message, "danger");
     }
-  };
-  const apply = async () => {
+  }
+
+  async function apply() {
     const clip = currentTarget();
     if (!clip) {
-      toast("Kein Clip ausgewählt. Look speichern oder als neuen Clip einsetzen.", "info");
+      toast("Kein Ziel-Clip. Look speichern oder als neuen Clip einsetzen.", "info");
       return;
     }
-    await commitClip(clip.id, "apply effect builder look", (target) => {
-      target.preset = recipe.preset;
-      target.params = deepClone(recipe.params);
-      target.spatial_mask = deepClone(recipe.spatial_mask);
-      target.filters = deepClone(recipe.filters);
-      target.keyframes = deepClone(recipe.keyframes);
-      target.expressions = deepClone(recipe.expressions);
+    await commitClip(clip.id, "apply effect builder look", (targetClip) => {
+      targetClip.preset = recipe.preset;
+      targetClip.params = deepClone(recipe.params);
+      targetClip.spatial_mask = deepClone(maskObject());
+      targetClip.filters = deepClone(recipe.filters);
+      targetClip.keyframes = deepClone(recipe.keyframes);
+      targetClip.expressions = deepClone(recipe.expressions);
+      targetClip.opacity = recipe.opacity;
     });
     stop();
     dialog.close("apply");
-  };
-  const insert = async () => {
+  }
+
+  async function insert() {
     const docNow = showDoc();
-    const track = findTrack() || docNow?.tracks?.[0];
+    const track = targetTrack || findTrack() || docNow?.tracks?.[0];
     if (!docNow || !track) {
       toast("Erst eine Spur anlegen.", "info");
       return;
     }
     const start = clamp(snapTime(currentTime()), 0, Math.max(0, docNow.duration_s - 0.25));
-    const length = Math.min(Math.max(gridSeconds() * 4, 0.5), docNow.duration_s - start);
+    const wanted = target ? Math.max(0.5, previewDuration) : Math.max(gridSeconds() * 4, 2);
+    const length = Math.min(wanted, docNow.duration_s - start);
     if (length <= 0.05) {
       toast("Kein Platz am Playhead.", "info");
       return;
@@ -7268,19 +7738,21 @@ function openEffectBuilder() {
     const ids = new Set(docNow.tracks.flatMap((item) => item.clips.map((clip) => clip.id)));
     const id = uniqueId("clip", ids);
     await commitShow("insert builder look", (current) => {
-      const targetTrack = current.tracks.find((item) => item.id === track.id);
-      if (!targetTrack) return;
-      targetTrack.clips.push({
+      const targetTrackCurrent = current.tracks.find((item) => item.id === track.id);
+      if (!targetTrackCurrent) return;
+      targetTrackCurrent.clips.push({
         id,
         name: null,
         start_s: start,
         end_s: start + length,
+        fade_in_s: 0,
+        fade_out_s: 0,
         preset: recipe.preset,
         opacity: recipe.opacity,
         params: deepClone(recipe.params),
         keyframes: deepClone(recipe.keyframes),
         expressions: deepClone(recipe.expressions),
-        spatial_mask: deepClone(recipe.spatial_mask),
+        spatial_mask: deepClone(maskObject()),
         filters: deepClone(recipe.filters),
         snap_zcl: false,
       });
@@ -7293,22 +7765,79 @@ function openEffectBuilder() {
     requestDraw();
     stop();
     dialog.close("insert");
-  };
+  }
 
   const form = document.createElement("form");
   form.method = "dialog";
   form.append(
-    el("div", { class: "dialog-head", text: "Effekt-Baukasten" }),
-    body,
-    el("div", { class: "builder-save" }, nameInput,
-      el("button", { class: "button small", type: "button", text: "Save Look", onclick: save })
+    el(
+      "div",
+      { class: "builder-head" },
+      el(
+        "div",
+        { class: "builder-title" },
+        el("strong", { text: "Effect Builder" }),
+        el("span", {
+          class: "builder-target",
+          text: target ? `${clipDisplayName(target)} · ${targetTrack?.name || ""}` : "Entwurf · kein Ziel-Clip",
+        })
+      ),
+      el(
+        "div",
+        { class: "builder-head-actions" },
+        el("button", {
+          class: "button small icon-button",
+          type: "button",
+          title: "Schließen",
+          "aria-label": "Schließen",
+          onclick: () => dialog.close("cancel"),
+        }, icon("close"))
+      )
     ),
-    el("div", { class: "dialog-actions" },
+    el(
+      "div",
+      { class: "builder-shell" },
+      el("aside", { class: "builder-rail" }, railBody),
+      el(
+        "div",
+        { class: "builder-stage" },
+        el("div", { class: "builder-preview-wrap" }, preview),
+        previewNote,
+        el(
+          "div",
+          { class: "builder-transport" },
+          playButton,
+          el("button", {
+            class: "button small icon-button",
+            type: "button",
+            title: "An den Anfang",
+            "aria-label": "An den Anfang",
+            onclick: () => { stop(); setTime(0); },
+          }, icon("start")),
+          timeSlider,
+          timeReadout
+        ),
+        pipe
+      ),
+      el("aside", { class: "builder-inspector" }, inspectorBody)
+    ),
+    el(
+      "div",
+      { class: "dialog-actions builder-actions" },
       el("button", { class: "button", type: "button", text: "Schließen", onclick: () => dialog.close("cancel") }),
       el("button", { class: "button", type: "button", text: "Als Clip einsetzen", onclick: insert }),
-      el("button", { class: "button primary", type: "button", text: "Auf Clip anwenden", onclick: apply })
+      el("button", {
+        class: "button primary",
+        type: "button",
+        text: "Auf Clip anwenden",
+        disabled: !target,
+        title: target ? "Look auf den Ziel-Clip schreiben" : "Kein Clip ausgewählt",
+        onclick: apply,
+      })
     )
   );
+  playButton.addEventListener("click", togglePlay);
+  timeSlider.addEventListener("input", () => setTime(timeSlider.value));
   dialog.append(form);
   dialog.addEventListener("close", () => {
     stop();
@@ -7316,7 +7845,11 @@ function openEffectBuilder() {
     dialog.remove();
   });
   document.body.append(dialog);
-  render();
+  setPlaying(false);
+  updateTimeReadout();
+  renderRail();
+  renderInspector();
+  renderPipeline();
   dialog.showModal();
   refreshPreview();
 }

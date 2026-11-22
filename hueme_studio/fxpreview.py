@@ -23,8 +23,8 @@ from hueme_studio.showdoc import Clip, FilterSpec, ShowDoc, Timing
 
 log = logging.getLogger("hueme_studio.fxpreview")
 
-MAX_WIDTH = 192
-MAX_HEIGHT = 108
+MAX_WIDTH = 320
+MAX_HEIGHT = 180
 
 
 def _preview_show(timing: Timing, t: float) -> ShowDoc:
@@ -63,6 +63,21 @@ def _front_grid(
     )
 
 
+def _grid_mirror_sources(width: int, height: int) -> dict[int, np.ndarray]:
+    """Exact mirror mapping for the regular front grid.
+
+    The preview grid is uniform, so the nearest voxel for a mirrored point is the
+    mirrored array index.  This turns mirror_symmetry from O(n^2) into O(n) for
+    every editor preview (the compositor keeps its own rig mapping).
+    """
+    index = np.arange(width * height, dtype=np.int64).reshape(height, width)
+    return {
+        0: index[:, ::-1].ravel().copy(),
+        1: np.arange(width * height, dtype=np.int64),
+        2: index[::-1, :].ravel().copy(),
+    }
+
+
 def _apply_filters(
     rgb: np.ndarray,
     specs: Sequence[FilterSpec],
@@ -77,6 +92,7 @@ def _apply_filters(
     timing: Timing,
     beat: dict[str, Any],
     env: dict[str, float],
+    mirror_sources: dict[int, np.ndarray] | None = None,
 ) -> np.ndarray:
     out = np.asarray(rgb, dtype=np.float32)
     n = int(positions.shape[0])
@@ -103,6 +119,7 @@ def _apply_filters(
             target_indices=indices,
             target_rank=indices,
             fps=30.0,
+            mirror_sources=mirror_sources or {},
         )
         try:
             out = np.asarray(info.apply(out, context, params), dtype=np.float32)
@@ -123,9 +140,11 @@ def _render(
     height: int,
     room_size: Sequence[float],
     env_values: dict[str, float] | None = None,
+    local_t: float | None = None,
 ) -> np.ndarray:
     width = max(16, min(MAX_WIDTH, int(width)))
     height = max(9, min(MAX_HEIGHT, int(height)))
+    local = float(t if local_t is None else local_t)
     preset = get_preset(preset_id)
     positions, normalized, scene_min, size = _front_grid(width, height, room_size)
     n = int(positions.shape[0])
@@ -139,7 +158,7 @@ def _render(
         scene_max=size,
         room_size=size,
         t=float(t),
-        local_t=float(t),
+        local_t=local,
         beat=beat,
         env={key: max(0.0, min(1.0, float(value))) for key, value in env.items()},
         params=dict(params or {}),
@@ -165,10 +184,11 @@ def _render(
         scene_max=size,
         room_size=size,
         t=t,
-        local_t=t,
         timing=timing,
         beat=beat,
         env=env,
+        mirror_sources=_grid_mirror_sources(width, height),
+        local_t=local,
     )
     rgb = np.clip(rgb * max(0.0, min(1.0, float(opacity))), 0.0, 255.0)
     image = rgb.reshape(height, width, 3)[::-1]
@@ -232,6 +252,7 @@ def render_clip_rgb(
         clip.effective_filters(local_t, context),
         opacity,
         t=t,
+        local_t=local_t,
         timing=timing,
         width=width,
         height=height,

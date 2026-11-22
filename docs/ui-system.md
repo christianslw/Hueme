@@ -175,6 +175,22 @@ Track identity colours (only for the top edge + clip tint, never large fills):
 - Library thumbnails use the same fixture-free renderer, so presets are judged
   by their particles, gradients and colours rather than by the rig projection.
 
+## Effect Builder
+
+- A modal `<dialog>` (1180×840 max) with three panes: **Pipeline** rail, preview
+  stage, **module inspector**. The rail owns module selection, add-filter and
+  saved looks; the inspector shows only the selected module's parameters.
+- Pipeline order matches the engine: Generator → Mask → filter chain. Filters
+  can be reordered, enabled and removed; the mask is a module, not a form dump.
+- Preview is a 320×180 PNG rendered from the same unfixtured front grid as the
+  FX viewport. The transport is clip-local (`0..clip duration`) but the render
+  uses the clip's show time, so sections, drops and envelopes match playback.
+- `◇`/`ƒ` write into the builder recipe, not the live show. Automation travels
+  with **Apply** and **Insert**; **Save Look** stores the visual recipe only.
+  The look list comes from `config/user-presets.json` and loads in one click.
+- No target clip means Apply is disabled; Insert still creates an editable clip.
+  Closing or Esc never writes to the show.
+
 ## Interaction rules
 
 - Single click selects; shift-click adds to selection; drag on empty canvas

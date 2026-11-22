@@ -4,7 +4,7 @@ This file is the durable handoff. A new session should read this first, then
 `docs/TODO.md`, then continue at the first unchecked item. Do **not** re-do
 completed work.
 
-Last updated: 2026-11-22 (P2 slice 2: view cube, structure band, colour keys, auto-show)
+Last updated: 2026-11-22 (P3 slice 1: Effect Builder module rack + preview performance)
 
 ## Ground rules
 
@@ -384,6 +384,38 @@ systems) is intentionally separate.
   seeking, colour keyframe commits with a gradient lane, Auto Show creation
   (7 sections → 7 clips) on `/studio`, and `/live` with no console errors.
 
+### P3 slice 1 — Effect Builder module rack — COMPLETE
+
+- [x] Replaced the old two-column form dialog with a 1180×840 module rack:
+  pipeline rail (Generator, Maske, filter modules, add-filter, saved looks),
+  large preview, clip-local transport and a contextual inspector. Selecting a
+  module shows only its parameters instead of dumping every form at once.
+- [x] The builder keeps a **detached recipe** and now owns local keyframes and
+  expressions for generator and filter parameters. `◇`/`ƒ` write into the
+  recipe; Apply and Insert carry the automation into the clip. The expression
+  dialog accepts a transient context/commit, so it never touches the show
+  until the user applies.
+- [x] Colour parameters keyframe as swatches; filter parameters use
+  `filter:<uid>:<param>`; removing a filter drops its automation.
+- [x] Saved looks are listed in the rail and load with one click. Save Look
+  stores preset + params + mask + filters (looks intentionally exclude
+  automation).
+- [x] Preview is clip-local (transport shows 0..clip duration) but renders at
+  the show time, so blueprint envelopes, sections and beat values match the
+  clip's real position. `_render` now takes an explicit `local_t` for params
+  and filters.
+- [x] Preview cap raised to 320×180. `mirror_symmetry` uses an exact O(n)
+  mirror mapping on the regular front grid instead of an O(n²) nearest search;
+  a filtered clip dropped from **7.3 s to 9 ms** per frame. Preview requests
+  are queued instead of dropped while one is in flight.
+- Tests: `tests/test_studio_fxpreview.py` covers the mirror mapping against
+  brute force and the full editor resolution. Full suite: **179 passed, 6
+  subtests**; the 9 JS cases stay green.
+- [x] Headless Chromium: opened the builder on a clip, added Bloom, switched to
+  the mask module, set a colour keyframe, committed a local expression, saved
+  and loaded a look, applied to the clip and inserted a new clip with mask +
+  expression. No console or page errors.
+
 ## Decisions already made
 
 - Coordinates metres, Z up. Room defaults to `[6.5, 8.0, 5.1]` only in the
@@ -467,6 +499,17 @@ systems) is intentionally separate.
   removes existing tracks, and leaves every generated clip editable.
 - Colour keyframe lanes interpolate in sRGB for the editor strip; the
   compositor continues to interpolate colour keyframes in Oklab.
+- The Effect Builder edits a detached recipe. Its keyframes/expressions are
+  builder-local and only reach the show through Apply or Insert; Save Look
+  stores the visual recipe without automation.
+- Builder preview transport is clip-local, but the render uses the clip's show
+  time so envelopes and sections match. `render_clip_rgb` passes `t` (show) and
+  `local_t` (clip) separately.
+- Editor previews render at up to 320×180. The front grid uses an exact mirror
+  index map for `mirror_symmetry`; do not reintroduce an O(n²) nearest search
+  in the preview path.
+- P3's multi-generator/colour/transform pipeline is engine work; the current
+  pipeline is Generator → Mask → Filter chain, with filters reorderable.
 - User looks are global runtime data in `config/user-presets.json`, not show
   data. They store preset + params + mask + filter stack, not timing.
 - Analysis mode is a scope over the same `envelopeAt()` values as expressions;
@@ -510,16 +553,26 @@ curl -s localhost:8090/mcp -H 'Content-Type: application/json' \
 
 ## Next session start point
 
-Phase 2 (slices 2.1–2.5), P1 usability polish and P2 slices 1–2 are complete.
-Read `docs/PROGRESS.md`, `docs/TODO.md`, `docs/effectcraft-analysis.md`,
-`docs/ui-system.md` and `docs/studio-server.md` first.
+Phase 2 (slices 2.1–2.5), P1 usability polish, P2 slices 1–2 and P3 slice 1
+are complete. Read `docs/PROGRESS.md`, `docs/TODO.md`,
+`docs/effectcraft-analysis.md`, `docs/ui-system.md` and
+`docs/studio-server.md` first.
 
 The next board in `docs/TODO.md`: section 1 visual hierarchy; section 2 layer
-hierarchy, palette/gradient keyframes and easing; section 3 the modular FX
-pipeline; section 4 audio/emitter expressions and event triggers; section 5
+hierarchy, palette/gradient keyframes and easing; section 3 the multi-generator
+FX pipeline (P3 slice 1 replaced the dialog, the engine still renders one
+generator); section 4 audio/emitter expressions and event triggers; section 5
 targets, group HW output, start hub and `/live`. The renderer memory spike still
 needs a long-run soak against the production host; the server's preview cache is
 capped.
+
+Completed in P3 slice 1:
+
+- New Effect Builder module rack with pipeline rail, contextual inspector,
+  saved looks, clip-local transport and 320×180 preview.
+- Builder-local keyframes/expressions that travel with Apply/Insert.
+- `mirror_symmetry` preview mapping fixed (7.3 s → 9 ms) and `local_t` plumbing
+  for musically correct previews.
 
 Completed in P2 slice 2:
 
